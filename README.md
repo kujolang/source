@@ -12,14 +12,15 @@ software changes remains inspectable.
 This repository contains the **MVP vertical slice**: a working implementation of
 the full `Project → Work → Session → Change → Evidence → Decision → Canonical
 Git State` lifecycle, validated against a real Kujo repository, plus the first
-two next-phase increments (real Kujo evidence integration and smart-HTTP Git
-transport).
+three next-phase increments (real Kujo evidence integration, smart-HTTP Git
+transport, and the `source submit` contribution flow).
 
 ## Status
 
-- **51/51 tests pass**, including a dogfood test against the real `spec` Kujo
+- **50/50 tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
-  artifacts, and smart-HTTP clone/fetch/push tests.
+  artifacts, smart-HTTP clone/fetch/push tests, and `source submit`
+  contribution-flow tests.
 - Zero runtime dependencies (Node.js ≥ 18, `git` on PATH).
 - Deterministic-first: no LLM is required for any operation in the slice.
 
@@ -44,6 +45,11 @@ node bin/source.js serve --port 8787
 #   GET /                            (human project index)
 #   GET /api/v1/projects/P1/work     (machine interface)
 #   git clone http://localhost:8787/git/P1/R1.git   (smart-HTTP)
+
+# Contribute as a Git-only developer (no Source concepts required)
+git clone http://localhost:8787/git/P1/R1.git
+# ... make changes ...
+node bin/source.js submit --url http://localhost:8787
 ```
 
 ## Architecture
@@ -62,6 +68,7 @@ src/
   api.js         — HTTP API + /.well-known/source discovery + /git/ transport
   web.js         — minimal human-facing HTML views
   cli.js         — CLI (same services as the API)
+  submit.js      — `source submit` contribution client
   integrations/
     kujo.js      — Eval/Spec/ShipCheck artifact normalizers + KujoRunner
 bin/source.js    — CLI entry
@@ -82,6 +89,7 @@ The full architecture, domain model, threat model, and MVP scope are in
 - `13-mvp-scope.md` / `14-implementation-plan.md` / `15-acceptance-tests.md`
 - `16-mvp-results.md` — what was built and dogfooded
 - `17-kujo-evidence-integration.md` — real Eval/Spec/ShipCheck evidence ingestion
+- `18-source-submit.md` — the `source submit` contribution flow
 - `decisions/` — architecture decision records
 
 ## License

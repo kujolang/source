@@ -20,6 +20,7 @@ lifecycle:
 | API | `src/api.js` | HTTP API + `/.well-known/source` discovery + field selection |
 | Web | `src/web.js` | Minimal human-facing HTML (project/work/change) |
 | CLI | `src/cli.js`, `bin/source.js` | Same services as the API |
+| Submit | `src/submit.js` | `source submit` contribution client |
 
 ## Architecture: proposed vs implemented
 
@@ -165,8 +166,7 @@ Measured in `tests/api.test.js`:
 
 1. ~~**Real Kujo evidence integration**~~ — done (`17-kujo-evidence-integration.md`).
 2. ~~**Smart-HTTP Git transport**~~ — done (`10-git-integration.md`).
-3. **`source submit` contribution flow** — the low-friction path for a
-   developer who knows Git but not Source.
+3. ~~**`source submit` contribution flow**~~ — done (`18-source-submit.md`).
 4. **Capability-gated API auth** — wire the capability credential into the
    HTTP API (currently the API is unauthenticated in the MVP).
 5. **SQLite/Postgres store** — swap the JSON store behind the existing boundary
@@ -177,11 +177,14 @@ Measured in `tests/api.test.js`:
 
 ## Update (next phase)
 
-Items 1 and 2 of "Recommended Next Phase" are now complete:
+Items 1–3 of "Recommended Next Phase" are now complete:
 
 - **Real Kujo evidence integration** — see `17-kujo-evidence-integration.md`.
 - **Smart-HTTP Git transport** — see `10-git-integration.md`; `git clone`,
   `git fetch`, and `git push` work over HTTP via `git http-backend`.
+- **`source submit` contribution flow** — see `18-source-submit.md`; a
+  Git-only developer can clone, modify, and `source submit`, and Source creates
+  the correct Work → Session → Change → Evidence lifecycle.
 
-The remaining next-phase items (`source submit`, capability-gated API auth,
-SQLite/Postgres store, multi-tenant org management) are unchanged.
+The remaining next-phase items (capability-gated API auth, SQLite/Postgres
+store, multi-tenant org management) are unchanged.

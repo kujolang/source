@@ -100,6 +100,7 @@ export function createServer(src, { port = 8787 } = {}) {
             evidence: '/api/v1/projects/{project}/evidence',
             git: '/git/{project}/{repo}.git',
             policy: '/api/v1/projects/{project}/policy',
+            submit: '/api/v1/projects/{project}/submit',
           },
           capabilities: ['read_source', 'read_context', 'submit_change', 'submit_evidence'],
           auth: ['capability'],
@@ -163,6 +164,15 @@ export function createServer(src, { port = 8787 } = {}) {
 
         if (rest === '/work' && req.method === 'GET') {
           return json(res, 200, selectFields(src.listWork(ORG, projectId), fields));
+        }
+
+        // Contribution flow: a Git-only developer submits a change from a
+        // working clone. Source creates the Work → Session → Change → Evidence
+        // lifecycle server-side.
+        if (rest === '/submit' && req.method === 'POST') {
+          const body = await readBody(req);
+          const r = src.submitContribution({ orgId: ORG, projectId, ...body });
+          return json(res, 201, r);
         }
 
         const workMatch = rest.match(/^\/work\/([^/]+)(\/.*)?$/);

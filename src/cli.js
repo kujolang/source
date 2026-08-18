@@ -2,6 +2,10 @@
 //
 // A thin client over the application service. The CLI uses the same domain
 // services as the API; no business logic lives only in the CLI.
+//
+// `source submit` is the exception: it is a *client* command that runs inside a
+// contributor's working clone and talks to a remote Source instance over HTTP
+// (see `submit.js`). All other commands operate on the local data root.
 
 import { Source } from './source.js';
 
@@ -22,7 +26,7 @@ function printText(lines) {
   process.stdout.write(lines.join('\n') + '\n');
 }
 
-export function run(argv) {
+export async function run(argv) {
   const [cmd, sub, ...rest] = argv;
   const src = new Source(dataRoot());
 
@@ -206,6 +210,18 @@ export function run(argv) {
           .catch((e) => fail(e.message));
         return;
       }
+      case 'submit': {
+        // Client command: run inside a working clone, talk to the remote Source
+        // instance over HTTP. See src/submit.js.
+        const { submitFromWorkingDir } = await import('./submit.js');
+        const result = await submitFromWorkingDir({
+          cwd: flag('--cwd') || process.cwd(),
+          intent: flag('--intent') || '',
+          baseUrl: flag('--url') || null,
+        });
+        print(result);
+        return;
+      }
       case 'principal': {
         if (sub === 'create') {
           print(src.createPrincipal({ type: flag('--type') || 'human', name: flag('--name') || 'human' }));
@@ -235,6 +251,7 @@ export function run(argv) {
           '  policy show --org <o> --project <p>',
           '  audit',
           '  serve --port <n>',
+          '  submit [--intent <s>] [--url <base>] [--cwd <dir>]',
           '',
           'Env: SOURCE_DATA (default .source)',
         ]);

@@ -458,6 +458,65 @@ export class Source {
     return result;
   }
 
+  // --- contribution flow -------------------------------------------------
+  // The low-friction path for a developer who knows Git but not Source:
+  // clone → modify → `source submit`. Creates contribution Work, a Session, a
+  // Change against the exact base state, deterministic footprint evidence, and
+  // evaluates policy. Returns the full lifecycle for inspection.
+  submitContribution({ orgId, projectId, repoRef, baseCommit, headCommit, intent = '', contributorName = 'contributor' }) {
+    const repo = this.resolveRepository(orgId, projectId, repoRef);
+    if (!repo) throw new Error(`repository not found: ${repoRef}`);
+    const git = this.gitRepo(orgId, projectId, repo.id);
+    if (!git.hasCommit(headCommit)) throw new Error('head commit not present in repository');
+    if (baseCommit && !git.hasCommit(baseCommit)) throw new Error('base commit not present in repository');
+    if (baseCommit === headCommit) throw new Error('no changes to submit (base == head)');
+
+    // Contributor identity: a human principal (no auth in the MVP).
+    const principal = this.createPrincipal({ type: 'human', name: contributorName });
+
+    // Contribution Work → claim → Session → Change.
+    const work = this.createWork({
+      orgId,
+      projectId,
+      intent: intent || `Contribution to ${repo.name}`,
+      type: 'contribution',
+      requester: principal.id,
+    });
+    this.claimWork({ orgId, projectId, workId: work.id, principalId: principal.id });
+    const session = this.startSession({ orgId, projectId, workId: work.id, principalId: principal.id, baseCommit });
+    const change = this.submitChange({ orgId, projectId, workId: work.id, sessionId: session.id, baseCommit, headCommit, repositories: [repo.id] });
+
+    // Deterministic footprint evidence (always available, no LLM, no test suite).
+    const changed = git.changedFiles(baseCommit, headCommit);
+    const nonEmpty = changed.length > 0;
+    const footprint = this.addEvidence({
+      orgId,
+      projectId,
+      changeId: change.id,
+      subject: 'change footprint',
+      claim: 'change is non-empty',
+      type: 'test',
+      producer: principal.id,
+      artifact: JSON.stringify({ changedFiles: changed, nonEmpty }),
+      result: { status: nonEmpty ? 'pass' : 'fail' },
+      validity: nonEmpty ? 'valid' : 'invalid',
+    });
+
+    // Evaluate policy. The footprint evidence is real but does not satisfy the
+    // project's full required evidence (tests/eval); the maintainer's
+    // verification service fills those. Missing evidence is visible here.
+    const evaluation = this.evaluateChange({ orgId, projectId, changeId: change.id });
+
+    return {
+      work,
+      session,
+      change,
+      evidence: footprint,
+      evaluation: evaluation.evaluation,
+      interpretation: evaluation.interpretation,
+    };
+  }
+
   // --- audit ------------------------------------------------------------
   readAudit() {
     return this.store.readAudit();
