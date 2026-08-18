@@ -27,9 +27,11 @@ import { nextId } from './ids.js';
 import { normalizeEvalSummary, normalizeEvalManifest, normalizeEvalRun, readEvalArtifacts } from './integrations/kujo.js';
 
 export class Source {
-  constructor(dataRoot) {
+  // `store` is optional; defaults to the JSON-file store. Pass a SqliteStore
+  // (see sqlite-store.js) for ACID transactions across records.
+  constructor(dataRoot, { store } = {}) {
     this.dataRoot = dataRoot;
-    this.store = new Store(dataRoot);
+    this.store = store ?? new Store(dataRoot);
     this.capabilities = new CapabilityService(this.store);
   }
 
@@ -83,8 +85,10 @@ export class Source {
     const id = nextId(this.store, 'project');
     const project = createProject({ id, slug, name, description, visibility, ownerOrg: orgId });
     const rel = this._projectRel(orgId, id);
-    this.store.writeJson(`${rel}/project.json`, project);
-    this.store.writeJson(`${rel}/policy.json`, defaultPolicy());
+    this.store.transaction(() => {
+      this.store.writeJson(`${rel}/project.json`, project);
+      this.store.writeJson(`${rel}/policy.json`, defaultPolicy());
+    });
     this.store.audit({ event: 'project.create', orgId, projectId: id, name });
     return project;
   }
@@ -121,8 +125,10 @@ export class Source {
     git.init(defaultBranch);
     git.enableReceivePack();
     project.repositories.push(id);
-    this.store.writeJson(`${this._projectRel(orgId, projectId)}/project.json`, project);
-    this.store.writeJson(`${this._projectRel(orgId, projectId)}/repos/${id}.json`, repo);
+    this.store.transaction(() => {
+      this.store.writeJson(`${this._projectRel(orgId, projectId)}/project.json`, project);
+      this.store.writeJson(`${this._projectRel(orgId, projectId)}/repos/${id}.json`, repo);
+    });
     this.store.audit({ event: 'repository.create', orgId, projectId, repoId: id, name });
     return repo;
   }
@@ -230,9 +236,11 @@ export class Source {
     transitionWork(work, 'in_progress');
     const id = nextId(this.store, 'session');
     const session = createSession({ id, workId, principal: principalId, environment, baseCommit });
-    this.store.writeJson(`${this._projectRel(orgId, projectId)}/sessions/${id}.json`, session);
     work.sessions.push(id);
-    this._saveWork(orgId, projectId, work);
+    this.store.transaction(() => {
+      this.store.writeJson(`${this._projectRel(orgId, projectId)}/sessions/${id}.json`, session);
+      this._saveWork(orgId, projectId, work);
+    });
     this.store.audit({ event: 'session.start', orgId, projectId, workId, sessionId: id, principalId });
     return session;
   }
@@ -258,14 +266,14 @@ export class Source {
     transitionWork(work, 'submitted');
     const id = nextId(this.store, 'change');
     const change = createChange({ id, workId, sessionId, baseCommit, headCommit, repositories });
-    this.store.writeJson(`${this._projectRel(orgId, projectId)}/changes/${id}.json`, change);
     work.changes.push(id);
-    this._saveWork(orgId, projectId, work);
     const session = this.getSession(orgId, projectId, sessionId);
-    if (session) {
-      session.changes.push(id);
-      this.store.writeJson(`${this._projectRel(orgId, projectId)}/sessions/${sessionId}.json`, session);
-    }
+    if (session) session.changes.push(id);
+    this.store.transaction(() => {
+      this.store.writeJson(`${this._projectRel(orgId, projectId)}/changes/${id}.json`, change);
+      this._saveWork(orgId, projectId, work);
+      if (session) this.store.writeJson(`${this._projectRel(orgId, projectId)}/sessions/${sessionId}.json`, session);
+    });
     this.store.audit({ event: 'change.submit', orgId, projectId, workId, changeId: id, baseCommit, headCommit });
     return change;
   }
@@ -294,9 +302,11 @@ export class Source {
       artifactRef = this.store.putArtifact(bytes);
     }
     const evidence = createEvidence({ id, subject, claim, type, producer, artifactRef, result, provenance, environment, sourceRevision, validity });
-    this.store.writeJson(`${this._projectRel(orgId, projectId)}/evidence/${id}.json`, evidence);
     change.evidence.push(id);
-    this._saveChange(orgId, projectId, change);
+    this.store.transaction(() => {
+      this.store.writeJson(`${this._projectRel(orgId, projectId)}/evidence/${id}.json`, evidence);
+      this._saveChange(orgId, projectId, change);
+    });
     this.store.audit({ event: 'evidence.add', orgId, projectId, changeId, evidenceId: id, type, claim, validity });
     return evidence;
   }
@@ -413,7 +423,6 @@ export class Source {
       reasoning,
       sourceState: change.headCommit,
     });
-    this.store.writeJson(`${this._projectRel(orgId, projectId)}/decisions/${id}.json`, decisionRecord);
 
     // A Decision may be made directly (without a prior evaluate step); ensure
     // the Change has entered review before recording the terminal state.
@@ -424,7 +433,6 @@ export class Source {
     if (decision === 'accepted') transitionChange(change, 'approved');
     else if (decision === 'rejected') transitionChange(change, 'rejected');
     else if (decision === 'revision_requested') transitionChange(change, 'changes_requested');
-    this._saveChange(orgId, projectId, change);
 
     const work = this.getWork(orgId, projectId, change.workId);
     if (work) {
@@ -436,8 +444,14 @@ export class Source {
       if (decision === 'accepted') transitionWork(work, 'accepted');
       else if (decision === 'rejected') transitionWork(work, 'rejected');
       else if (decision === 'revision_requested') transitionWork(work, 'revision_requested');
-      this._saveWork(orgId, projectId, work);
     }
+
+    // The Decision, Change, and Work records are written atomically.
+    this.store.transaction(() => {
+      this.store.writeJson(`${this._projectRel(orgId, projectId)}/decisions/${id}.json`, decisionRecord);
+      this._saveChange(orgId, projectId, change);
+      if (work) this._saveWork(orgId, projectId, work);
+    });
 
     this.store.audit({ event: 'decision.make', orgId, projectId, changeId, decisionId: id, decision, decider });
     return decisionRecord;

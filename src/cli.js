@@ -28,7 +28,6 @@ function printText(lines) {
 
 export async function run(argv) {
   const [cmd, sub, ...rest] = argv;
-  const src = new Source(dataRoot());
 
   // Flags may appear after the command (with or without a subcommand), so
   // search everything after `cmd`.
@@ -38,6 +37,17 @@ export async function run(argv) {
     return i >= 0 ? all[i + 1] : undefined;
   };
   const hasFlag = (name) => all.includes(name);
+
+  // Select the store backend: --store sqlite|json, or SOURCE_STORE env var.
+  // SQLite requires Node >= 22.5 (node:sqlite); JSON is the default.
+  const backend = flag('--store') || process.env.SOURCE_STORE || 'json';
+  let src;
+  if (backend === 'sqlite') {
+    const { SqliteStore } = await import('./sqlite-store.js');
+    src = new Source(dataRoot(), { store: new SqliteStore(dataRoot()) });
+  } else {
+    src = new Source(dataRoot());
+  }
 
   try {
     switch (cmd) {
@@ -276,7 +286,8 @@ export async function run(argv) {
           '  serve --port <n>',
           '  submit [--intent <s>] [--url <base>] [--cwd <dir>]',
           '',
-          'Env: SOURCE_DATA (default .source)',
+          'Env: SOURCE_DATA (default .source), SOURCE_STORE (json|sqlite)',
+          'Flags: --store json|sqlite (select the storage backend)',
         ]);
         return;
       }

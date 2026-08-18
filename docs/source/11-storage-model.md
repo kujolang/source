@@ -4,7 +4,7 @@ Status: **Implementation hypothesis (swappable) + evidence-backed immutability.*
 
 ## Layout
 
-```
+```text
 data/
   instances/<instance-id>/
     instance.json
@@ -31,7 +31,9 @@ data/
    rename). Matches the Kujo ecosystem's "plain JSON, inspectable" philosophy
    and needs zero dependencies. This is an **implementation hypothesis**:
    swappable for SQLite/Postgres behind the `storage` boundary without
-   changing the domain model.
+   changing the domain model. **A SQLite backend now exists** (`sqlite-store.js`,
+   `node:sqlite`) providing ACID transactions across records; see
+   `20-sqlite-store.md`.
 
 2. **Content-addressed artifacts.** Evidence artifacts are stored by SHA-256
    and are immutable. Re-ingesting identical bytes yields the same path.
@@ -63,10 +65,13 @@ data/
 | Critical evidence artifacts | proof content gone | backup `artifacts/` |
 
 Backup = copy the `data/` tree (bare repos + JSON + artifacts). Full automated
-backup is outside MVP but the requirement is documented here.
+backup is outside MVP but the requirement is documented here. (With the SQLite
+backend, the domain records/artifacts/audit live in `source.sqlite`; the bare
+repos remain on the filesystem.)
 
 ## Cross-references
 
 - `03-system-architecture.md` — storage boundary.
 - `07-evidence-model.md` — artifact integrity.
 - `12-threat-model.md` — tampered artifacts.
+- `20-sqlite-store.md` — the SQLite backend and transactions.

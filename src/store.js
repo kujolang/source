@@ -6,6 +6,9 @@
 // Synchronous fs is used deliberately: the MVP is a single-process modular
 // monolith whose Git operations are already synchronous (execFileSync), so a
 // synchronous store keeps the whole service simple and race-free per record.
+//
+// This is the default backend. `sqlite-store.js` provides the same interface
+// with ACID transactions; see `docs/source/20-sqlite-store.md`.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -107,5 +110,13 @@ export class Store {
       if (e.code === 'ENOENT') return [];
       throw e;
     }
+  }
+
+  // --- transactions -----------------------------------------------------
+  // The JSON store has no cross-record transactions; this is a no-op wrapper
+  // that keeps the interface uniform with SqliteStore. Documented limitation:
+  // multi-record writes are not atomic on this backend.
+  transaction(fn) {
+    return fn();
   }
 }

@@ -25,3 +25,11 @@ JSON files on disk with atomic writes, behind a `storage` boundary.
 
 The `storage` boundary exposes `get/put/list/append`; swapping to SQLite or
 Postgres does not change the domain model or on-disk JSON shape.
+
+## Update (validated)
+
+This hypothesis was validated in the next phase: a zero-dependency SQLite
+backend (`node:sqlite`) now implements the same interface and adds ACID
+transactions across records, selected via `--store sqlite`. The domain model
+and logical record paths are unchanged — the swap happened entirely behind the
+boundary. See `20-sqlite-store.md`.

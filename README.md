@@ -12,17 +12,19 @@ software changes remains inspectable.
 This repository contains the **MVP vertical slice**: a working implementation of
 the full `Project → Work → Session → Change → Evidence → Decision → Canonical
 Git State` lifecycle, validated against a real Kujo repository, plus the first
-four next-phase increments (real Kujo evidence integration, smart-HTTP Git
-transport, the `source submit` contribution flow, and capability-gated API
-auth).
+five next-phase increments (real Kujo evidence integration, smart-HTTP Git
+transport, the `source submit` contribution flow, capability-gated API auth,
+and a SQLite store backend).
 
 ## Status
 
-- **60/60 tests pass**, including a dogfood test against the real `spec` Kujo
+- **68/68 tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests, `source submit`
-  contribution-flow tests, and capability-gated API auth tests.
-- Zero runtime dependencies (Node.js ≥ 18, `git` on PATH).
+  contribution-flow tests, capability-gated API auth tests, and SQLite store
+  transaction/contract tests.
+- Zero runtime dependencies (Node.js ≥ 18, `git` on PATH). The SQLite backend
+  requires Node ≥ 22.5 (`node:sqlite`); the JSON store works on Node ≥ 18.
 - Deterministic-first: no LLM is required for any operation in the slice.
 
 ## Quick start
@@ -62,6 +64,17 @@ The machine interface (`/api/v1/…`) is capability-gated: send
 `Authorization: Bearer <credential>` on every request. See
 `docs/source/19-capability-auth.md`.
 
+### Storage backend
+
+The default store is JSON files on disk. Select the SQLite backend (ACID
+transactions across records) with `--store sqlite` or `SOURCE_STORE=sqlite`:
+
+```bash
+node bin/source.js --store sqlite init --name source.kujolang.ai
+```
+
+See `docs/source/20-sqlite-store.md`.
+
 ## Architecture
 
 A **modular monolith** in Node.js (ESM), zero dependencies:
@@ -71,6 +84,7 @@ src/
   domain.js      — object model + lifecycle state machines (pure)
   source.js      — application service (wires store/git/policy/capability)
   store.js       — JSON-file store, content-addressed artifacts, audit log
+  sqlite-store.js— SQLite store (node:sqlite), ACID transactions
   git.js         — bare-repo storage, clone/fetch/push, fast-forward guard
   git-http.js    — smart-HTTP transport via `git http-backend`
   policy.js      — deterministic required-evidence evaluation
@@ -102,6 +116,7 @@ The full architecture, domain model, threat model, and MVP scope are in
 - `17-kujo-evidence-integration.md` — real Eval/Spec/ShipCheck evidence ingestion
 - `18-source-submit.md` — the `source submit` contribution flow
 - `19-capability-auth.md` — capability-gated API auth
+- `20-sqlite-store.md` — the SQLite store backend and transactions
 - `decisions/` — architecture decision records
 
 ## License
