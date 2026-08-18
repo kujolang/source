@@ -123,7 +123,7 @@ export function createChange({ id, workId, sessionId, baseCommit, headCommit, re
   };
 }
 
-export function createEvidence({ id, subject, claim, type, producer, artifactRef = null, result = null, provenance = {}, environment = {}, sourceRevision = null }) {
+export function createEvidence({ id, subject, claim, type, producer, artifactRef = null, result = null, provenance = {}, environment = {}, sourceRevision = null, validity = 'valid' }) {
   return {
     id,
     subject,
@@ -135,7 +135,7 @@ export function createEvidence({ id, subject, claim, type, producer, artifactRef
     provenance,
     environment,
     sourceRevision,
-    validity: 'valid',
+    validity,
     expiresAt: null,
     relationships: [],
     integrity: artifactRef ? artifactRef.hash : null,

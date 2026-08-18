@@ -1,0 +1,1 @@
+{"metadata":{"source_file":"specs/dark-mode.spec.yml","schema_version":"1.0.0","checksum_sha256":"abc123def456","generated_at":"2026-01-01T00:00:00Z","payload_format":"dispatch"},"payload":{"name":"Add dark mode","goal":"Add a theme toggle and persist the selected color scheme."}}

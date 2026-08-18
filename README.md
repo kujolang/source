@@ -11,12 +11,14 @@ software changes remains inspectable.
 
 This repository contains the **MVP vertical slice**: a working implementation of
 the full `Project → Work → Session → Change → Evidence → Decision → Canonical
-Git State` lifecycle, validated against a real Kujo repository.
+Git State` lifecycle, validated against a real Kujo repository, plus the first
+next-phase increment (real Kujo evidence integration).
 
 ## Status
 
-- **29/29 tests pass**, including a dogfood test against the real `spec` Kujo
-  repository.
+- **41/41 tests pass**, including a dogfood test against the real `spec` Kujo
+  repository and Kujo evidence-integration tests against real Eval/Spec/ShipCheck
+  artifacts.
 - Zero runtime dependencies (Node.js ≥ 18, `git` on PATH).
 - Deterministic-first: no LLM is required for any operation in the slice.
 
@@ -57,6 +59,8 @@ src/
   api.js         — HTTP API + /.well-known/source discovery
   web.js         — minimal human-facing HTML views
   cli.js         — CLI (same services as the API)
+  integrations/
+    kujo.js      — Eval/Spec/ShipCheck artifact normalizers + KujoRunner
 bin/source.js    — CLI entry
 ```
 
@@ -74,6 +78,7 @@ The full architecture, domain model, threat model, and MVP scope are in
 - `10-git-integration.md` / `11-storage-model.md` / `12-threat-model.md`
 - `13-mvp-scope.md` / `14-implementation-plan.md` / `15-acceptance-tests.md`
 - `16-mvp-results.md` — what was built and dogfooded
+- `17-kujo-evidence-integration.md` — real Eval/Spec/ShipCheck evidence ingestion
 - `decisions/` — architecture decision records
 
 ## License

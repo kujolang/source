@@ -24,6 +24,7 @@ import {
 } from './domain.js';
 import { defaultPolicy, evaluateEvidence, interpret, canApprove } from './policy.js';
 import { nextId } from './ids.js';
+import { normalizeEvalSummary, normalizeEvalManifest, normalizeEvalRun, readEvalArtifacts } from './integrations/kujo.js';
 
 export class Source {
   constructor(dataRoot) {
@@ -250,7 +251,7 @@ export class Source {
   }
 
   // --- evidence ---------------------------------------------------------
-  addEvidence({ orgId, projectId, changeId, subject, claim, type, producer, artifact = null, result = null, provenance = {}, environment = {}, sourceRevision = null }) {
+  addEvidence({ orgId, projectId, changeId, subject, claim, type, producer, artifact = null, result = null, provenance = {}, environment = {}, sourceRevision = null, validity = 'valid' }) {
     const change = this.getChange(orgId, projectId, changeId);
     if (!change) throw new Error(`change not found: ${changeId}`);
     const id = nextId(this.store, 'evidence');
@@ -259,11 +260,11 @@ export class Source {
       const bytes = Buffer.isBuffer(artifact) ? artifact : Buffer.from(String(artifact), 'utf8');
       artifactRef = this.store.putArtifact(bytes);
     }
-    const evidence = createEvidence({ id, subject, claim, type, producer, artifactRef, result, provenance, environment, sourceRevision });
+    const evidence = createEvidence({ id, subject, claim, type, producer, artifactRef, result, provenance, environment, sourceRevision, validity });
     this.store.writeJson(`${this._projectRel(orgId, projectId)}/evidence/${id}.json`, evidence);
     change.evidence.push(id);
     this._saveChange(orgId, projectId, change);
-    this.store.audit({ event: 'evidence.add', orgId, projectId, changeId, evidenceId: id, type, claim });
+    this.store.audit({ event: 'evidence.add', orgId, projectId, changeId, evidenceId: id, type, claim, validity });
     return evidence;
   }
 
@@ -278,6 +279,46 @@ export class Source {
 
   getArtifact(hash) {
     return this.store.getArtifact(hash);
+  }
+
+  // Ingest a normalized Evidence descriptor (from a Kujo adapter or any other
+  // producer) plus its original artifact. The descriptor carries subject, claim,
+  // type, result, provenance, and validity; the artifact is preserved verbatim.
+  ingestEvidence({ orgId, projectId, changeId, producer, descriptor, artifact = null }) {
+    return this.addEvidence({
+      orgId,
+      projectId,
+      changeId,
+      subject: descriptor.subject,
+      claim: descriptor.claim,
+      type: descriptor.type,
+      producer,
+      artifact,
+      result: descriptor.result,
+      provenance: descriptor.provenance,
+      environment: descriptor.environment ?? {},
+      sourceRevision: descriptor.sourceRevision ?? null,
+      validity: descriptor.validity ?? 'valid',
+    });
+  }
+
+  // Ingest a Kujo Eval output directory as first-class Evidence. Reads
+  // summary.json, artifact-manifest.json, and last_run.json, normalizes each,
+  // and preserves the original artifacts content-addressed. Returns the list of
+  // created Evidence records.
+  ingestEvalEvidence({ orgId, projectId, changeId, producer, artifactsDir }) {
+    const a = readEvalArtifacts(artifactsDir);
+    const out = [];
+    if (a.summary) {
+      out.push(this.ingestEvidence({ orgId, projectId, changeId, producer, descriptor: normalizeEvalSummary(a.summary), artifact: a.summaryRaw }));
+    }
+    if (a.manifest) {
+      out.push(this.ingestEvidence({ orgId, projectId, changeId, producer, descriptor: normalizeEvalManifest(a.manifest), artifact: a.manifestRaw }));
+    }
+    if (a.lastRun) {
+      out.push(this.ingestEvidence({ orgId, projectId, changeId, producer, descriptor: normalizeEvalRun(a.lastRun), artifact: a.lastRunRaw }));
+    }
+    return out;
   }
 
   // --- policy -----------------------------------------------------------

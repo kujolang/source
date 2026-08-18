@@ -1,0 +1,1 @@
+{"tool":"shipcheck","version":"1.0.0","dir":"../spec","project_type":"kujo","summary":{"total_checks":16,"passed":16,"failed_errors":0,"warnings":0,"gate_passed":1},"checks":[{"name":"readme-present","passed":1,"severity":"error","message":"README present","detail":"README.md exists"}]}

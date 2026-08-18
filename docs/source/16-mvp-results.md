@@ -169,3 +169,12 @@ Measured in `tests/api.test.js`:
 5. **SQLite/Postgres store** — swap the JSON store behind the existing boundary
    for transactional integrity.
 6. **Multi-tenant org management** — the boundary exists; add the UI/API.
+
+---
+
+## Update (next phase)
+
+Item 1 of "Recommended Next Phase" — **real Kujo evidence integration** — is
+now complete. See `17-kujo-evidence-integration.md`. The remaining next-phase
+items (smart-HTTP transport, `source submit`, capability-gated API auth,
+SQLite/Postgres store, multi-tenant org management) are unchanged.
