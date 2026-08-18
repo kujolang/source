@@ -1,0 +1,53 @@
+import { test } from 'node:test';
+import assert from 'node:assert';
+import { freshSource } from './helpers.js';
+
+test('project can contain a repository', () => {
+  const { src, org, project } = freshSource();
+  const repo = src.createRepository({ orgId: org.id, projectId: project.id, name: 'main' });
+  const p = src.getProject(org.id, project.id);
+  assert.ok(p.repositories.includes(repo.id));
+});
+
+test('work can be created, claimed, and assigned', () => {
+  const { src, org, project, agent } = freshSource();
+  const w = src.createWork({ orgId: org.id, projectId: project.id, intent: 'fix parser regression', requester: 'U1' });
+  assert.equal(w.status, 'open');
+  const claimed = src.claimWork({ orgId: org.id, projectId: project.id, workId: w.id, principalId: agent.id });
+  assert.equal(claimed.status, 'claimed');
+  assert.equal(claimed.assignee, agent.id);
+});
+
+test('a session can be started and completed', () => {
+  const { src, org, project, agent } = freshSource();
+  const w = src.createWork({ orgId: org.id, projectId: project.id, intent: 'implement API', requester: 'U1' });
+  src.claimWork({ orgId: org.id, projectId: project.id, workId: w.id, principalId: agent.id });
+  const s = src.startSession({ orgId: org.id, projectId: project.id, workId: w.id, principalId: agent.id, baseCommit: 'abc' });
+  assert.equal(s.workId, w.id);
+  assert.equal(s.principal, agent.id);
+  const done = src.completeSession({ orgId: org.id, projectId: project.id, sessionId: s.id, result: 'pass' });
+  assert.equal(done.result, 'pass');
+  assert.ok(done.endedAt);
+});
+
+test('a change can be submitted and is tied to an exact base state', () => {
+  const { src, org, project, agent } = freshSource();
+  const w = src.createWork({ orgId: org.id, projectId: project.id, intent: 'change', requester: 'U1' });
+  src.claimWork({ orgId: org.id, projectId: project.id, workId: w.id, principalId: agent.id });
+  const s = src.startSession({ orgId: org.id, projectId: project.id, workId: w.id, principalId: agent.id, baseCommit: 'base123' });
+  const c = src.submitChange({ orgId: org.id, projectId: project.id, workId: w.id, sessionId: s.id, baseCommit: 'base123', headCommit: 'head456' });
+  assert.equal(c.baseCommit, 'base123');
+  assert.equal(c.headCommit, 'head456');
+  assert.equal(c.workId, w.id);
+  assert.equal(c.sessionId, s.id);
+  const work = src.getWork(org.id, project.id, w.id);
+  assert.equal(work.status, 'submitted');
+  assert.ok(work.changes.includes(c.id));
+});
+
+test('invalid work transitions are rejected', () => {
+  const { src, org, project } = freshSource();
+  const w = src.createWork({ orgId: org.id, projectId: project.id, intent: 'x', requester: 'U1' });
+  // open -> in_progress is invalid (must claim first)
+  assert.throws(() => src.startSession({ orgId: org.id, projectId: project.id, workId: w.id, principalId: 'U1' }), /invalid work transition/);
+});
