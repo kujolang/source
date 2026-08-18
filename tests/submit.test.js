@@ -6,6 +6,10 @@
 // lifecycle. Also proves the contribution can be completed end-to-end by a
 // maintainer, and that empty changes are rejected.
 //
+// The contribution flow uses a public repository (anonymous clone) plus a
+// `git_push` capability credential for the push. The developer needs a git
+// credential but does not need to understand Source concepts.
+//
 // Note: the git client runs in the same process as the server, so git commands
 // must be invoked asynchronously (execFile, not execFileSync) to avoid blocking
 // the event loop that serves the HTTP requests.
@@ -41,7 +45,16 @@ async function withServer(src, fn) {
   }
 }
 
-// Clone a Source repo over HTTP, make a change, and return the working dir.
+// A public project + seeded repo + a git_push capability for the contributor.
+function publicSetup() {
+  const { src, org, human, service } = freshSource();
+  const project = src.createProject({ orgId: org.id, slug: 'public', name: 'Public', visibility: 'public' });
+  const { repo, head: seedHead } = seedRepo(src, org.id, project.id);
+  const cap = src.issueGitCapability({ orgId: org.id, projectId: project.id, principalId: human.id });
+  return { src, org, project, human, service, repo, seedHead, cap };
+}
+
+// Clone a public Source repo over HTTP, make a change, and return the working dir.
 async function cloneAndModify(base, orgId, projectId, repoName) {
   const cloneDir = mkdtempSync(path.join(tmpdir(), 'source-submit-'));
   await run(['clone', `${base}/git/${orgId}/${projectId}/${repoName}.git`, cloneDir]);
@@ -54,14 +67,13 @@ async function cloneAndModify(base, orgId, projectId, repoName) {
 }
 
 test('source submit: a Git-only developer contributes without knowing Source', async () => {
-  const { src, org, project } = freshSource();
-  const { repo, head: seedHead } = seedRepo(src, org.id, project.id);
+  const { src, org, project, repo, seedHead, cap } = publicSetup();
 
   await withServer(src, async (base) => {
     const cloneDir = await cloneAndModify(base, org.id, project.id, repo.name);
 
-    // The minimal Source-specific step.
-    const result = await submitFromWorkingDir({ cwd: cloneDir, baseUrl: base });
+    // The minimal Source-specific step (with a git_push credential for the push).
+    const result = await submitFromWorkingDir({ cwd: cloneDir, baseUrl: base, credential: cap.credential });
 
     // Source created the correct lifecycle.
     assert.ok(result.work, 'work created');
@@ -101,12 +113,11 @@ test('source submit: a Git-only developer contributes without knowing Source', a
 });
 
 test('source submit: a contribution can be completed end-to-end by a maintainer', async () => {
-  const { src, org, project, human, service } = freshSource();
-  const { repo } = seedRepo(src, org.id, project.id);
+  const { src, org, project, human, service, repo, cap } = publicSetup();
 
   await withServer(src, async (base) => {
     const cloneDir = await cloneAndModify(base, org.id, project.id, repo.name);
-    const result = await submitFromWorkingDir({ cwd: cloneDir, baseUrl: base });
+    const result = await submitFromWorkingDir({ cwd: cloneDir, baseUrl: base, credential: cap.credential });
 
     // The maintainer's verification service fills the required evidence.
     src.addEvidence({ orgId: org.id, projectId: project.id, changeId: result.change.id, subject: 'tests', claim: 'tests pass', type: 'test', producer: service.id, result: { status: 'pass' } });
@@ -133,8 +144,7 @@ test('source submit: a contribution can be completed end-to-end by a maintainer'
 });
 
 test('source submit: empty change is rejected', async () => {
-  const { src, org, project } = freshSource();
-  const { repo } = seedRepo(src, org.id, project.id);
+  const { src, org, project, repo } = publicSetup();
 
   await withServer(src, async (base) => {
     // Clone without modifying.

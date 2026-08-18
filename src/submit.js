@@ -12,6 +12,11 @@
 // submits the contribution to the Source API. Source then creates the correct
 // Work → Session → Change → Evidence lifecycle server-side.
 //
+// The push requires a `git_push` capability (Git transport is authenticated).
+// The credential is passed via `credential` (or the SOURCE_CREDENTIAL env var)
+// and sent as HTTP Basic auth. A contributor needs a credential but does not
+// need to understand Source concepts.
+//
 // All Git operations are asynchronous (execFile) so this can run in the same
 // process as a Source server during tests without blocking the event loop.
 
@@ -52,7 +57,7 @@ async function mergeBase(cwd) {
 // Submit a contribution from a working clone. Returns the Source lifecycle
 // objects created server-side: { work, session, change, evidence, evaluation,
 // interpretation }.
-export async function submitFromWorkingDir({ cwd = process.cwd(), intent = '', baseUrl = null } = {}) {
+export async function submitFromWorkingDir({ cwd = process.cwd(), intent = '', baseUrl = null, credential = null } = {}) {
   // 1. Confirm we are inside a Git working tree.
   await git(['rev-parse', '--show-toplevel'], cwd);
 
@@ -69,8 +74,15 @@ export async function submitFromWorkingDir({ cwd = process.cwd(), intent = '', b
   }
 
   // 4. Push the head commit to a contribution ref so it is present in the bare
-  //    repository (required for the later canonical-state update).
-  await git(['push', 'origin', `HEAD:refs/heads/source-submit-${head.slice(0, 8)}`], cwd);
+  //    repository (required for the later canonical-state update). The push is
+  //    authenticated with a git_push capability credential (Basic auth).
+  const cred = credential || process.env.SOURCE_CREDENTIAL || null;
+  const pushArgs = ['push', 'origin', `HEAD:refs/heads/source-submit-${head.slice(0, 8)}`];
+  if (cred) {
+    const auth = Buffer.from(`source:${cred}`).toString('base64');
+    pushArgs.unshift('-c', `http.extraHeader=Authorization: Basic ${auth}`);
+  }
+  await git(pushArgs, cwd);
 
   // 5. Contributor identity and intent (from Git, not Source concepts).
   let contributorName = 'contributor';

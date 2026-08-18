@@ -11,19 +11,19 @@ software changes remains inspectable.
 
 This repository contains the **MVP vertical slice**: a working implementation of
 the full `Project → Work → Session → Change → Evidence → Decision → Canonical
-Git State` lifecycle, validated against a real Kujo repository, plus all six
+Git State` lifecycle, validated against a real Kujo repository, plus the
 next-phase increments (real Kujo evidence integration, smart-HTTP Git transport,
 the `source submit` contribution flow, capability-gated API auth, a SQLite store
-backend, and multi-tenant org management).
+backend, multi-tenant org management, and capability-gated Git-transport auth).
 
 ## Status
 
-- **76/76 tests pass**, including a dogfood test against the real `spec` Kujo
+- **80/80 tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
-  artifacts, smart-HTTP clone/fetch/push tests, `source submit`
-  contribution-flow tests, capability-gated API auth tests, SQLite store
-  transaction/contract tests, and multi-tenant org-management/tenant-isolation
-  tests.
+  artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
+  `source submit` contribution-flow tests, capability-gated API auth tests,
+  Git-transport auth tests (401/403), SQLite store transaction/contract tests,
+  and multi-tenant org-management/tenant-isolation tests.
 - Zero runtime dependencies (Node.js ≥ 18, `git` on PATH). The SQLite backend
   requires Node ≥ 22.5 (`node:sqlite`); the JSON store works on Node ≥ 18.
 - Deterministic-first: no LLM is required for any operation in the slice.
@@ -50,6 +50,9 @@ node bin/source.js cap issue --principal U2 --org O1 --project P1 \
   --allowed read_source,read_context,submit_change,submit_evidence \
   --denied accept_change,modify_policy,publish_release
 
+# Issue a Git-transport capability (read + push) for a contributor
+node bin/source.js git-cap --org O1 --project P1 --principal U1
+
 # Serve the HTTP API + minimal web UI + smart-HTTP Git transport
 node bin/source.js serve --port 8787
 #   GET /.well-known/source                          (agent discovery)
@@ -58,16 +61,20 @@ node bin/source.js serve --port 8787
 #   git clone http://localhost:8787/git/O1/P1/R1.git (smart-HTTP)
 
 # Contribute as a Git-only developer (no Source concepts required)
-git clone http://localhost:8787/git/O1/P1/R1.git
+#   public repos clone anonymously; private repos and all pushes need a credential
+git clone http://source:<credential>@localhost:8787/git/O1/P1/R1.git
 # ... make changes ...
-node bin/source.js submit --url http://localhost:8787
+node bin/source.js submit --url http://localhost:8787 --credential <credential>
 ```
 
 The machine interface (`/api/v1/…`) is capability-gated: send
-`Authorization: Bearer <credential>` on every request. The Organization is the
-tenant boundary and is explicit in every route (`/api/v1/orgs/{org}/…`,
-`/git/{org}/{project}/…`). See `docs/source/19-capability-auth.md` and
-`docs/source/21-multi-tenant-orgs.md`.
+`Authorization: Bearer <credential>` on every request. The Git transport
+(`/git/…`) is capability-gated via HTTP Basic auth: public repos allow anonymous
+read, private repos require `read_source`, and push always requires `git_push`.
+The Organization is the tenant boundary and is explicit in every route
+(`/api/v1/orgs/{org}/…`, `/git/{org}/{project}/…`). See
+`docs/source/19-capability-auth.md`, `docs/source/21-multi-tenant-orgs.md`, and
+`docs/source/22-git-transport-auth.md`.
 
 ### Storage backend
 
@@ -94,7 +101,7 @@ src/
   git-http.js    — smart-HTTP transport via `git http-backend`
   policy.js      — deterministic required-evidence evaluation
   capability.js  — bounded, expiring capability grants
-  auth.js        — capability-gated API authorization (actions + org/project/work scope)
+  auth.js        — capability-gated API (bearer) + Git (basic) authorization
   api.js         — HTTP API + /.well-known/source discovery + /git/ transport
   web.js         — minimal human-facing HTML views (org/project/work/change)
   cli.js         — CLI (same services as the API)
@@ -123,6 +130,7 @@ The full architecture, domain model, threat model, and MVP scope are in
 - `19-capability-auth.md` — capability-gated API auth
 - `20-sqlite-store.md` — the SQLite store backend and transactions
 - `21-multi-tenant-orgs.md` — the org-scoped tenant boundary
+- `22-git-transport-auth.md` — capability-gated Git transport (Basic auth)
 - `decisions/` — architecture decision records
 
 ## License

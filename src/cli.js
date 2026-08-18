@@ -239,6 +239,18 @@ export async function run(argv) {
         }
         break;
       }
+      case 'git-cap': {
+        const orgId = flag('--org') || 'O1';
+        const projectId = flag('--project') || 'P1';
+        const cap = src.issueGitCapability({
+          orgId,
+          projectId,
+          principalId: flag('--principal') || 'U1',
+          push: !hasFlag('--read-only'),
+        });
+        print(cap);
+        return;
+      }
       case 'audit': {
         print(src.readAudit());
         return;
@@ -258,6 +270,7 @@ export async function run(argv) {
           cwd: flag('--cwd') || process.cwd(),
           intent: flag('--intent') || '',
           baseUrl: flag('--url') || null,
+          credential: flag('--credential') || null,
         });
         print(result);
         return;
@@ -285,6 +298,7 @@ export async function run(argv) {
           '  principal create --type human|agent|service --name <n>',
           '  cap issue --principal <id> [--org <o>] [--project <p>] [--work <w>] [--allowed a,b] [--denied d,e] [--ttl <ms>]',
           '  cap revoke <id>',
+          '  git-cap --org <o> --project <p> --principal <id> [--read-only]',
           '  work create|list|show|claim|assign --org <o> --project <p>',
           '  session start|complete --org <o> --project <p>',
           '  change submit|list|inspect --org <o> --project <p>',
@@ -293,7 +307,7 @@ export async function run(argv) {
           '  policy show --org <o> --project <p>',
           '  audit',
           '  serve --port <n>',
-          '  submit [--intent <s>] [--url <base>] [--cwd <dir>]',
+          '  submit [--intent <s>] [--url <base>] [--credential <c>] [--cwd <dir>]',
           '',
           'Env: SOURCE_DATA (default .source), SOURCE_STORE (json|sqlite)',
           'Flags: --store json|sqlite (select the storage backend)',

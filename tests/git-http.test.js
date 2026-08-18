@@ -5,6 +5,11 @@
 // The org is explicit in the URL (`/git/{org}/{project}/{repo}.git`), so the
 // tenant boundary is enforced server-side.
 //
+// Git transport is capability-gated via HTTP Basic auth: public repos allow
+// anonymous read; private repos require `read_source`; push always requires
+// `git_push`. These tests exercise both the happy path (authenticated) and the
+// auth rejections (401/403).
+//
 // Note: the git client runs in the same process as the server, so git commands
 // must be invoked asynchronously (execFile, not execFileSync) to avoid blocking
 // the event loop that serves the HTTP requests.
@@ -39,31 +44,55 @@ async function withServer(src, fn) {
   }
 }
 
-test('git clone works over smart HTTP', async () => {
-  const { src, org, project } = freshSource();
+// Build a URL with Basic-auth credentials embedded (git sends these on every
+// request to the host).
+function authedUrl(base, path, credential) {
+  const u = new URL(base + path);
+  u.username = 'source';
+  u.password = credential;
+  return u.toString();
+}
+
+// Build an Authorization: Basic header value for fetch-based assertions.
+function basicAuthHeader(credential) {
+  return `Basic ${Buffer.from(`source:${credential}`).toString('base64')}`;
+}
+
+// Issue a project-scoped git capability (read + push).
+function gitCap(src, orgId, projectId, principalId) {
+  return src.issueGitCapability({ orgId, projectId, principalId });
+}
+
+test('git clone works over smart HTTP (authenticated)', async () => {
+  const { src, org, project, human } = freshSource();
   const { repo } = seedRepo(src, org.id, project.id);
+  const cap = gitCap(src, org.id, project.id, human.id);
   await withServer(src, async (base) => {
     const cloneDir = mkdtempSync(path.join(tmpdir(), 'source-http-clone-'));
-    await run(['clone', `${base}/git/${org.id}/${project.id}/${repo.id}.git`, cloneDir]);
+    const url = authedUrl(base, `/git/${org.id}/${project.id}/${repo.id}.git`, cap.credential);
+    await run(['clone', url, cloneDir]);
     const readme = readFileSync(path.join(cloneDir, 'README.md'), 'utf8');
     assert.ok(readme.includes('change'));
   });
 });
 
-test('git clone works by repository name over smart HTTP', async () => {
-  const { src, org, project } = freshSource();
+test('git clone works by repository name over smart HTTP (authenticated)', async () => {
+  const { src, org, project, human } = freshSource();
   const { repo } = seedRepo(src, org.id, project.id);
+  const cap = gitCap(src, org.id, project.id, human.id);
   await withServer(src, async (base) => {
     const cloneDir = mkdtempSync(path.join(tmpdir(), 'source-http-name-'));
-    await run(['clone', `${base}/git/${org.id}/${project.id}/${repo.name}.git`, cloneDir]);
+    const url = authedUrl(base, `/git/${org.id}/${project.id}/${repo.name}.git`, cap.credential);
+    await run(['clone', url, cloneDir]);
     const readme = readFileSync(path.join(cloneDir, 'README.md'), 'utf8');
     assert.ok(readme.includes('change'));
   });
 });
 
-test('git fetch works over smart HTTP', async () => {
-  const { src, org, project } = freshSource();
+test('git fetch works over smart HTTP (authenticated)', async () => {
+  const { src, org, project, human } = freshSource();
   const { repo, work } = seedRepo(src, org.id, project.id);
+  const cap = gitCap(src, org.id, project.id, human.id);
   // Advance the bare repo with a new commit (via local push), then fetch it
   // over HTTP from a fresh clone.
   writeFileSync(path.join(work, 'NEW.md'), 'new\n');
@@ -73,19 +102,22 @@ test('git fetch works over smart HTTP', async () => {
 
   await withServer(src, async (base) => {
     const cloneDir = mkdtempSync(path.join(tmpdir(), 'source-http-fetch-'));
-    await run(['clone', `${base}/git/${org.id}/${project.id}/${repo.id}.git`, cloneDir]);
+    const url = authedUrl(base, `/git/${org.id}/${project.id}/${repo.id}.git`, cap.credential);
+    await run(['clone', url, cloneDir]);
     await run(['fetch', 'origin'], cloneDir);
     const log = await run(['log', '--oneline', 'origin/main'], cloneDir);
     assert.ok(log.includes('new'));
   });
 });
 
-test('git push works over smart HTTP (contribution transport)', async () => {
-  const { src, org, project } = freshSource();
+test('git push works over smart HTTP (authenticated contribution transport)', async () => {
+  const { src, org, project, human } = freshSource();
   const { repo } = seedRepo(src, org.id, project.id);
+  const cap = gitCap(src, org.id, project.id, human.id);
   await withServer(src, async (base) => {
     const cloneDir = mkdtempSync(path.join(tmpdir(), 'source-http-push-'));
-    await run(['clone', `${base}/git/${org.id}/${project.id}/${repo.id}.git`, cloneDir]);
+    const url = authedUrl(base, `/git/${org.id}/${project.id}/${repo.id}.git`, cap.credential);
+    await run(['clone', url, cloneDir]);
     writeFileSync(path.join(cloneDir, 'CONTRIB.md'), 'contribution\n');
     await run(['config', 'user.email', 'contrib@example.com'], cloneDir);
     await run(['config', 'user.name', 'Contrib'], cloneDir);
@@ -97,6 +129,52 @@ test('git push works over smart HTTP (contribution transport)', async () => {
     const tip = git.revParse('main');
     assert.ok(tip.length === 40);
     assert.ok(git.hasCommit(tip));
+  });
+});
+
+test('public repository allows anonymous clone', async () => {
+  const { src, org } = freshSource();
+  const project = src.createProject({ orgId: org.id, slug: 'public', name: 'Public', visibility: 'public' });
+  const { repo } = seedRepo(src, org.id, project.id);
+  await withServer(src, async (base) => {
+    const cloneDir = mkdtempSync(path.join(tmpdir(), 'source-http-public-'));
+    await run(['clone', `${base}/git/${org.id}/${project.id}/${repo.id}.git`, cloneDir]);
+    const readme = readFileSync(path.join(cloneDir, 'README.md'), 'utf8');
+    assert.ok(readme.includes('change'));
+  });
+});
+
+test('private repository read requires auth (401)', async () => {
+  const { src, org, project } = freshSource();
+  const { repo } = seedRepo(src, org.id, project.id);
+  await withServer(src, async (base) => {
+    const res = await fetch(`${base}/git/${org.id}/${project.id}/${repo.id}.git/info/refs?service=git-upload-pack`);
+    assert.equal(res.status, 401);
+    assert.ok((res.headers.get('www-authenticate') || '').includes('Basic'));
+  });
+});
+
+test('push requires auth even for public repositories (401)', async () => {
+  const { src, org } = freshSource();
+  const project = src.createProject({ orgId: org.id, slug: 'public', name: 'Public', visibility: 'public' });
+  const { repo } = seedRepo(src, org.id, project.id);
+  await withServer(src, async (base) => {
+    const res = await fetch(`${base}/git/${org.id}/${project.id}/${repo.id}.git/info/refs?service=git-receive-pack`);
+    assert.equal(res.status, 401);
+  });
+});
+
+test('a capability scoped to another org cannot read its repo (403)', async () => {
+  const { src, org, project, human } = freshSource();
+  const org2 = src.createOrg({ name: 'other', slug: 'other' });
+  const project2 = src.createProject({ orgId: org2.id, slug: 'p2', name: 'P2' });
+  const { repo: repo2 } = seedRepo(src, org2.id, project2.id);
+  // Capability scoped to org1/project1.
+  const cap = gitCap(src, org.id, project.id, human.id);
+  await withServer(src, async (base) => {
+    const url = `${base}/git/${org2.id}/${project2.id}/${repo2.id}.git/info/refs?service=git-upload-pack`;
+    const res = await fetch(url, { headers: { authorization: basicAuthHeader(cap.credential) } });
+    assert.equal(res.status, 403);
   });
 });
 

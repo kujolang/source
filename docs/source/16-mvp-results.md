@@ -1,6 +1,6 @@
 # 16 — MVP Results
 
-Status: **Complete.** The vertical slice is implemented, tested (29/29 pass),
+Status: **Complete.** The vertical slice is implemented, tested (80/80 pass),
 and dogfooded against a real Kujo repository.
 
 ## What Was Built
@@ -17,7 +17,7 @@ lifecycle:
 | Git HTTP | `src/git-http.js` | Smart-HTTP transport via `git http-backend` |
 | Policy | `src/policy.js` | Deterministic required-evidence evaluation |
 | Capability | `src/capability.js` | Bounded, expiring, revocable grants |
-| Auth | `src/auth.js` | Capability-gated API authorization (actions + scope) |
+| Auth | `src/auth.js` | Capability-gated API (bearer) + Git (basic) authorization |
 | API | `src/api.js` | HTTP API + `/.well-known/source` discovery + field selection |
 | Web | `src/web.js` | Minimal human-facing HTML (org/project/work/change) |
 | CLI | `src/cli.js`, `bin/source.js` | Same services as the API |
@@ -104,6 +104,9 @@ Controls implemented:
 - Bounded, expiring, revocable capabilities (server-enforced).
 - Capability-gated API auth: every `/api/v1/` endpoint requires a credential;
   scope (org/project/work) is enforced server-side (see `19-capability-auth.md`).
+- Git-transport auth: public repos allow anonymous read; private repos require
+  `read_source`; push always requires `git_push` (Basic auth, server-enforced;
+  see `22-git-transport-auth.md`).
 - Deny-list (`accept_change`, `modify_policy`, `publish_release`).
 - Approval authority: only a `human` principal may accept (policy-enforced).
 - Evidence integrity: content-addressed artifacts, SHA-256 hashes.
@@ -135,9 +138,9 @@ Measured in `tests/api.test.js`:
 1. ~~**Single Organization per Instance**~~ — resolved: the org is now a
    first-class, server-enforced tenant boundary (see `21-multi-tenant-orgs.md`).
 2. **Single-repository Changes** (multi-repo schema present, not exercised).
-3. **Smart-HTTP has no TLS or auth** — transport works, but it is plain HTTP
-   and anonymous; TLS and Git-transport auth are pending (the HTTP API itself
-   is capability-gated; see `19-capability-auth.md`).
+3. **Smart-HTTP has no TLS** — transport works and is now capability-gated
+   (see `22-git-transport-auth.md`), but it is still plain HTTP; TLS
+   termination is a deployment requirement.
 4. **JSON-file store** — no transactions across records; fine at MVP scale.
    (A SQLite backend with ACID transactions is now available; see
    `20-sqlite-store.md`.)
@@ -161,6 +164,9 @@ Measured in `tests/api.test.js`:
 5. **Org and project ids must use independent counters** — `createOrg` reused
    the project counter, so the first project was `P2`; fixed with a dedicated
    `org` prefix (see `21-multi-tenant-orgs.md`).
+6. **Git transport uses Basic auth, not bearer** — git clients do not send
+   bearer tokens; the capability credential is carried as the Basic-auth
+   password (see `22-git-transport-auth.md`).
 
 ## Product Questions (require human decision)
 
@@ -205,15 +211,14 @@ All six items of the original "Recommended Next Phase" are now complete:
   org-scoped capabilities are enforced server-side, and org list/get/create is
   exposed via API, CLI, and web.
 
-The test suite is now **76/76 passing**.
+The test suite is now **80/80 passing**.
 
 ## Next phase (fresh prioritization)
 
 With the original six increments complete, the next phase should be ranked by
 product value, not coding convenience:
 
-1. **Git-transport auth** — smart-HTTP is still anonymous; wire capability (or
-   basic-auth) into `git http-backend` so private repos are actually private.
+1. ~~**Git-transport auth**~~ — done (`22-git-transport-auth.md`).
 2. **TLS + deployment** — the transport is plain HTTP; a real deployment needs
    TLS termination and a documented self-host path.
 3. **Multi-repository Changes** — the schema supports it; exercise a Change

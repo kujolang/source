@@ -132,7 +132,6 @@ export class Source {
     };
     const git = new GitRepo(repo.barePath);
     git.init(defaultBranch);
-    git.enableReceivePack();
     project.repositories.push(id);
     this.store.transaction(() => {
       this.store.writeJson(`${this._projectRel(orgId, projectId)}/project.json`, project);
@@ -195,6 +194,21 @@ export class Source {
       denied: ['accept_change', 'modify_policy', 'publish_release'],
     });
     this.store.audit({ event: 'capability.issue', orgId, projectId, workId, principalId, capabilityId: cap.id });
+    return cap;
+  }
+
+  // Issue a project-scoped capability for Git transport (clone/fetch/push).
+  // Read is always granted; push (`git_push`) is opt-in. This is the credential
+  // a contributor or agent uses with `git clone`/`git push` over smart HTTP.
+  issueGitCapability({ orgId, projectId, principalId, push = true }) {
+    const allowed = ['read_source'];
+    if (push) allowed.push('git_push');
+    const cap = this.capabilities.issue({
+      principalId,
+      scope: { org: orgId, project: projectId },
+      allowed,
+    });
+    this.store.audit({ event: 'capability.issue', orgId, projectId, principalId, capabilityId: cap.id, kind: 'git' });
     return cap;
   }
 

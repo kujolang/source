@@ -10,13 +10,14 @@
 // filtering.
 //
 // The same server also serves Git over smart HTTP (`/git/{org}/{project}/…`)
-// by delegating to `git http-backend`; see `git-http.js`.
+// by delegating to `git http-backend`; see `git-http.js`. Git transport is
+// capability-gated via HTTP Basic auth (see `authorizeGit` in auth.js).
 
 import http from 'node:http';
 import { Source } from './source.js';
 import { renderOrgIndex, renderIndex, renderProject, renderWork, renderChange } from './web.js';
 import { gitHttpBackend } from './git-http.js';
-import { ACTIONS, authorizeRequest } from './auth.js';
+import { ACTIONS, authorizeRequest, authorizeGit } from './auth.js';
 
 function json(res, status, obj) {
   const body = JSON.stringify(obj);
@@ -80,6 +81,19 @@ function guard(src, req, action, scope) {
   return { status: r.status, body: { error: r.error } };
 }
 
+// Reject a Git transport request. 401 responses carry a WWW-Authenticate
+// challenge so git clients know to send Basic auth.
+function gitAuthError(res, status, error) {
+  const body = JSON.stringify({ error });
+  const headers = {
+    'Content-Type': 'application/json',
+    'Content-Length': Buffer.byteLength(body),
+  };
+  if (status === 401) headers['WWW-Authenticate'] = 'Basic realm="source"';
+  res.writeHead(status, headers);
+  res.end(body);
+}
+
 // Resolve the Work id a Change belongs to (for work-scoped capability checks).
 function changeWork(src, orgId, projectId, changeId) {
   const c = src.getChange(orgId, projectId, changeId);
@@ -131,6 +145,10 @@ export function createServer(src, { port = 8787 } = {}) {
             header: 'Authorization: Bearer <credential>',
             note: 'capabilities are issued out-of-band (CLI/operator) and scoped to org/project/work',
           },
+          git_auth: {
+            type: 'basic',
+            note: 'git transport uses HTTP Basic auth; the password is a capability credential (read_source for private read, git_push for push)',
+          },
         });
       }
 
@@ -146,6 +164,19 @@ export function createServer(src, { port = 8787 } = {}) {
         const repo = src.resolveRepository(orgId, projectId, repoRef);
         if (!repo) return json(res, 404, { error: 'repository not found' });
 
+        // Auth: read (upload-pack) vs write (receive-pack). Public repos allow
+        // anonymous read; private repos require read_source; push always
+        // requires git_push. Enforced here, before delegating to git.
+        const service = url.searchParams.get('service') || '';
+        const isWrite = service === 'git-receive-pack' || rest.includes('git-receive-pack');
+        const auth = authorizeGit(src.capabilities, req, {
+          org: orgId,
+          project: projectId,
+          visibility: repo.visibility,
+          isWrite,
+        });
+        if (!auth.ok) return gitAuthError(res, auth.status, auth.error);
+
         let body = null;
         if (req.method === 'POST') body = await readRawBody(req);
 
@@ -156,7 +187,7 @@ export function createServer(src, { port = 8787 } = {}) {
           method: req.method,
           contentType: req.headers['content-type'] || '',
           body,
-          remoteUser: 'anonymous', // MVP has no auth; replaced by capability-gated auth
+          remoteUser: auth.remoteUser,
           remoteAddr: req.socket.remoteAddress || '',
           headers: req.headers,
         });

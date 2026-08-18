@@ -28,14 +28,6 @@ export class GitRepo {
     return this;
   }
 
-  // Enable anonymous push over smart HTTP. `git http-backend` disables
-  // receive-pack for unauthenticated users by default; the MVP has no auth, so
-  // this is set explicitly. Replaced by capability-gated auth in a later phase.
-  enableReceivePack() {
-    run(['config', 'http.receivepack', 'true'], { cwd: this.barePath });
-    return this;
-  }
-
   // Resolve a ref to a commit hash (empty string if unborn).
   revParse(ref) {
     try {
