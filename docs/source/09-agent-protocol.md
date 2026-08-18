@@ -16,27 +16,42 @@ compact, structured, and progressively retrievable.
 {
   "instance": "source.kujolang.ai",
   "api_version": "1",
-  "protocols": ["http+json"],
+  "protocols": ["http+json", "git-smart-http"],
   "endpoints": {
     "projects": "/api/v1/projects",
     "work": "/api/v1/projects/{project}/work",
     "changes": "/api/v1/projects/{project}/changes",
     "evidence": "/api/v1/projects/{project}/evidence",
     "git": "/git/{project}/{repo}.git",
-    "auth": "/api/v1/auth",
-    "policy": "/api/v1/projects/{project}/policy"
+    "policy": "/api/v1/projects/{project}/policy",
+    "submit": "/api/v1/projects/{project}/submit"
   },
-  "capabilities": ["read_source", "read_context", "submit_change", "submit_evidence"],
-  "auth": ["capability_token"]
+  "capabilities": ["read_source", "read_context", "claim_work", "start_session", "submit_change", "submit_evidence", "accept_change", "modify_policy", "publish_release"],
+  "auth": {
+    "type": "capability",
+    "header": "Authorization: Bearer <credential>"
+  }
 }
 ```
 
 This is a `.well-known` resource (RFC 8615) — a standard, cacheable mechanism
 that requires no scraping. It is intentionally compact.
 
+## Authentication
+
+Every `/api/v1/` request carries a capability credential:
+
+```text
+Authorization: Bearer <credential>
+```
+
+The credential is an opaque bearer token; authorization is enforced server-side
+against the grant record (scope, allowed/denied, expiry, revocation). See
+`19-capability-auth.md` for the full endpoint → action → scope mapping.
+
 ## Progressive retrieval
 
-```
+```text
 discover instance ──► discover project ──► retrieve Work ──► retrieve policy
 ──► retrieve only relevant context ──► retrieve relevant source
 ──► perform action ──► submit structured output
@@ -65,8 +80,8 @@ requirement to prove the vertical slice.
 | discover instance | `GET /.well-known/source` | compact manifest |
 | discover project | `GET /api/v1/projects/{project}` | identity, repos, policy ref |
 | list/get Work | `GET /api/v1/projects/{p}/work` / `.../{id}` | field-selectable |
-| claim Work | `POST /api/v1/projects/{p}/work/{id}/claim` | requires capability |
-| start Session | `POST /api/v1/projects/{p}/work/{id}/sessions` | returns session + capability |
+| claim Work | `POST /api/v1/projects/{p}/work/{id}/claim` | requires `claim_work` |
+| start Session | `POST /api/v1/projects/{p}/work/{id}/sessions` | returns session + scoped capability |
 | retrieve context | `GET /api/v1/projects/{p}/work/{id}/context` | scoped, token-bounded |
 | retrieve repo info | `GET /api/v1/projects/{p}/repos/{r}` | clone URL, default branch |
 | submit Change | `POST /api/v1/projects/{p}/work/{id}/changes` | base/head commits |
@@ -86,5 +101,6 @@ requirement to prove the vertical slice.
 ## Cross-references
 
 - `08-identity-capability-model.md` — capability issuance.
+- `19-capability-auth.md` — capability-gated API auth (actions + scope).
 - `10-git-integration.md` — Git endpoints.
 - `13-mvp-scope.md` — which operations are implemented.

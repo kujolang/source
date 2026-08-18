@@ -11,6 +11,7 @@ import http from 'node:http';
 import { Source } from './source.js';
 import { renderIndex, renderProject, renderWork, renderChange } from './web.js';
 import { gitHttpBackend } from './git-http.js';
+import { ACTIONS, authorizeRequest } from './auth.js';
 
 const ORG = 'O1';
 
@@ -68,6 +69,20 @@ function selectFields(obj, fields) {
   return out;
 }
 
+// Authorize a request against a capability action and scope. Returns null when
+// authorized, or {status, body} to send as the rejection response.
+function guard(src, req, action, scope) {
+  const r = authorizeRequest(src.capabilities, req, action, scope);
+  if (r.ok) return null;
+  return { status: r.status, body: { error: r.error } };
+}
+
+// Resolve the Work id a Change belongs to (for work-scoped capability checks).
+function changeWork(src, orgId, projectId, changeId) {
+  const c = src.getChange(orgId, projectId, changeId);
+  return c ? c.workId : undefined;
+}
+
 export function createServer(src, { port = 8787 } = {}) {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
@@ -75,7 +90,7 @@ export function createServer(src, { port = 8787 } = {}) {
     const fields = url.searchParams.get('fields') || undefined;
 
     try {
-      // --- human-facing HTML views --------------------------------------
+      // --- human-facing HTML views (public; human auth is a later phase) ---
       if (req.method === 'GET' && pathname === '/') {
         return html(res, 200, renderIndex(src, ORG));
       }
@@ -87,7 +102,7 @@ export function createServer(src, { port = 8787 } = {}) {
         return html(res, 200, renderProject(src, ORG, projectId));
       }
 
-      // --- discovery -----------------------------------------------------
+      // --- discovery (public) ---------------------------------------------
       if (pathname === '/.well-known/source') {
         return json(res, 200, {
           instance: src.getInstance()?.name ?? 'source',
@@ -102,8 +117,12 @@ export function createServer(src, { port = 8787 } = {}) {
             policy: '/api/v1/projects/{project}/policy',
             submit: '/api/v1/projects/{project}/submit',
           },
-          capabilities: ['read_source', 'read_context', 'submit_change', 'submit_evidence'],
-          auth: ['capability'],
+          capabilities: Object.values(ACTIONS),
+          auth: {
+            type: 'capability',
+            header: 'Authorization: Bearer <credential>',
+            note: 'capabilities are issued out-of-band (CLI/operator) and scoped to project/work',
+          },
         });
       }
 
@@ -144,6 +163,8 @@ export function createServer(src, { port = 8787 } = {}) {
 
       // --- projects ------------------------------------------------------
       if (pathname === '/api/v1/projects' && req.method === 'GET') {
+        const g = guard(src, req, ACTIONS.read_source, {});
+        if (g) return json(res, g.status, g.body);
         return json(res, 200, selectFields(src.listProjects(ORG), fields));
       }
 
@@ -153,22 +174,29 @@ export function createServer(src, { port = 8787 } = {}) {
         const rest = projectMatch[2] || '';
 
         if (rest === '' && req.method === 'GET') {
+          const g = guard(src, req, ACTIONS.read_source, { project: projectId });
+          if (g) return json(res, g.status, g.body);
           const p = src.getProject(ORG, projectId);
           if (!p) return json(res, 404, { error: 'not found' });
           return json(res, 200, selectFields(p, fields));
         }
 
         if (rest === '/policy' && req.method === 'GET') {
+          const g = guard(src, req, ACTIONS.read_context, { project: projectId });
+          if (g) return json(res, g.status, g.body);
           return json(res, 200, src.getPolicy(ORG, projectId));
         }
 
         if (rest === '/work' && req.method === 'GET') {
+          const g = guard(src, req, ACTIONS.read_context, { project: projectId });
+          if (g) return json(res, g.status, g.body);
           return json(res, 200, selectFields(src.listWork(ORG, projectId), fields));
         }
 
         // Contribution flow: a Git-only developer submits a change from a
         // working clone. Source creates the Work → Session → Change → Evidence
-        // lifecycle server-side.
+        // lifecycle server-side. Public by design (low-friction onboarding);
+        // rate limiting is a documented follow-up.
         if (rest === '/submit' && req.method === 'POST') {
           const body = await readBody(req);
           const r = src.submitContribution({ orgId: ORG, projectId, ...body });
@@ -181,24 +209,35 @@ export function createServer(src, { port = 8787 } = {}) {
           const wrest = workMatch[2] || '';
 
           if (wrest === '' && req.method === 'GET') {
+            const g = guard(src, req, ACTIONS.read_context, { project: projectId, work: workId });
+            if (g) return json(res, g.status, g.body);
             const w = src.getWork(ORG, projectId, workId);
             if (!w) return json(res, 404, { error: 'not found' });
             return json(res, 200, selectFields(w, fields));
           }
 
           if (wrest === '/claim' && req.method === 'POST') {
+            const g = guard(src, req, ACTIONS.claim_work, { project: projectId, work: workId });
+            if (g) return json(res, g.status, g.body);
             const body = await readBody(req);
             const w = src.claimWork({ orgId: ORG, projectId, workId, principalId: body.principalId });
             return json(res, 200, w);
           }
 
           if (wrest === '/sessions' && req.method === 'POST') {
+            const g = guard(src, req, ACTIONS.start_session, { project: projectId, work: workId });
+            if (g) return json(res, g.status, g.body);
             const body = await readBody(req);
             const s = src.startSession({ orgId: ORG, projectId, workId, principalId: body.principalId, environment: body.environment, baseCommit: body.baseCommit });
-            return json(res, 201, s);
+            // Issue a session-scoped capability (temporary session identity):
+            // bounded to this project/work, expiring, denied accept/policy.
+            const cap = src.issueSessionCapability({ orgId: ORG, projectId, workId, principalId: body.principalId });
+            return json(res, 201, { ...s, capability: cap });
           }
 
           if (wrest === '/context' && req.method === 'GET') {
+            const g = guard(src, req, ACTIONS.read_context, { project: projectId, work: workId });
+            if (g) return json(res, g.status, g.body);
             const w = src.getWork(ORG, projectId, workId);
             if (!w) return json(res, 404, { error: 'not found' });
             // Scoped, token-bounded context: intent, requirements, acceptance,
@@ -214,6 +253,8 @@ export function createServer(src, { port = 8787 } = {}) {
           }
 
           if (wrest === '/changes' && req.method === 'POST') {
+            const g = guard(src, req, ACTIONS.submit_change, { project: projectId, work: workId });
+            if (g) return json(res, g.status, g.body);
             const body = await readBody(req);
             const c = src.submitChange({ orgId: ORG, projectId, workId, sessionId: body.sessionId, baseCommit: body.baseCommit, headCommit: body.headCommit, repositories: body.repositories });
             return json(res, 201, c);
@@ -224,25 +265,34 @@ export function createServer(src, { port = 8787 } = {}) {
         if (changeMatch) {
           const changeId = changeMatch[1];
           const crest = changeMatch[2] || '';
+          const workId = changeWork(src, ORG, projectId, changeId);
 
           if (crest === '' && req.method === 'GET') {
+            const g = guard(src, req, ACTIONS.read_context, { project: projectId, work: workId });
+            if (g) return json(res, g.status, g.body);
             const c = src.getChange(ORG, projectId, changeId);
             if (!c) return json(res, 404, { error: 'not found' });
             return json(res, 200, selectFields(c, fields));
           }
 
           if (crest === '/evidence' && req.method === 'POST') {
+            const g = guard(src, req, ACTIONS.submit_evidence, { project: projectId, work: workId });
+            if (g) return json(res, g.status, g.body);
             const body = await readBody(req);
             const e = src.addEvidence({ orgId: ORG, projectId, changeId, ...body });
             return json(res, 201, e);
           }
 
           if (crest === '/evaluate' && req.method === 'POST') {
+            const g = guard(src, req, ACTIONS.submit_evidence, { project: projectId, work: workId });
+            if (g) return json(res, g.status, g.body);
             const r = src.evaluateChange({ orgId: ORG, projectId, changeId });
             return json(res, 200, { evaluation: r.evaluation, interpretation: r.interpretation });
           }
 
           if (crest === '/decision' && req.method === 'GET') {
+            const g = guard(src, req, ACTIONS.read_context, { project: projectId, work: workId });
+            if (g) return json(res, g.status, g.body);
             const c = src.getChange(ORG, projectId, changeId);
             if (!c) return json(res, 404, { error: 'not found' });
             const decisions = (c.decisions || []).map((id) => src.getDecision(ORG, projectId, id)).filter(Boolean);
@@ -250,6 +300,8 @@ export function createServer(src, { port = 8787 } = {}) {
           }
 
           if (crest === '/decision' && req.method === 'POST') {
+            const g = guard(src, req, ACTIONS.accept_change, { project: projectId });
+            if (g) return json(res, g.status, g.body);
             const body = await readBody(req);
             const d = src.makeDecision({ orgId: ORG, projectId, changeId, decision: body.decision, decider: body.decider, reasoning: body.reasoning });
             return json(res, 201, d);
@@ -261,11 +313,15 @@ export function createServer(src, { port = 8787 } = {}) {
           const evidenceId = evidenceMatch[1];
           const erest = evidenceMatch[2] || '';
           if (erest === '' && req.method === 'GET') {
+            const g = guard(src, req, ACTIONS.read_context, { project: projectId });
+            if (g) return json(res, g.status, g.body);
             const e = src.getEvidence(ORG, projectId, evidenceId);
             if (!e) return json(res, 404, { error: 'not found' });
             return json(res, 200, e);
           }
           if (erest === '/artifact' && req.method === 'GET') {
+            const g = guard(src, req, ACTIONS.read_context, { project: projectId });
+            if (g) return json(res, g.status, g.body);
             const e = src.getEvidence(ORG, projectId, evidenceId);
             if (!e || !e.artifactRef) return json(res, 404, { error: 'not found' });
             const bytes = src.getArtifact(e.artifactRef.hash);

@@ -12,15 +12,16 @@ software changes remains inspectable.
 This repository contains the **MVP vertical slice**: a working implementation of
 the full `Project → Work → Session → Change → Evidence → Decision → Canonical
 Git State` lifecycle, validated against a real Kujo repository, plus the first
-three next-phase increments (real Kujo evidence integration, smart-HTTP Git
-transport, and the `source submit` contribution flow).
+four next-phase increments (real Kujo evidence integration, smart-HTTP Git
+transport, the `source submit` contribution flow, and capability-gated API
+auth).
 
 ## Status
 
-- **50/50 tests pass**, including a dogfood test against the real `spec` Kujo
+- **60/60 tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
-  artifacts, smart-HTTP clone/fetch/push tests, and `source submit`
-  contribution-flow tests.
+  artifacts, smart-HTTP clone/fetch/push tests, `source submit`
+  contribution-flow tests, and capability-gated API auth tests.
 - Zero runtime dependencies (Node.js ≥ 18, `git` on PATH).
 - Deterministic-first: no LLM is required for any operation in the slice.
 
@@ -39,11 +40,16 @@ node bin/source.js principal create --type human --name maintainer
 node bin/source.js work create --org O1 --project P1 --intent "fix parser regression"
 node bin/source.js work claim --org O1 --project P1 W1 --principal U1
 
+# Issue a bounded capability for an agent (operator/CLI, out-of-band)
+node bin/source.js cap issue --principal U2 --project P1 \
+  --allowed read_source,read_context,submit_change,submit_evidence \
+  --denied accept_change,modify_policy,publish_release
+
 # Serve the HTTP API + minimal web UI + smart-HTTP Git transport
 node bin/source.js serve --port 8787
 #   GET /.well-known/source          (agent discovery)
 #   GET /                            (human project index)
-#   GET /api/v1/projects/P1/work     (machine interface)
+#   GET /api/v1/projects/P1/work     (machine interface, requires capability)
 #   git clone http://localhost:8787/git/P1/R1.git   (smart-HTTP)
 
 # Contribute as a Git-only developer (no Source concepts required)
@@ -51,6 +57,10 @@ git clone http://localhost:8787/git/P1/R1.git
 # ... make changes ...
 node bin/source.js submit --url http://localhost:8787
 ```
+
+The machine interface (`/api/v1/…`) is capability-gated: send
+`Authorization: Bearer <credential>` on every request. See
+`docs/source/19-capability-auth.md`.
 
 ## Architecture
 
@@ -65,6 +75,7 @@ src/
   git-http.js    — smart-HTTP transport via `git http-backend`
   policy.js      — deterministic required-evidence evaluation
   capability.js  — bounded, expiring capability grants
+  auth.js        — capability-gated API authorization (actions + scope)
   api.js         — HTTP API + /.well-known/source discovery + /git/ transport
   web.js         — minimal human-facing HTML views
   cli.js         — CLI (same services as the API)
@@ -90,6 +101,7 @@ The full architecture, domain model, threat model, and MVP scope are in
 - `16-mvp-results.md` — what was built and dogfooded
 - `17-kujo-evidence-integration.md` — real Eval/Spec/ShipCheck evidence ingestion
 - `18-source-submit.md` — the `source submit` contribution flow
+- `19-capability-auth.md` — capability-gated API auth
 - `decisions/` — architecture decision records
 
 ## License

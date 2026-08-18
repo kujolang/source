@@ -14,6 +14,10 @@ async function withServer(src, fn) {
   }
 }
 
+function auth(credential) {
+  return { Authorization: `Bearer ${credential}` };
+}
+
 test('discovery endpoint returns a compact machine manifest', async () => {
   const { src } = freshSource();
   await withServer(src, async (base) => {
@@ -24,60 +28,76 @@ test('discovery endpoint returns a compact machine manifest', async () => {
     assert.ok(body.endpoints.work);
     assert.ok(body.endpoints.git);
     assert.ok(Array.isArray(body.capabilities));
+    assert.equal(body.auth.type, 'capability');
   });
 });
 
-test('an agent can complete the workflow without HTML', async () => {
+test('an agent can complete the workflow without HTML (capability-gated)', async () => {
   const { src, org, project, agent, service, human } = freshSource();
   const w = src.createWork({ orgId: org.id, projectId: project.id, intent: 'fix parser regression', requester: 'U1' });
 
+  // Bootstrap capability for the agent (operator-issued, project-scoped).
+  const agentCap = src.capabilities.issue({
+    principalId: agent.id,
+    scope: { project: project.id },
+    allowed: ['read_source', 'read_context', 'claim_work', 'start_session', 'submit_change', 'submit_evidence'],
+  });
+  // Maintainer capability for the decision.
+  const humanCap = src.capabilities.issue({
+    principalId: human.id,
+    scope: { project: project.id },
+    allowed: ['accept_change'],
+  });
+
   await withServer(src, async (base) => {
     // discover project
-    const p = await (await fetch(`${base}/api/v1/projects/${project.id}`)).json();
+    const p = await (await fetch(`${base}/api/v1/projects/${project.id}`, { headers: auth(agentCap.credential) })).json();
     assert.equal(p.id, project.id);
 
     // list work
-    const workList = await (await fetch(`${base}/api/v1/projects/${project.id}/work`)).json();
+    const workList = await (await fetch(`${base}/api/v1/projects/${project.id}/work`, { headers: auth(agentCap.credential) })).json();
     assert.ok(workList.some((x) => x.id === w.id));
 
     // claim work
-    const claim = await (await fetch(`${base}/api/v1/projects/${project.id}/work/${w.id}/claim`, { method: 'POST', body: JSON.stringify({ principalId: agent.id }) })).json();
+    const claim = await (await fetch(`${base}/api/v1/projects/${project.id}/work/${w.id}/claim`, { method: 'POST', headers: auth(agentCap.credential), body: JSON.stringify({ principalId: agent.id }) })).json();
     assert.equal(claim.status, 'claimed');
 
-    // start session
-    const session = await (await fetch(`${base}/api/v1/projects/${project.id}/work/${w.id}/sessions`, { method: 'POST', body: JSON.stringify({ principalId: agent.id, baseCommit: 'base' }) })).json();
+    // start session (returns a session-scoped capability)
+    const session = await (await fetch(`${base}/api/v1/projects/${project.id}/work/${w.id}/sessions`, { method: 'POST', headers: auth(agentCap.credential), body: JSON.stringify({ principalId: agent.id, baseCommit: 'base' }) })).json();
     assert.ok(session.id);
+    assert.ok(session.capability.credential, 'session returns a scoped capability');
 
     // retrieve scoped context
-    const ctx = await (await fetch(`${base}/api/v1/projects/${project.id}/work/${w.id}/context`)).json();
+    const ctx = await (await fetch(`${base}/api/v1/projects/${project.id}/work/${w.id}/context`, { headers: auth(agentCap.credential) })).json();
     assert.equal(ctx.intent, 'fix parser regression');
     assert.ok(ctx.policy);
 
     // submit change
-    const change = await (await fetch(`${base}/api/v1/projects/${project.id}/work/${w.id}/changes`, { method: 'POST', body: JSON.stringify({ sessionId: session.id, baseCommit: 'base', headCommit: 'head' }) })).json();
+    const change = await (await fetch(`${base}/api/v1/projects/${project.id}/work/${w.id}/changes`, { method: 'POST', headers: auth(agentCap.credential), body: JSON.stringify({ sessionId: session.id, baseCommit: 'base', headCommit: 'head' }) })).json();
     assert.equal(change.baseCommit, 'base');
 
     // submit evidence
-    const ev = await (await fetch(`${base}/api/v1/projects/${project.id}/changes/${change.id}/evidence`, { method: 'POST', body: JSON.stringify({ subject: 'tests', claim: 'tests pass', type: 'test', producer: service.id, result: { status: 'pass' } }) })).json();
+    const ev = await (await fetch(`${base}/api/v1/projects/${project.id}/changes/${change.id}/evidence`, { method: 'POST', headers: auth(agentCap.credential), body: JSON.stringify({ subject: 'tests', claim: 'tests pass', type: 'test', producer: service.id, result: { status: 'pass' } }) })).json();
     assert.ok(ev.id);
 
     // evaluate
-    const evalRes = await (await fetch(`${base}/api/v1/projects/${project.id}/changes/${change.id}/evaluate`, { method: 'POST' })).json();
+    const evalRes = await (await fetch(`${base}/api/v1/projects/${project.id}/changes/${change.id}/evaluate`, { method: 'POST', headers: auth(agentCap.credential) })).json();
     assert.ok(evalRes.interpretation);
 
-    // decision
-    const decision = await (await fetch(`${base}/api/v1/projects/${project.id}/changes/${change.id}/decision`, { method: 'POST', body: JSON.stringify({ decision: 'rejected', decider: human.id, reasoning: 'needs work' }) })).json();
+    // decision (requires accept_change — the human maintainer's capability)
+    const decision = await (await fetch(`${base}/api/v1/projects/${project.id}/changes/${change.id}/decision`, { method: 'POST', headers: auth(humanCap.credential), body: JSON.stringify({ decision: 'rejected', decider: human.id, reasoning: 'needs work' }) })).json();
     assert.equal(decision.decision, 'rejected');
   });
 });
 
 test('field selection reduces response size (token efficiency)', async () => {
-  const { src, org, project } = freshSource();
+  const { src, org, project, agent } = freshSource();
   src.createWork({ orgId: org.id, projectId: project.id, intent: 'a fairly long intent string to measure', requester: 'U1', requirements: ['r1', 'r2', 'r3'], acceptanceConditions: ['a1', 'a2'] });
+  const cap = src.capabilities.issue({ principalId: agent.id, scope: { project: project.id }, allowed: ['read_context'] });
 
   await withServer(src, async (base) => {
-    const full = await (await fetch(`${base}/api/v1/projects/${project.id}/work`)).text();
-    const slim = await (await fetch(`${base}/api/v1/projects/${project.id}/work?fields=id,status,intent`)).text();
+    const full = await (await fetch(`${base}/api/v1/projects/${project.id}/work`, { headers: auth(cap.credential) })).text();
+    const slim = await (await fetch(`${base}/api/v1/projects/${project.id}/work?fields=id,status,intent`, { headers: auth(cap.credential) })).text();
     assert.ok(slim.length < full.length, `slim (${slim.length}) should be smaller than full (${full.length})`);
   });
 });

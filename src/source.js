@@ -167,6 +167,21 @@ export class Source {
     return this.store.readJson(`principals/${id}.json`);
   }
 
+  // --- capabilities -----------------------------------------------------
+  // Issue a session-scoped capability for an agent working a specific Work item.
+  // This is the "temporary session identity" grant: bounded to the project and
+  // work, expiring, and denied the authority to accept changes or modify policy.
+  issueSessionCapability({ orgId, projectId, workId, principalId }) {
+    const cap = this.capabilities.issue({
+      principalId,
+      scope: { project: projectId, work: workId },
+      allowed: ['read_source', 'read_context', 'submit_change', 'submit_evidence'],
+      denied: ['accept_change', 'modify_policy', 'publish_release'],
+    });
+    this.store.audit({ event: 'capability.issue', orgId, projectId, workId, principalId, capabilityId: cap.id });
+    return cap;
+  }
+
   // --- work -------------------------------------------------------------
   createWork({ orgId, projectId, intent, type = 'task', requester, requirements = [], acceptanceConditions = [], requiredEvidence = [], priority = 'medium' }) {
     const id = nextId(this.store, 'work');

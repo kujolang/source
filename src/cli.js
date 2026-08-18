@@ -199,6 +199,27 @@ export async function run(argv) {
         }
         break;
       }
+      case 'cap': {
+        if (sub === 'issue') {
+          const cap = src.capabilities.issue({
+            principalId: flag('--principal') || 'U1',
+            scope: {
+              project: flag('--project') || undefined,
+              work: flag('--work') || undefined,
+            },
+            allowed: flag('--allowed') ? flag('--allowed').split(',') : [],
+            denied: flag('--denied') ? flag('--denied').split(',') : [],
+            ttlMs: flag('--ttl') ? Number(flag('--ttl')) : 4 * 60 * 60 * 1000,
+          });
+          print(cap);
+          return;
+        }
+        if (sub === 'revoke') {
+          print({ revoked: src.capabilities.revoke(rest[0]) });
+          return;
+        }
+        break;
+      }
       case 'audit': {
         print(src.readAudit());
         return;
@@ -243,6 +264,8 @@ export async function run(argv) {
           '  project create|list|show --org <o> [--name --slug]',
           '  repo create --org <o> --project <p> --name <n>',
           '  principal create --type human|agent|service --name <n>',
+          '  cap issue --principal <id> [--project <p>] [--work <w>] [--allowed a,b] [--denied d,e] [--ttl <ms>]',
+          '  cap revoke <id>',
           '  work create|list|show|claim|assign --org <o> --project <p>',
           '  session start|complete --org <o> --project <p>',
           '  change submit|list|inspect --org <o> --project <p>',
