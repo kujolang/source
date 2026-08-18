@@ -6,6 +6,7 @@
 import { randomBytes } from 'node:crypto';
 
 const PREFIXES = {
+  org: 'O',
   work: 'W',
   session: 'S',
   change: 'C',

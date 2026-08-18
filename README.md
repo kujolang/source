@@ -11,18 +11,19 @@ software changes remains inspectable.
 
 This repository contains the **MVP vertical slice**: a working implementation of
 the full `Project → Work → Session → Change → Evidence → Decision → Canonical
-Git State` lifecycle, validated against a real Kujo repository, plus the first
-five next-phase increments (real Kujo evidence integration, smart-HTTP Git
-transport, the `source submit` contribution flow, capability-gated API auth,
-and a SQLite store backend).
+Git State` lifecycle, validated against a real Kujo repository, plus all six
+next-phase increments (real Kujo evidence integration, smart-HTTP Git transport,
+the `source submit` contribution flow, capability-gated API auth, a SQLite store
+backend, and multi-tenant org management).
 
 ## Status
 
-- **68/68 tests pass**, including a dogfood test against the real `spec` Kujo
+- **76/76 tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests, `source submit`
-  contribution-flow tests, capability-gated API auth tests, and SQLite store
-  transaction/contract tests.
+  contribution-flow tests, capability-gated API auth tests, SQLite store
+  transaction/contract tests, and multi-tenant org-management/tenant-isolation
+  tests.
 - Zero runtime dependencies (Node.js ≥ 18, `git` on PATH). The SQLite backend
   requires Node ≥ 22.5 (`node:sqlite`); the JSON store works on Node ≥ 18.
 - Deterministic-first: no LLM is required for any operation in the slice.
@@ -37,32 +38,36 @@ npm test
 node bin/source.js help
 node bin/source.js init --name source.kujolang.ai
 node bin/source.js org create --name kujolang --slug kujolang
+node bin/source.js org list
+node bin/source.js org show O1
 node bin/source.js project create --org O1 --name spec --slug spec
 node bin/source.js principal create --type human --name maintainer
 node bin/source.js work create --org O1 --project P1 --intent "fix parser regression"
 node bin/source.js work claim --org O1 --project P1 W1 --principal U1
 
 # Issue a bounded capability for an agent (operator/CLI, out-of-band)
-node bin/source.js cap issue --principal U2 --project P1 \
+node bin/source.js cap issue --principal U2 --org O1 --project P1 \
   --allowed read_source,read_context,submit_change,submit_evidence \
   --denied accept_change,modify_policy,publish_release
 
 # Serve the HTTP API + minimal web UI + smart-HTTP Git transport
 node bin/source.js serve --port 8787
-#   GET /.well-known/source          (agent discovery)
-#   GET /                            (human project index)
-#   GET /api/v1/projects/P1/work     (machine interface, requires capability)
-#   git clone http://localhost:8787/git/P1/R1.git   (smart-HTTP)
+#   GET /.well-known/source                          (agent discovery)
+#   GET /                                            (human org index)
+#   GET /api/v1/orgs/O1/projects/P1/work              (machine interface, requires capability)
+#   git clone http://localhost:8787/git/O1/P1/R1.git (smart-HTTP)
 
 # Contribute as a Git-only developer (no Source concepts required)
-git clone http://localhost:8787/git/P1/R1.git
+git clone http://localhost:8787/git/O1/P1/R1.git
 # ... make changes ...
 node bin/source.js submit --url http://localhost:8787
 ```
 
 The machine interface (`/api/v1/…`) is capability-gated: send
-`Authorization: Bearer <credential>` on every request. See
-`docs/source/19-capability-auth.md`.
+`Authorization: Bearer <credential>` on every request. The Organization is the
+tenant boundary and is explicit in every route (`/api/v1/orgs/{org}/…`,
+`/git/{org}/{project}/…`). See `docs/source/19-capability-auth.md` and
+`docs/source/21-multi-tenant-orgs.md`.
 
 ### Storage backend
 
@@ -89,9 +94,9 @@ src/
   git-http.js    — smart-HTTP transport via `git http-backend`
   policy.js      — deterministic required-evidence evaluation
   capability.js  — bounded, expiring capability grants
-  auth.js        — capability-gated API authorization (actions + scope)
+  auth.js        — capability-gated API authorization (actions + org/project/work scope)
   api.js         — HTTP API + /.well-known/source discovery + /git/ transport
-  web.js         — minimal human-facing HTML views
+  web.js         — minimal human-facing HTML views (org/project/work/change)
   cli.js         — CLI (same services as the API)
   submit.js      — `source submit` contribution client
   integrations/
@@ -117,6 +122,7 @@ The full architecture, domain model, threat model, and MVP scope are in
 - `18-source-submit.md` — the `source submit` contribution flow
 - `19-capability-auth.md` — capability-gated API auth
 - `20-sqlite-store.md` — the SQLite store backend and transactions
+- `21-multi-tenant-orgs.md` — the org-scoped tenant boundary
 - `decisions/` — architecture decision records
 
 ## License

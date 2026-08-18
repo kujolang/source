@@ -19,7 +19,7 @@ lifecycle:
 | Capability | `src/capability.js` | Bounded, expiring, revocable grants |
 | Auth | `src/auth.js` | Capability-gated API authorization (actions + scope) |
 | API | `src/api.js` | HTTP API + `/.well-known/source` discovery + field selection |
-| Web | `src/web.js` | Minimal human-facing HTML (project/work/change) |
+| Web | `src/web.js` | Minimal human-facing HTML (org/project/work/change) |
 | CLI | `src/cli.js`, `bin/source.js` | Same services as the API |
 | Submit | `src/submit.js` | `source submit` contribution client |
 
@@ -103,12 +103,13 @@ Controls implemented:
 
 - Bounded, expiring, revocable capabilities (server-enforced).
 - Capability-gated API auth: every `/api/v1/` endpoint requires a credential;
-  scope (project/work) is enforced server-side (see `19-capability-auth.md`).
+  scope (org/project/work) is enforced server-side (see `19-capability-auth.md`).
 - Deny-list (`accept_change`, `modify_policy`, `publish_release`).
 - Approval authority: only a `human` principal may accept (policy-enforced).
 - Evidence integrity: content-addressed artifacts, SHA-256 hashes.
 - TOCTOU guard: fast-forward update refused on non-fast-forward.
-- Tenant isolation: org-scoped paths, server-side checks (tested).
+- Tenant isolation: org-scoped paths + org-scoped capability checks, enforced
+  server-side (see `21-multi-tenant-orgs.md`).
 - Append-only audit log of every authorization/decision/state event.
 - HTML escaping of all repo content in web views (untrusted data).
 - Smart-HTTP: server-side repo resolution, path-traversal rejection (tested).
@@ -131,12 +132,12 @@ Measured in `tests/api.test.js`:
 
 ## Known Limitations (no euphemisms)
 
-1. **Single Organization per Instance** in the MVP (multi-tenant boundary
-   exists in schema and is tested, but there is no org-management UI).
+1. ~~**Single Organization per Instance**~~ — resolved: the org is now a
+   first-class, server-enforced tenant boundary (see `21-multi-tenant-orgs.md`).
 2. **Single-repository Changes** (multi-repo schema present, not exercised).
 3. **Smart-HTTP has no TLS or auth** — transport works, but it is plain HTTP
    and anonymous; TLS and Git-transport auth are pending (the HTTP API itself
-   is now capability-gated; see `19-capability-auth.md`).
+   is capability-gated; see `19-capability-auth.md`).
 4. **JSON-file store** — no transactions across records; fine at MVP scale.
    (A SQLite backend with ACID transactions is now available; see
    `20-sqlite-store.md`.)
@@ -157,6 +158,9 @@ Measured in `tests/api.test.js`:
    push; fixed by making it synchronous.
 4. **Smart-HTTP tests must use async `execFile`** — `execFileSync` blocks the
    event loop, so an in-process server cannot answer the git client's requests.
+5. **Org and project ids must use independent counters** — `createOrg` reused
+   the project counter, so the first project was `P2`; fixed with a dedicated
+   `org` prefix (see `21-multi-tenant-orgs.md`).
 
 ## Product Questions (require human decision)
 
@@ -176,13 +180,13 @@ Measured in `tests/api.test.js`:
 3. ~~**`source submit` contribution flow**~~ — done (`18-source-submit.md`).
 4. ~~**Capability-gated API auth**~~ — done (`19-capability-auth.md`).
 5. ~~**SQLite/Postgres store**~~ — done (`20-sqlite-store.md`).
-6. **Multi-tenant org management** — the boundary exists; add the UI/API.
+6. ~~**Multi-tenant org management**~~ — done (`21-multi-tenant-orgs.md`).
 
 ---
 
 ## Update (next phase)
 
-Items 1–5 of "Recommended Next Phase" are now complete:
+All six items of the original "Recommended Next Phase" are now complete:
 
 - **Real Kujo evidence integration** — see `17-kujo-evidence-integration.md`.
 - **Smart-HTTP Git transport** — see `10-git-integration.md`; `git clone`,
@@ -196,5 +200,27 @@ Items 1–5 of "Recommended Next Phase" are now complete:
 - **SQLite store** — see `20-sqlite-store.md`; the JSON store is swappable for
   a zero-dependency SQLite backend (`node:sqlite`) with ACID transactions
   across records, selected via `--store sqlite`.
+- **Multi-tenant org management** — see `21-multi-tenant-orgs.md`; the org is
+  now explicit in every route (`/api/v1/orgs/{org}/…`, `/git/{org}/{project}/…`),
+  org-scoped capabilities are enforced server-side, and org list/get/create is
+  exposed via API, CLI, and web.
 
-The remaining next-phase item (multi-tenant org management) is unchanged.
+The test suite is now **76/76 passing**.
+
+## Next phase (fresh prioritization)
+
+With the original six increments complete, the next phase should be ranked by
+product value, not coding convenience:
+
+1. **Git-transport auth** — smart-HTTP is still anonymous; wire capability (or
+   basic-auth) into `git http-backend` so private repos are actually private.
+2. **TLS + deployment** — the transport is plain HTTP; a real deployment needs
+   TLS termination and a documented self-host path.
+3. **Multi-repository Changes** — the schema supports it; exercise a Change
+   spanning two repos.
+4. **Rate limiting + secret scanning** — the anonymous `submit` path and Git
+   push are unthrottled; add basic controls.
+5. **Normalized relational schema (Postgres)** — the `storage` boundary is the
+   seam; a queryable relationship model replaces the path-keyed records table.
+6. **Human authentication** — the HTML views are public; add a real human
+   identity path (not username/password as the fundamental model).

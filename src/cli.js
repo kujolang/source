@@ -62,6 +62,14 @@ export async function run(argv) {
           print(org);
           return;
         }
+        if (sub === 'list') {
+          print(src.listOrgs());
+          return;
+        }
+        if (sub === 'show') {
+          print(src.getOrg(rest[0]));
+          return;
+        }
         break;
       }
       case 'project': {
@@ -214,6 +222,7 @@ export async function run(argv) {
           const cap = src.capabilities.issue({
             principalId: flag('--principal') || 'U1',
             scope: {
+              org: flag('--org') || undefined,
               project: flag('--project') || undefined,
               work: flag('--work') || undefined,
             },
@@ -270,11 +279,11 @@ export async function run(argv) {
           '',
           'Commands:',
           '  init --name <n> [--hosted]',
-          '  org create --name <n> --slug <s>',
+          '  org create|list|show [--name <n> --slug <s>]',
           '  project create|list|show --org <o> [--name --slug]',
           '  repo create --org <o> --project <p> --name <n>',
           '  principal create --type human|agent|service --name <n>',
-          '  cap issue --principal <id> [--project <p>] [--work <w>] [--allowed a,b] [--denied d,e] [--ttl <ms>]',
+          '  cap issue --principal <id> [--org <o>] [--project <p>] [--work <w>] [--allowed a,b] [--denied d,e] [--ttl <ms>]',
           '  cap revoke <id>',
           '  work create|list|show|claim|assign --org <o> --project <p>',
           '  session start|complete --org <o> --project <p>',

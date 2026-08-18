@@ -27,7 +27,7 @@ Create Project → Connect/Create Git Repository → Create Work → Assign/Clai
 | Audit | append-only log of every authorization/decision/state event |
 | Agent interface | `/.well-known/source` + JSON API (no HTML required) |
 | CLI | `source project/work/session/change/evidence/decision` |
-| Web UI | minimal project/work/change/evidence views |
+| Web UI | minimal org/project/work/change/evidence views |
 | Capability | bounded, expiring grants; server-enforced |
 | Tests | unit, lifecycle, authorization, capability-expiry, tenant-isolation, git, API, evidence-integrity, policy, e2e |
 
@@ -48,8 +48,8 @@ plane, visual design system.
 
 ## Deliberate simplifications (documented, reversible)
 
-- Single Organization per Instance in MVP (multi-tenant boundary exists in
-  schema and is tested, but no org-management UI).
+- ~~Single Organization per Instance~~ — resolved: the org is now a first-class,
+  server-enforced tenant boundary (see `21-multi-tenant-orgs.md`).
 - Single-repository Changes (multi-repo schema present).
 - Local `file://` Git transport (smart-HTTP is a documented next step).
 - JSON-file store (swappable for SQLite/Postgres).

@@ -1,7 +1,7 @@
 // Source — minimal human-facing HTML views.
 //
 // The frontend is not the primary innovation. These views are enough for a
-// maintainer to understand what happened: project, work, change, evidence.
+// maintainer to understand what happened: org, project, work, change, evidence.
 // All content is HTML-escaped (repo content is untrusted data).
 
 function esc(s) {
@@ -23,12 +23,23 @@ pre{background:#f6f8fa;padding:.75rem;overflow:auto}</style></head>
 <body>${body}</body></html>`;
 }
 
+// Instance index: list organizations (the tenant boundary).
+export function renderOrgIndex(src) {
+  const orgs = src.listOrgs();
+  const rows = orgs
+    .map((o) => `<tr><td><a href="/o/${esc(o.id)}">${esc(o.name)}</a></td><td>${esc(o.slug)}</td><td>${esc(o.visibility)}</td></tr>`)
+    .join('');
+  return page('Source', `<h1>Source</h1><h2>Organizations</h2><table><tr><th>Name</th><th>Slug</th><th>Visibility</th></tr>${rows || '<tr><td colspan=3>none</td></tr>'}</table>`);
+}
+
+// Organization index: list the org's projects.
 export function renderIndex(src, orgId) {
+  const org = src.getOrg(orgId);
   const projects = src.listProjects(orgId);
   const rows = projects
-    .map((p) => `<tr><td><a href="/p/${esc(p.id)}">${esc(p.name)}</a></td><td>${esc(p.slug)}</td><td>${esc(p.visibility)}</td></tr>`)
+    .map((p) => `<tr><td><a href="/o/${esc(orgId)}/p/${esc(p.id)}">${esc(p.name)}</a></td><td>${esc(p.slug)}</td><td>${esc(p.visibility)}</td></tr>`)
     .join('');
-  return page('Source', `<h1>Source</h1><h2>Projects</h2><table><tr><th>Name</th><th>Slug</th><th>Visibility</th></tr>${rows || '<tr><td colspan=3>none</td></tr>'}</table>`);
+  return page(org ? org.name : 'Source', `<h1>${esc(org?.name ?? 'Source')}</h1><h2>Projects</h2><table><tr><th>Name</th><th>Slug</th><th>Visibility</th></tr>${rows || '<tr><td colspan=3>none</td></tr>'}</table>`);
 }
 
 export function renderProject(src, orgId, projectId) {
@@ -37,10 +48,10 @@ export function renderProject(src, orgId, projectId) {
   const work = src.listWork(orgId, projectId);
   const changes = src.listChanges(orgId, projectId);
   const workRows = work
-    .map((w) => `<tr><td><a href="/p/${esc(projectId)}/w/${esc(w.id)}">${esc(w.id)}</a></td><td>${esc(w.intent)}</td><td><span class="badge">${esc(w.status)}</span></td></tr>`)
+    .map((w) => `<tr><td><a href="/o/${esc(orgId)}/p/${esc(projectId)}/w/${esc(w.id)}">${esc(w.id)}</a></td><td>${esc(w.intent)}</td><td><span class="badge">${esc(w.status)}</span></td></tr>`)
     .join('');
   const changeRows = changes
-    .map((c) => `<tr><td><a href="/p/${esc(projectId)}/c/${esc(c.id)}">${esc(c.id)}</a></td><td>${esc(c.workId)}</td><td><span class="badge">${esc(c.decisionState)}</span></td></tr>`)
+    .map((c) => `<tr><td><a href="/o/${esc(orgId)}/p/${esc(projectId)}/c/${esc(c.id)}">${esc(c.id)}</a></td><td>${esc(c.workId)}</td><td><span class="badge">${esc(c.decisionState)}</span></td></tr>`)
     .join('');
   return page(
     p.name,
@@ -62,7 +73,7 @@ export function renderWork(src, orgId, projectId, workId) {
 <h2>Requirements</h2><ul>${w.requirements.map((r) => `<li>${esc(r)}</li>`).join('') || '<li>none</li>'}</ul>
 <h2>Acceptance conditions</h2><ul>${w.acceptanceConditions.map((r) => `<li>${esc(r)}</li>`).join('') || '<li>none</li>'}</ul>
 <h2>Sessions</h2><ul>${w.sessions.map((s) => `<li>${esc(s)}</li>`).join('') || '<li>none</li>'}</ul>
-<h2>Changes</h2><ul>${w.changes.map((c) => `<li><a href="/p/${esc(projectId)}/c/${esc(c)}">${esc(c)}</a></li>`).join('') || '<li>none</li>'}</ul>`,
+<h2>Changes</h2><ul>${w.changes.map((c) => `<li><a href="/o/${esc(orgId)}/p/${esc(projectId)}/c/${esc(c)}">${esc(c)}</a></li>`).join('') || '<li>none</li>'}</ul>`,
   );
 }
 

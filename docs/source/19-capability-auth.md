@@ -1,8 +1,8 @@
 # 19 — Capability-Gated API Auth
 
-Status: **Implemented.** The machine interface (`/api/v1/…`) is now
+Status: **Implemented.** The machine interface (`/api/v1/…`) is
 capability-gated; the bounded-capability model is enforced at the HTTP boundary,
-not only in the domain layer.
+not only in the domain layer. Scope is `{org, project, work}`.
 
 ## What changed
 
@@ -27,7 +27,7 @@ discovery manifest):
 
 | Action | Meaning |
 |---|---|
-| `read_source` | read project/repository metadata |
+| `read_source` | read org/project/repository metadata |
 | `read_context` | read Work/Change/Evidence context |
 | `claim_work` | claim a Work item |
 | `start_session` | start a Session |
@@ -36,43 +36,51 @@ discovery manifest):
 | `accept_change` | record a Decision (accept/reject/revision) |
 | `modify_policy` | change policy (not yet exposed) |
 | `publish_release` | publish a release (not yet exposed) |
+| `manage_org` | create an Organization (tenant) |
 
 ## Endpoint → action mapping
 
 | Endpoint | Method | Action | Scope |
 |---|---|---|---|
 | `/.well-known/source` | GET | public | — |
-| `/` and `/p/…` HTML | GET | public | — |
-| `/git/…` | GET/POST | (unchanged) | — |
-| `/api/v1/projects` | GET | `read_source` | instance |
-| `/api/v1/projects/{p}` | GET | `read_source` | project |
-| `/api/v1/projects/{p}/policy` | GET | `read_context` | project |
-| `/api/v1/projects/{p}/work` | GET | `read_context` | project |
-| `/api/v1/projects/{p}/work/{w}` | GET | `read_context` | project + work |
-| `/api/v1/projects/{p}/work/{w}/claim` | POST | `claim_work` | project + work |
-| `/api/v1/projects/{p}/work/{w}/sessions` | POST | `start_session` | project + work |
-| `/api/v1/projects/{p}/work/{w}/context` | GET | `read_context` | project + work |
-| `/api/v1/projects/{p}/work/{w}/changes` | POST | `submit_change` | project + work |
-| `/api/v1/projects/{p}/changes/{c}` | GET | `read_context` | project + work |
-| `/api/v1/projects/{p}/changes/{c}/evidence` | POST | `submit_evidence` | project + work |
-| `/api/v1/projects/{p}/changes/{c}/evaluate` | POST | `submit_evidence` | project + work |
-| `/api/v1/projects/{p}/changes/{c}/decision` | GET | `read_context` | project + work |
-| `/api/v1/projects/{p}/changes/{c}/decision` | POST | `accept_change` | project |
-| `/api/v1/projects/{p}/evidence/{e}` | GET | `read_context` | project |
-| `/api/v1/projects/{p}/evidence/{e}/artifact` | GET | `read_context` | project |
-| `/api/v1/projects/{p}/submit` | POST | public | — |
+| `/` and `/o/…` HTML | GET | public | — |
+| `/git/{org}/{project}/…` | GET/POST | (unchanged) | — |
+| `/api/v1/orgs` | GET | `read_source` | instance |
+| `/api/v1/orgs` | POST | `manage_org` | instance |
+| `/api/v1/orgs/{org}` | GET | `read_source` | org |
+| `/api/v1/orgs/{org}/projects/{p}` | GET | `read_source` | org + project |
+| `/api/v1/orgs/{org}/projects/{p}/policy` | GET | `read_context` | org + project |
+| `/api/v1/orgs/{org}/projects/{p}/work` | GET | `read_context` | org + project |
+| `/api/v1/orgs/{org}/projects/{p}/work/{w}` | GET | `read_context` | org + project + work |
+| `/api/v1/orgs/{org}/projects/{p}/work/{w}/claim` | POST | `claim_work` | org + project + work |
+| `/api/v1/orgs/{org}/projects/{p}/work/{w}/sessions` | POST | `start_session` | org + project + work |
+| `/api/v1/orgs/{org}/projects/{p}/work/{w}/context` | GET | `read_context` | org + project + work |
+| `/api/v1/orgs/{org}/projects/{p}/work/{w}/changes` | POST | `submit_change` | org + project + work |
+| `/api/v1/orgs/{org}/projects/{p}/changes/{c}` | GET | `read_context` | org + project + work |
+| `/api/v1/orgs/{org}/projects/{p}/changes/{c}/evidence` | POST | `submit_evidence` | org + project + work |
+| `/api/v1/orgs/{org}/projects/{p}/changes/{c}/evaluate` | POST | `submit_evidence` | org + project + work |
+| `/api/v1/orgs/{org}/projects/{p}/changes/{c}/decision` | GET | `read_context` | org + project + work |
+| `/api/v1/orgs/{org}/projects/{p}/changes/{c}/decision` | POST | `accept_change` | org + project |
+| `/api/v1/orgs/{org}/projects/{p}/evidence/{e}` | GET | `read_context` | org + project |
+| `/api/v1/orgs/{org}/projects/{p}/evidence/{e}/artifact` | GET | `read_context` | org + project |
+| `/api/v1/orgs/{org}/projects/{p}/submit` | POST | public | — |
 
 ## Scope enforcement
 
-A capability's `scope` is `{ project?, work? }`. A missing field means "no
-restriction". A request is authorized only if the capability's scope covers the
-request's `{project, work}`:
+A capability's `scope` is `{ org?, project?, work? }`. A missing field means
+"no restriction". A request is authorized only if the capability's scope covers
+the request's `{org, project, work}`:
 
+- `scope.org` set → must equal the request org.
 - `scope.project` set → must equal the request project.
 - `scope.work` set → must equal the request work.
 
 For Change endpoints, the Work is resolved from the Change (`change.workId`) so a
 work-scoped session capability can submit Evidence to its own Change.
+
+The org check is the tenant boundary: a capability scoped to org A cannot reach
+anything under org B, even by guessing a project id (see
+`21-multi-tenant-orgs.md`).
 
 ## Status codes
 
@@ -92,9 +100,9 @@ Agent Definition ──► bootstrap capability (claim_work, start_session)
 ──► Change ──► Evidence ──► Session ends ──► capability expires
 ```
 
-The session capability is bounded to `{project, work}`, expires after 4 hours,
-and denies `accept_change`, `modify_policy`, `publish_release`. This is the
-"temporary session identity" flow from the MEGA_PROMPT §10.
+The session capability is bounded to `{org, project, work}`, expires after 4
+hours, and denies `accept_change`, `modify_policy`, `publish_release`. This is
+the "temporary session identity" flow from the MEGA_PROMPT §10.
 
 ## Issuance
 
@@ -102,7 +110,7 @@ Capabilities are issued **out-of-band** (operator/CLI), not via an
 unauthenticated endpoint:
 
 ```bash
-source cap issue --principal U2 --project P1 --work W1 \
+source cap issue --principal U2 --org O1 --project P1 --work W1 \
   --allowed read_source,read_context,submit_change,submit_evidence \
   --denied accept_change,modify_policy,publish_release
 source cap revoke K1
@@ -115,10 +123,10 @@ would be a privilege-escalation hole.
 
 - `/.well-known/source` — discovery must be public so agents can find the
   instance.
-- HTML views (`/`, `/p/…`) — the human interface; human authentication is a
+- HTML views (`/`, `/o/…`) — the human interface; human authentication is a
   separate, later phase.
-- `/api/v1/projects/{p}/submit` — the low-friction anonymous contribution path
-  (`source submit`). Rate limiting is a documented follow-up.
+- `/api/v1/orgs/{org}/projects/{p}/submit` — the low-friction anonymous
+  contribution path (`source submit`). Rate limiting is a documented follow-up.
 - `/git/…` — smart-HTTP transport is still anonymous; Git-transport auth is a
   separate follow-up (git clients use basic auth, not bearer tokens).
 
@@ -129,9 +137,13 @@ not-allowed and denied actions (403), project-scope and work-scope violations
 (403), the session-scoped capability (submit allowed, accept denied), and the
 public contribution path.
 
+`tests/org.test.js` covers org-scoped enforcement: org creation requires
+`manage_org`, and an org-scoped capability cannot reach another org (403/404).
+
 ## Cross-references
 
 - `08-identity-capability-model.md` — the capability model and crypto choice.
 - `09-agent-protocol.md` — how agents obtain and use capabilities.
+- `21-multi-tenant-orgs.md` — the org-scoped URL scheme and tenant boundary.
 - `12-threat-model.md` — stolen capability, replay, escalation.
 - `16-mvp-results.md` — item 4 of the next-phase list.

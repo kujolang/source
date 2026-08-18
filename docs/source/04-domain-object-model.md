@@ -26,8 +26,9 @@ boundaries are enforced at the Organization level.
 
 ### Organization
 A grouping of principals and projects. Fields: `id`, `name`, `slug`,
-`visibility`, `created_at`. MVP keeps this minimal (single org) but the
-boundary exists so multi-tenancy is not retrofitted later.
+`visibility`, `created_at`. The Organization is the tenant boundary: it is
+explicit in every route and enforced server-side (see
+`21-multi-tenant-orgs.md`).
 
 ### Project
 The primary human-facing unit. Fields: `id`, `slug`, `name`, `description`,
@@ -98,7 +99,7 @@ Capabilities are issued to.
 
 ### Capability
 A bounded grant of authority. Fields: `id`, `principal_id`, `scope`
-(`project|repository|work|action`), `allowed[]`, `denied[]`, `expires_at`,
+(`org|project|repository|work|action`), `allowed[]`, `denied[]`, `expires_at`,
 `issued_at`, `token` (opaque, HMAC-signed). Example scope: read source, read
 context, submit change, submit evidence; denied: accept change, modify policy,
 publish release. See `08-identity-capability-model.md`.

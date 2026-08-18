@@ -69,8 +69,7 @@ export class Source {
   }
 
   createOrg({ name, slug }) {
-    const id = nextId(this.store, 'project'); // reuse a counter; org ids are O<n>
-    const orgId = `O${id.slice(1)}`;
+    const orgId = nextId(this.store, 'org');
     const org = { id: orgId, name, slug, visibility: 'private', createdAt: new Date().toISOString() };
     this.store.writeJson(`${this._orgRel(orgId)}/org.json`, org);
     this.store.audit({ event: 'org.create', orgId, name });
@@ -79,6 +78,16 @@ export class Source {
 
   getOrg(orgId) {
     return this.store.readJson(`${this._orgRel(orgId)}/org.json`);
+  }
+
+  listOrgs() {
+    const dir = path.join(this.dataRoot, 'orgs');
+    if (!fs.existsSync(dir)) return [];
+    return fs
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => this.getOrg(e.name))
+      .filter(Boolean);
   }
 
   createProject({ orgId, slug, name, description = '', visibility = 'private' }) {
@@ -175,12 +184,13 @@ export class Source {
 
   // --- capabilities -----------------------------------------------------
   // Issue a session-scoped capability for an agent working a specific Work item.
-  // This is the "temporary session identity" grant: bounded to the project and
-  // work, expiring, and denied the authority to accept changes or modify policy.
+  // This is the "temporary session identity" grant: bounded to the org, project,
+  // and work, expiring, and denied the authority to accept changes or modify
+  // policy.
   issueSessionCapability({ orgId, projectId, workId, principalId }) {
     const cap = this.capabilities.issue({
       principalId,
-      scope: { project: projectId, work: workId },
+      scope: { org: orgId, project: projectId, work: workId },
       allowed: ['read_source', 'read_context', 'submit_change', 'submit_evidence'],
       denied: ['accept_change', 'modify_policy', 'publish_release'],
     });

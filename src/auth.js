@@ -17,6 +17,7 @@ export const ACTIONS = {
   accept_change: 'accept_change',
   modify_policy: 'modify_policy',
   publish_release: 'publish_release',
+  manage_org: 'manage_org',
 };
 
 // Extract a bearer credential from an Authorization header.
@@ -26,10 +27,11 @@ export function bearerCredential(req) {
   return m ? m[1].trim() : null;
 }
 
-// Does a capability's scope cover a request targeting {project, work}?
+// Does a capability's scope cover a request targeting {org, project, work}?
 // A missing scope field means "no restriction" (instance-wide).
-export function scopeCovers(cap, { project, work } = {}) {
+export function scopeCovers(cap, { org, project, work } = {}) {
   const s = cap.scope || {};
+  if (s.org && s.org !== org) return false;
   if (s.project && s.project !== project) return false;
   if (s.work && s.work !== work) return false;
   return true;
@@ -48,13 +50,13 @@ function statusFor(reason) {
 
 // Authorize a request against a capability service.
 // Returns {ok:true, cap} or {ok:false, status, error}.
-export function authorizeRequest(capabilities, req, action, { project, work } = {}) {
+export function authorizeRequest(capabilities, req, action, { org, project, work } = {}) {
   const credential = bearerCredential(req);
   const auth = capabilities.authorize(credential, action);
   if (!auth.ok) {
     return { ok: false, status: statusFor(auth.reason), error: auth.reason };
   }
-  if (!scopeCovers(auth.cap, { project, work })) {
+  if (!scopeCovers(auth.cap, { org, project, work })) {
     return { ok: false, status: 403, error: 'scope violation' };
   }
   return { ok: true, cap: auth.cap };

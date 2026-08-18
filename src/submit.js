@@ -2,7 +2,7 @@
 //
 // The low-friction path for a developer who knows Git but not Source:
 //
-//   git clone https://source.example.com/git/{project}/{repo}.git
+//   git clone https://source.example.com/git/{org}/{project}/{repo}.git
 //   # make changes
 //   source submit
 //
@@ -26,14 +26,14 @@ function git(args, cwd) {
   });
 }
 
-// Parse a Source smart-HTTP remote URL into { baseUrl, projectId, repoRef }.
-//   http://host:port/git/{project}/{repo}.git
+// Parse a Source smart-HTTP remote URL into { baseUrl, orgId, projectId, repoRef }.
+//   http://host:port/git/{org}/{project}/{repo}.git
 function parseRemoteUrl(url) {
-  const m = url.match(/^(https?:\/\/[^/]+)\/git\/([^/]+)\/([^/]+)\.git$/);
+  const m = url.match(/^(https?:\/\/[^/]+)\/git\/([^/]+)\/([^/]+)\/([^/]+)\.git$/);
   if (!m) {
-    throw new Error(`unrecognized remote URL: ${url} (expected .../git/{project}/{repo}.git)`);
+    throw new Error(`unrecognized remote URL: ${url} (expected .../git/{org}/{project}/{repo}.git)`);
   }
-  return { baseUrl: m[1], projectId: m[2], repoRef: m[3] };
+  return { baseUrl: m[1], orgId: m[2], projectId: m[3], repoRef: m[4] };
 }
 
 // Determine the base commit: the fork point between HEAD and the remote default
@@ -56,7 +56,7 @@ export async function submitFromWorkingDir({ cwd = process.cwd(), intent = '', b
   // 1. Confirm we are inside a Git working tree.
   await git(['rev-parse', '--show-toplevel'], cwd);
 
-  // 2. Resolve the origin remote and parse the Source project/repo.
+  // 2. Resolve the origin remote and parse the Source org/project/repo.
   const remoteUrl = await git(['config', '--get', 'remote.origin.url'], cwd);
   const parsed = parseRemoteUrl(remoteUrl);
   const apiBase = baseUrl || parsed.baseUrl;
@@ -88,8 +88,8 @@ export async function submitFromWorkingDir({ cwd = process.cwd(), intent = '', b
     }
   }
 
-  // 6. Submit to the Source API.
-  const res = await fetch(`${apiBase}/api/v1/projects/${parsed.projectId}/submit`, {
+  // 6. Submit to the Source API (org-scoped).
+  const res = await fetch(`${apiBase}/api/v1/orgs/${parsed.orgId}/projects/${parsed.projectId}/submit`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({

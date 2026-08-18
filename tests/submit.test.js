@@ -42,9 +42,9 @@ async function withServer(src, fn) {
 }
 
 // Clone a Source repo over HTTP, make a change, and return the working dir.
-async function cloneAndModify(base, projectId, repoName) {
+async function cloneAndModify(base, orgId, projectId, repoName) {
   const cloneDir = mkdtempSync(path.join(tmpdir(), 'source-submit-'));
-  await run(['clone', `${base}/git/${projectId}/${repoName}.git`, cloneDir]);
+  await run(['clone', `${base}/git/${orgId}/${projectId}/${repoName}.git`, cloneDir]);
   await run(['config', 'user.email', 'dev@example.com'], cloneDir);
   await run(['config', 'user.name', 'Dev Contributor'], cloneDir);
   writeFileSync(path.join(cloneDir, 'FEATURE.md'), '# feature\n');
@@ -58,7 +58,7 @@ test('source submit: a Git-only developer contributes without knowing Source', a
   const { repo, head: seedHead } = seedRepo(src, org.id, project.id);
 
   await withServer(src, async (base) => {
-    const cloneDir = await cloneAndModify(base, project.id, repo.name);
+    const cloneDir = await cloneAndModify(base, org.id, project.id, repo.name);
 
     // The minimal Source-specific step.
     const result = await submitFromWorkingDir({ cwd: cloneDir, baseUrl: base });
@@ -105,7 +105,7 @@ test('source submit: a contribution can be completed end-to-end by a maintainer'
   const { repo } = seedRepo(src, org.id, project.id);
 
   await withServer(src, async (base) => {
-    const cloneDir = await cloneAndModify(base, project.id, repo.name);
+    const cloneDir = await cloneAndModify(base, org.id, project.id, repo.name);
     const result = await submitFromWorkingDir({ cwd: cloneDir, baseUrl: base });
 
     // The maintainer's verification service fills the required evidence.
@@ -139,7 +139,7 @@ test('source submit: empty change is rejected', async () => {
   await withServer(src, async (base) => {
     // Clone without modifying.
     const cloneDir = mkdtempSync(path.join(tmpdir(), 'source-submit-empty-'));
-    await run(['clone', `${base}/git/${project.id}/${repo.name}.git`, cloneDir]);
+    await run(['clone', `${base}/git/${org.id}/${project.id}/${repo.name}.git`, cloneDir]);
     await run(['config', 'user.email', 'dev@example.com'], cloneDir);
     await run(['config', 'user.name', 'Dev Contributor'], cloneDir);
 

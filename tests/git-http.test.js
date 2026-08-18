@@ -2,6 +2,8 @@
 //
 // Proves that a developer who knows Git but not Source can clone, fetch, and
 // push over HTTP against a Source bare repository — the human onboarding ramp.
+// The org is explicit in the URL (`/git/{org}/{project}/{repo}.git`), so the
+// tenant boundary is enforced server-side.
 //
 // Note: the git client runs in the same process as the server, so git commands
 // must be invoked asynchronously (execFile, not execFileSync) to avoid blocking
@@ -42,7 +44,7 @@ test('git clone works over smart HTTP', async () => {
   const { repo } = seedRepo(src, org.id, project.id);
   await withServer(src, async (base) => {
     const cloneDir = mkdtempSync(path.join(tmpdir(), 'source-http-clone-'));
-    await run(['clone', `${base}/git/${project.id}/${repo.id}.git`, cloneDir]);
+    await run(['clone', `${base}/git/${org.id}/${project.id}/${repo.id}.git`, cloneDir]);
     const readme = readFileSync(path.join(cloneDir, 'README.md'), 'utf8');
     assert.ok(readme.includes('change'));
   });
@@ -53,7 +55,7 @@ test('git clone works by repository name over smart HTTP', async () => {
   const { repo } = seedRepo(src, org.id, project.id);
   await withServer(src, async (base) => {
     const cloneDir = mkdtempSync(path.join(tmpdir(), 'source-http-name-'));
-    await run(['clone', `${base}/git/${project.id}/${repo.name}.git`, cloneDir]);
+    await run(['clone', `${base}/git/${org.id}/${project.id}/${repo.name}.git`, cloneDir]);
     const readme = readFileSync(path.join(cloneDir, 'README.md'), 'utf8');
     assert.ok(readme.includes('change'));
   });
@@ -71,7 +73,7 @@ test('git fetch works over smart HTTP', async () => {
 
   await withServer(src, async (base) => {
     const cloneDir = mkdtempSync(path.join(tmpdir(), 'source-http-fetch-'));
-    await run(['clone', `${base}/git/${project.id}/${repo.id}.git`, cloneDir]);
+    await run(['clone', `${base}/git/${org.id}/${project.id}/${repo.id}.git`, cloneDir]);
     await run(['fetch', 'origin'], cloneDir);
     const log = await run(['log', '--oneline', 'origin/main'], cloneDir);
     assert.ok(log.includes('new'));
@@ -83,7 +85,7 @@ test('git push works over smart HTTP (contribution transport)', async () => {
   const { repo } = seedRepo(src, org.id, project.id);
   await withServer(src, async (base) => {
     const cloneDir = mkdtempSync(path.join(tmpdir(), 'source-http-push-'));
-    await run(['clone', `${base}/git/${project.id}/${repo.id}.git`, cloneDir]);
+    await run(['clone', `${base}/git/${org.id}/${project.id}/${repo.id}.git`, cloneDir]);
     writeFileSync(path.join(cloneDir, 'CONTRIB.md'), 'contribution\n');
     await run(['config', 'user.email', 'contrib@example.com'], cloneDir);
     await run(['config', 'user.name', 'Contrib'], cloneDir);
@@ -101,7 +103,18 @@ test('git push works over smart HTTP (contribution transport)', async () => {
 test('unknown repository returns 404 (tenant isolation)', async () => {
   const { src, org, project } = freshSource();
   await withServer(src, async (base) => {
-    const res = await fetch(`${base}/git/${project.id}/NOPE.git/info/refs?service=git-upload-pack`);
+    const res = await fetch(`${base}/git/${org.id}/${project.id}/NOPE.git/info/refs?service=git-upload-pack`);
+    assert.equal(res.status, 404);
+  });
+});
+
+test('a repository in another org is not reachable (tenant isolation)', async () => {
+  const { src, org, project } = freshSource();
+  const { repo } = seedRepo(src, org.id, project.id);
+  const org2 = src.createOrg({ name: 'other', slug: 'other' });
+  await withServer(src, async (base) => {
+    // The repo exists under org1; requesting it under org2 must 404.
+    const res = await fetch(`${base}/git/${org2.id}/${project.id}/${repo.id}.git/info/refs?service=git-upload-pack`);
     assert.equal(res.status, 404);
   });
 });
@@ -109,7 +122,7 @@ test('unknown repository returns 404 (tenant isolation)', async () => {
 test('path traversal is rejected (no repo escape)', async () => {
   const { src, org, project } = freshSource();
   await withServer(src, async (base) => {
-    const res = await fetch(`${base}/git/${project.id}/..%2F..%2Fetc.git/info/refs?service=git-upload-pack`);
+    const res = await fetch(`${base}/git/${org.id}/${project.id}/..%2F..%2Fetc.git/info/refs?service=git-upload-pack`);
     assert.equal(res.status, 404);
   });
 });
