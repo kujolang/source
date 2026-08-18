@@ -13,6 +13,9 @@
 // by delegating to `git http-backend`; see `git-http.js`. Git transport is
 // capability-gated via HTTP Basic auth (see `authorizeGit` in auth.js).
 //
+// Anonymous/unauthenticated paths (the `source submit` contribution endpoint
+// and Git push) are rate-limited by client address (see `ratelimit.js`).
+//
 // TLS: pass `tls: { key, cert }` (PEM) to `createServer`/`startServer` to
 // terminate TLS in-process (Node `https`). Otherwise the server is plain HTTP
 // and TLS is expected to be terminated by a reverse proxy (see
@@ -24,6 +27,7 @@ import { Source } from './source.js';
 import { renderOrgIndex, renderIndex, renderProject, renderWork, renderChange } from './web.js';
 import { gitHttpBackend } from './git-http.js';
 import { ACTIONS, authorizeRequest, authorizeGit } from './auth.js';
+import { RateLimiter } from './ratelimit.js';
 
 function json(res, status, obj) {
   const body = JSON.stringify(obj);
@@ -106,7 +110,13 @@ function changeWork(src, orgId, projectId, changeId) {
   return c ? c.workId : undefined;
 }
 
-export function createServer(src, { port = 8787, tls, host } = {}) {
+export function createServer(src, { port = 8787, tls, host, rateLimit = {} } = {}) {
+  const limiter = new RateLimiter();
+  const limits = {
+    submit: { limit: 10, windowMs: 60_000, ...(rateLimit.submit || {}) },
+    gitPush: { limit: 30, windowMs: 60_000, ...(rateLimit.gitPush || {}) },
+  };
+
   const handler = async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const pathname = url.pathname;
@@ -175,6 +185,15 @@ export function createServer(src, { port = 8787, tls, host } = {}) {
         // requires git_push. Enforced here, before delegating to git.
         const service = url.searchParams.get('service') || '';
         const isWrite = service === 'git-receive-pack' || rest.includes('git-receive-pack');
+
+        // Rate-limit the write path (push) by client address.
+        if (isWrite) {
+          const ip = req.socket.remoteAddress || 'unknown';
+          if (!limiter.allow(`gitpush:${ip}`, limits.gitPush)) {
+            return gitAuthError(res, 429, 'rate limit exceeded');
+          }
+        }
+
         const auth = authorizeGit(src.capabilities, req, {
           org: orgId,
           project: projectId,
@@ -261,8 +280,12 @@ export function createServer(src, { port = 8787, tls, host } = {}) {
         // Contribution flow: a Git-only developer submits a change from a
         // working clone. Source creates the Work → Session → Change → Evidence
         // lifecycle server-side. Public by design (low-friction onboarding);
-        // rate limiting is a documented follow-up.
+        // rate-limited by client address.
         if (rest === '/submit' && req.method === 'POST') {
+          const ip = req.socket.remoteAddress || 'unknown';
+          if (!limiter.allow(`submit:${ip}`, limits.submit)) {
+            return json(res, 429, { error: 'rate limit exceeded' });
+          }
           const body = await readBody(req);
           const r = src.submitContribution({ orgId, projectId, ...body });
           return json(res, 201, r);
@@ -321,7 +344,7 @@ export function createServer(src, { port = 8787, tls, host } = {}) {
             const g = guard(src, req, ACTIONS.submit_change, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
             const body = await readBody(req);
-            const c = src.submitChange({ orgId, projectId, workId, sessionId: body.sessionId, baseCommit: body.baseCommit, headCommit: body.headCommit, repositories: body.repositories });
+            const c = src.submitChange({ orgId, projectId, workId, sessionId: body.sessionId, baseCommit: body.baseCommit, headCommit: body.headCommit, repositories: body.repositories, repositoryChanges: body.repositoryChanges });
             return json(res, 201, c);
           }
         }
@@ -353,6 +376,13 @@ export function createServer(src, { port = 8787, tls, host } = {}) {
             if (g) return json(res, g.status, g.body);
             const r = src.evaluateChange({ orgId, projectId, changeId });
             return json(res, 200, { evaluation: r.evaluation, interpretation: r.interpretation });
+          }
+
+          if (crest === '/scan' && req.method === 'GET') {
+            const g = guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
+            if (g) return json(res, g.status, g.body);
+            const findings = src.scanChangeSecrets({ orgId, projectId, changeId });
+            return json(res, 200, { findings });
           }
 
           if (crest === '/decision' && req.method === 'GET') {

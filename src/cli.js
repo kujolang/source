@@ -151,6 +151,7 @@ export async function run(argv) {
         const orgId = flag('--org') || 'O1';
         const projectId = flag('--project') || 'P1';
         if (sub === 'submit') {
+          const repoChanges = flag('--repo-changes') ? JSON.parse(flag('--repo-changes')) : null;
           const c = src.submitChange({
             orgId,
             projectId,
@@ -158,6 +159,8 @@ export async function run(argv) {
             sessionId: flag('--session'),
             baseCommit: flag('--base') || '',
             headCommit: flag('--head') || '',
+            repositories: flag('--repos') ? flag('--repos').split(',') : [],
+            repositoryChanges: repoChanges,
           });
           print(c);
           return;
@@ -170,6 +173,10 @@ export async function run(argv) {
           const change = src.getChange(orgId, projectId, rest[0]);
           const evaluation = src.evaluateChange({ orgId, projectId, changeId: rest[0] });
           print({ change, interpretation: evaluation.interpretation });
+          return;
+        }
+        if (sub === 'scan-secrets') {
+          print({ findings: src.scanChangeSecrets({ orgId, projectId, changeId: flag('--change') || rest[0] }) });
           return;
         }
         break;
@@ -317,7 +324,7 @@ export async function run(argv) {
           '  git-cap --org <o> --project <p> --principal <id> [--read-only]',
           '  work create|list|show|claim|assign --org <o> --project <p>',
           '  session start|complete --org <o> --project <p>',
-          '  change submit|list|inspect --org <o> --project <p>',
+          '  change submit|list|inspect|scan-secrets --org <o> --project <p>',
           '  evidence add|list --org <o> --project <p>',
           '  decision accept|reject|request-revision --org <o> --project <p>',
           '  policy show --org <o> --project <p>',

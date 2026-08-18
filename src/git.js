@@ -108,6 +108,18 @@ export class GitRepo {
     }
   }
 
+  // Full diff (patch) between two commits (or empty tree).
+  diff(base, head) {
+    const args = ['diff', '--no-renames'];
+    if (base) args.push(base, head);
+    else args.push(head);
+    try {
+      return run(args, { cwd: this.barePath });
+    } catch {
+      return '';
+    }
+  }
+
   // List changed files between base and head.
   changedFiles(base, head) {
     const args = ['diff', '--name-status', '--no-renames'];

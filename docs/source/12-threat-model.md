@@ -80,7 +80,8 @@ never a control.
 - **Asset:** repos, availability. **Attacker:** unauthenticated client.
 - **Path:** push to protected refs, force-push, huge objects.
 - **Impact:** source corruption, DoS.
-- **Preventive:** capability-gated push; ref protection; size limits.
+- **Preventive:** capability-gated push; ref protection; size limits; rate
+  limiting on push.
 - **Detective:** post-receive events; audit.
 - **Recovery:** reflog; restore refs.
 - **Remaining risk:** MVP local transport; smart-HTTP hardening deferred.
@@ -134,15 +135,17 @@ never a control.
 - **Recovery:** revert.
 - **Remaining risk:** zero-dependency MVP reduces but does not eliminate.
 
-### T13 — Secret leakage
-- **Asset:** secrets. **Attacker:** log reader, contributor.
-- **Path:** secrets in commits, logs, or evidence artifacts.
+### T13 — Credential leakage
+- **Asset:** credentials. **Attacker:** log reader, contributor.
+- **Path:** credentials in commits, logs, or evidence artifacts.
 - **Impact:** credential compromise.
-- **Preventive:** never log secrets; redaction on evidence ingestion (Scent
-  pattern); no secrets in Source's own store.
-- **Detective:** secret scanning (deferred).
+- **Preventive:** never log credentials; redaction on evidence ingestion (Scent
+  pattern); no credentials in Source's own store.
+- **Detective:** deterministic credential scanning of Change diffs; findings
+  are redacted and recorded as `security` Evidence (see
+  `25-rate-limiting-scanning.md`).
 - **Recovery:** rotate.
-- **Remaining risk:** secrets already committed to Git history.
+- **Remaining risk:** credentials already committed to Git history.
 
 ### T14 — Malicious workflow / skill
 - **Asset:** execution. **Attacker:** contributor.
@@ -219,7 +222,7 @@ never a control.
 - **Path:** state moves between evaluation and merge.
 - **Impact:** merge on stale base.
 - **Preventive:** pin base/head hashes; fast-forward check at update; refuse
-  non-fast-forward.
+  non-fast-forward (per repository).
 - **Detective:** update refusal logged.
 - **Recovery:** re-evaluate.
 - **Remaining risk:** none (deterministic check).
@@ -237,10 +240,11 @@ never a control.
 - **Asset:** availability. **Attacker:** anyone.
 - **Path:** resource exhaustion (huge repos, many requests).
 - **Impact:** outage.
-- **Preventive:** size limits, rate limits (deferred), timeouts.
+- **Preventive:** size limits, rate limits (submit + git push), timeouts.
 - **Detective:** observability.
 - **Recovery:** restart; scale.
-- **Remaining risk:** MVP has minimal rate limiting.
+- **Remaining risk:** the rate limiter is per-process (in-memory); a shared
+  limiter is needed for horizontally-scaled deployments.
 
 ### T24 — Destructive Git operations
 - **Asset:** source. **Attacker:** principal with write.
@@ -258,3 +262,4 @@ never a control.
 - `10-git-integration.md` — Git endpoint controls.
 - `15-acceptance-tests.md` — security tests.
 - `23-tls-deployment.md` — TLS termination and deployment.
+- `25-rate-limiting-scanning.md` — rate limiting and credential scanning.

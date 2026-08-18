@@ -25,6 +25,7 @@ import {
 import { defaultPolicy, evaluateEvidence, interpret, canApprove } from './policy.js';
 import { nextId } from './ids.js';
 import { normalizeEvalSummary, normalizeEvalManifest, normalizeEvalRun, readEvalArtifacts } from './integrations/kujo.js';
+import { scanSecrets } from './scan.js';
 
 export class Source {
   // `store` is optional; defaults to the JSON-file store. Pass a SqliteStore
@@ -284,12 +285,12 @@ export class Source {
   }
 
   // --- change -----------------------------------------------------------
-  submitChange({ orgId, projectId, workId, sessionId, baseCommit, headCommit, repositories = [] }) {
+  submitChange({ orgId, projectId, workId, sessionId, baseCommit = '', headCommit = '', repositories = [], repositoryChanges = null }) {
     const work = this.getWork(orgId, projectId, workId);
     if (!work) throw new Error(`work not found: ${workId}`);
     transitionWork(work, 'submitted');
     const id = nextId(this.store, 'change');
-    const change = createChange({ id, workId, sessionId, baseCommit, headCommit, repositories });
+    const change = createChange({ id, workId, sessionId, baseCommit, headCommit, repositories, repositoryChanges });
     work.changes.push(id);
     const session = this.getSession(orgId, projectId, sessionId);
     if (session) session.changes.push(id);
@@ -446,6 +447,7 @@ export class Source {
       evidenceSnapshot,
       reasoning,
       sourceState: change.headCommit,
+      sourceStates: change.repositoryChanges,
     });
 
     // A Decision may be made directly (without a prior evaluate step); ensure
@@ -486,36 +488,80 @@ export class Source {
   }
 
   // --- canonical state update (on accept) -------------------------------
-  // Fast-forward the default branch to the Change's head commit, guarded by
-  // the base commit (TOCTOU). Returns {ok, reason}.
-  updateCanonicalState({ orgId, projectId, changeId, repoId }) {
+  // Fast-forward each repository in the Change to its head commit, guarded by
+  // the base commit (TOCTOU). Returns {ok, reason} for a single-repo update
+  // (repoId provided) or {ok, results} for a multi-repo update (repoId omitted).
+  updateCanonicalState({ orgId, projectId, changeId, repoId = null }) {
     const change = this.getChange(orgId, projectId, changeId);
     if (!change) throw new Error(`change not found: ${changeId}`);
     if (change.decisionState !== 'accepted') {
       throw new Error(`change not accepted (state: ${change.decisionState})`);
     }
-    const git = this.gitRepo(orgId, projectId, repoId);
-    if (!git.hasCommit(change.headCommit)) {
-      return { ok: false, reason: 'head commit not present in repository' };
+
+    let targets;
+    if (repoId) {
+      const match = change.repositoryChanges.find((r) => r.repoId === repoId);
+      if (match) {
+        targets = [match];
+      } else if (change.repositoryChanges.length === 0) {
+        // Legacy single-repo change: the repository is implied by repoId and the
+        // base/head are the top-level fields.
+        targets = [{ repoId, baseCommit: change.baseCommit, headCommit: change.headCommit }];
+      } else {
+        targets = [];
+      }
+    } else {
+      targets = change.repositoryChanges;
     }
-    const branch = git.defaultBranch();
-    const result = git.fastForward(change.baseCommit, change.headCommit, branch);
-    this.store.audit({ event: 'canonical.update', orgId, projectId, changeId, repoId, branch, ...result });
-    if (result.ok) {
+    if (targets.length === 0) throw new Error('no repository changes to update');
+
+    const results = [];
+    for (const t of targets) {
+      const git = this.gitRepo(orgId, projectId, t.repoId);
+      if (!git.hasCommit(t.headCommit)) {
+        results.push({ repoId: t.repoId, ok: false, reason: 'head commit not present in repository' });
+        continue;
+      }
+      const branch = git.defaultBranch();
+      const result = git.fastForward(t.baseCommit, t.headCommit, branch);
+      this.store.audit({ event: 'canonical.update', orgId, projectId, changeId, repoId: t.repoId, branch, ...result });
+      results.push({ repoId: t.repoId, ...result });
+    }
+
+    const ok = results.every((r) => r.ok);
+    if (ok) {
       const work = this.getWork(orgId, projectId, change.workId);
       if (work && work.status === 'accepted') {
         transitionWork(work, 'closed');
         this._saveWork(orgId, projectId, work);
       }
     }
-    return result;
+
+    if (repoId) return results[0];
+    return { ok, results };
+  }
+
+  // --- credential scanning ----------------------------------------------
+  // Scan a Change's diff (across all its repositories) for credentials.
+  // Returns an array of { name, count } findings (redacted — no values).
+  scanChangeSecrets({ orgId, projectId, changeId }) {
+    const change = this.getChange(orgId, projectId, changeId);
+    if (!change) throw new Error(`change not found: ${changeId}`);
+    const findings = [];
+    for (const rc of change.repositoryChanges) {
+      const git = this.gitRepo(orgId, projectId, rc.repoId);
+      const diff = git.diff(rc.baseCommit, rc.headCommit);
+      findings.push(...scanSecrets(diff));
+    }
+    return findings;
   }
 
   // --- contribution flow -------------------------------------------------
   // The low-friction path for a developer who knows Git but not Source:
   // clone → modify → `source submit`. Creates contribution Work, a Session, a
-  // Change against the exact base state, deterministic footprint evidence, and
-  // evaluates policy. Returns the full lifecycle for inspection.
+  // Change against the exact base state, deterministic footprint evidence, a
+  // deterministic credential scan, and evaluates policy. Returns the full
+  // lifecycle for inspection.
   submitContribution({ orgId, projectId, repoRef, baseCommit, headCommit, intent = '', contributorName = 'contributor' }) {
     const repo = this.resolveRepository(orgId, projectId, repoRef);
     if (!repo) throw new Error(`repository not found: ${repoRef}`);
@@ -555,6 +601,27 @@ export class Source {
       validity: nonEmpty ? 'valid' : 'invalid',
     });
 
+    // Deterministic credential scan of the diff. If findings exist, record a
+    // `security` evidence with validity 'invalid' so the finding is visible in
+    // the Change's evidence chain (detective control; the maintainer's Decision
+    // remains the gate).
+    const findings = this.scanChangeSecrets({ orgId, projectId, changeId: change.id });
+    let securityEvidence = null;
+    if (findings.length > 0) {
+      securityEvidence = this.addEvidence({
+        orgId,
+        projectId,
+        changeId: change.id,
+        subject: 'credential scan',
+        claim: 'no credentials in change',
+        type: 'security',
+        producer: principal.id,
+        artifact: JSON.stringify({ findings }),
+        result: { status: 'fail', findings },
+        validity: 'invalid',
+      });
+    }
+
     // Evaluate policy. The footprint evidence is real but does not satisfy the
     // project's full required evidence (tests/eval); the maintainer's
     // verification service fills those. Missing evidence is visible here.
@@ -565,6 +632,8 @@ export class Source {
       session,
       change,
       evidence: footprint,
+      securityEvidence,
+      findings,
       evaluation: evaluation.evaluation,
       interpretation: evaluation.interpretation,
     };

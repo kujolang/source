@@ -21,6 +21,7 @@ session_id         — the Session that produced it
 base_commit        — exact base state (immutable)
 head_commit        — resulting state (immutable)
 repositories[]     — one or more repositories (multi-repo)
+repositoryChanges[]— [{ repoId, baseCommit, headCommit }] (canonical multi-repo)
 diff_ref           — pointer to stored diff/patch
 evidence[]         — Evidence linked to this Change
 review_state       — pending | in_review | approved | changes_requested | rejected
@@ -32,9 +33,14 @@ created_at
 ## Multi-repository support
 
 A single Work may affect multiple repositories. A Change therefore references
-`repositories[]`, each with its own `base_commit`/`head_commit`. The MVP
-implements single-repository Changes but the schema is multi-repo from day one
-so the model does not need to be broken later.
+`repositoryChanges[]`, each entry carrying its own `repoId`/`baseCommit`/
+`headCommit`. This is now exercised end-to-end (see `24-multi-repo-changes.md`):
+a Change can span multiple repositories, and accepting it fast-forwards every
+repository's canonical state.
+
+The legacy single-repository fields (`baseCommit`, `headCommit`, `repositories`)
+remain as a convenience view over the first (primary) entry, so existing
+single-repo callers are unchanged.
 
 ## Review state machine
 
@@ -66,10 +72,12 @@ state changed, not just *that* it changed.
 Between policy evaluation and Decision, the base/head commits are pinned by
 hash. A Decision is recorded against those exact hashes. If canonical state
 moved in the meantime, the update step detects a non-fast-forward and requires
-a new evaluation — never a silent merge. See `12-threat-model.md`.
+a new evaluation — never a silent merge. The guard applies per repository in a
+multi-repository Change. See `12-threat-model.md`.
 
 ## Cross-references
 
 - `05-work-lifecycle.md` — how Change submission moves Work.
 - `07-evidence-model.md` — what Evidence a Change carries.
 - `10-git-integration.md` — how head/base map to Git refs.
+- `24-multi-repo-changes.md` — the multi-repository representation.

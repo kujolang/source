@@ -106,14 +106,30 @@ export function createSession({ id, workId, principal, environment = {}, baseCom
   };
 }
 
-export function createChange({ id, workId, sessionId, baseCommit, headCommit, repositories = [] }) {
+export function createChange({ id, workId, sessionId, baseCommit = '', headCommit = '', repositories = [], repositoryChanges = null }) {
+  // `repositoryChanges` is the canonical multi-repository representation:
+  // [{ repoId, baseCommit, headCommit }]. When omitted, derive it from the
+  // single-repository baseCommit/headCommit/repositories fields. When
+  // `repositories` is empty (legacy single-repo change with the repository
+  // implied at update time), `repositoryChanges` is empty and the top-level
+  // baseCommit/headCommit are preserved as the primary view.
+  let rc;
+  if (repositoryChanges) {
+    rc = repositoryChanges;
+  } else if (repositories.length > 0) {
+    rc = repositories.map((repoId) => ({ repoId, baseCommit, headCommit }));
+  } else {
+    rc = [];
+  }
+  const primary = rc[0] ?? { repoId: null, baseCommit, headCommit };
   return {
     id,
     workId,
     sessionId,
-    baseCommit,
-    headCommit,
-    repositories,
+    baseCommit: primary.baseCommit,
+    headCommit: primary.headCommit,
+    repositories: rc.map((r) => r.repoId),
+    repositoryChanges: rc,
     diffRef: null,
     evidence: [],
     reviewState: 'pending',
@@ -143,7 +159,7 @@ export function createEvidence({ id, subject, claim, type, producer, artifactRef
   };
 }
 
-export function createDecision({ id, changeId, decision, decider, authority, policyRef, evidenceSnapshot = [], reasoning = '', sourceState = '' }) {
+export function createDecision({ id, changeId, decision, decider, authority, policyRef, evidenceSnapshot = [], reasoning = '', sourceState = '', sourceStates = null }) {
   return {
     id,
     changeId,
@@ -154,6 +170,7 @@ export function createDecision({ id, changeId, decision, decider, authority, pol
     evidenceSnapshot,
     reasoning,
     sourceState,
+    sourceStates,
     timestamp: new Date().toISOString(),
   };
 }

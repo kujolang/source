@@ -14,18 +14,20 @@ the full `Project → Work → Session → Change → Evidence → Decision → 
 Git State` lifecycle, validated against a real Kujo repository, plus the
 next-phase increments (real Kujo evidence integration, smart-HTTP Git transport,
 the `source submit` contribution flow, capability-gated API auth, a SQLite store
-backend, multi-tenant org management, capability-gated Git-transport auth, and
-TLS + deployment).
+backend, multi-tenant org management, capability-gated Git-transport auth,
+TLS + deployment, multi-repository Changes, and rate limiting + credential
+scanning).
 
 ## Status
 
-- **83/83 tests pass**, including a dogfood test against the real `spec` Kujo
+- **93/93 tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
   Git-transport auth tests (401/403), SQLite store transaction/contract tests,
-  multi-tenant org-management/tenant-isolation tests, and TLS/deployment tests
-  (HTTPS + `git clone` over HTTPS).
+  multi-tenant org-management/tenant-isolation tests, TLS/deployment tests
+  (HTTPS + `git clone` over HTTPS), multi-repository Change tests, rate-limiting
+  tests, and credential-scanning tests.
 - Zero runtime dependencies (Node.js ≥ 18, `git` on PATH). The SQLite backend
   requires Node ≥ 22.5 (`node:sqlite`); the JSON store works on Node ≥ 18.
 - Deterministic-first: no LLM is required for any operation in the slice.
@@ -116,6 +118,8 @@ src/
   policy.js      — deterministic required-evidence evaluation
   capability.js  — bounded, expiring capability grants
   auth.js        — capability-gated API (bearer) + Git (basic) authorization
+  ratelimit.js   — fixed-window rate limiter for anonymous paths
+  scan.js        — deterministic credential scanning (redacted findings)
   api.js         — HTTP API + /.well-known/source discovery + /git/ transport + TLS
   web.js         — minimal human-facing HTML views (org/project/work/change)
   cli.js         — CLI (same services as the API)
@@ -146,6 +150,8 @@ The full architecture, domain model, threat model, and MVP scope are in
 - `21-multi-tenant-orgs.md` — the org-scoped tenant boundary
 - `22-git-transport-auth.md` — capability-gated Git transport (Basic auth)
 - `23-tls-deployment.md` — TLS termination + self-host deployment path
+- `24-multi-repo-changes.md` — multi-repository Changes
+- `25-rate-limiting-scanning.md` — rate limiting + credential scanning
 - `decisions/` — architecture decision records
 
 ## License
