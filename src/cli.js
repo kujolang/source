@@ -7,6 +7,7 @@
 // contributor's working clone and talks to a remote Source instance over HTTP
 // (see `submit.js`). All other commands operate on the local data root.
 
+import { readFileSync } from 'node:fs';
 import { Source } from './source.js';
 
 function dataRoot() {
@@ -256,9 +257,24 @@ export async function run(argv) {
         return;
       }
       case 'serve': {
+        // TLS: --tls-key/--tls-cert enable in-process HTTPS termination. Without
+        // them the server is plain HTTP (terminate TLS at a reverse proxy).
+        const tlsKey = flag('--tls-key');
+        const tlsCert = flag('--tls-cert');
+        let tls = null;
+        if (tlsKey || tlsCert) {
+          if (!tlsKey || !tlsCert) fail('--tls-key and --tls-cert must be provided together');
+          tls = { key: readFileSync(tlsKey), cert: readFileSync(tlsCert) };
+        }
+        const host = flag('--host');
         import('./api.js')
-          .then(({ startServer }) => startServer(src, { port: Number(flag('--port') || 8787) }))
-          .then((server) => process.stdout.write(`listening on http://localhost:${server.address().port}\n`))
+          .then(({ startServer }) => startServer(src, { port: Number(flag('--port') || 8787), tls, host }))
+          .then((server) => {
+            const scheme = tls ? 'https' : 'http';
+            const addr = server.address();
+            const hostStr = host || 'localhost';
+            process.stdout.write(`listening on ${scheme}://${hostStr}:${addr.port}\n`);
+          })
           .catch((e) => fail(e.message));
         return;
       }
@@ -306,7 +322,7 @@ export async function run(argv) {
           '  decision accept|reject|request-revision --org <o> --project <p>',
           '  policy show --org <o> --project <p>',
           '  audit',
-          '  serve --port <n>',
+          '  serve --port <n> [--host <addr>] [--tls-key <pem> --tls-cert <pem>]',
           '  submit [--intent <s>] [--url <base>] [--credential <c>] [--cwd <dir>]',
           '',
           'Env: SOURCE_DATA (default .source), SOURCE_STORE (json|sqlite)',

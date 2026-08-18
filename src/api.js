@@ -12,8 +12,14 @@
 // The same server also serves Git over smart HTTP (`/git/{org}/{project}/…`)
 // by delegating to `git http-backend`; see `git-http.js`. Git transport is
 // capability-gated via HTTP Basic auth (see `authorizeGit` in auth.js).
+//
+// TLS: pass `tls: { key, cert }` (PEM) to `createServer`/`startServer` to
+// terminate TLS in-process (Node `https`). Otherwise the server is plain HTTP
+// and TLS is expected to be terminated by a reverse proxy (see
+// `23-tls-deployment.md`).
 
 import http from 'node:http';
+import https from 'node:https';
 import { Source } from './source.js';
 import { renderOrgIndex, renderIndex, renderProject, renderWork, renderChange } from './web.js';
 import { gitHttpBackend } from './git-http.js';
@@ -100,8 +106,8 @@ function changeWork(src, orgId, projectId, changeId) {
   return c ? c.workId : undefined;
 }
 
-export function createServer(src, { port = 8787 } = {}) {
-  const server = http.createServer(async (req, res) => {
+export function createServer(src, { port = 8787, tls, host } = {}) {
+  const handler = async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const pathname = url.pathname;
     const fields = url.searchParams.get('fields') || undefined;
@@ -395,14 +401,15 @@ export function createServer(src, { port = 8787 } = {}) {
     } catch (e) {
       return json(res, 400, { error: e.message });
     }
-  });
+  };
 
+  const server = tls ? https.createServer(tls, handler) : http.createServer(handler);
   return server;
 }
 
 export function startServer(src, opts) {
   const server = createServer(src, opts);
   return new Promise((resolve) => {
-    server.listen(opts.port ?? 8787, () => resolve(server));
+    server.listen(opts.port ?? 8787, opts.host, () => resolve(server));
   });
 }

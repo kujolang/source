@@ -14,16 +14,18 @@ the full `Project → Work → Session → Change → Evidence → Decision → 
 Git State` lifecycle, validated against a real Kujo repository, plus the
 next-phase increments (real Kujo evidence integration, smart-HTTP Git transport,
 the `source submit` contribution flow, capability-gated API auth, a SQLite store
-backend, multi-tenant org management, and capability-gated Git-transport auth).
+backend, multi-tenant org management, capability-gated Git-transport auth, and
+TLS + deployment).
 
 ## Status
 
-- **80/80 tests pass**, including a dogfood test against the real `spec` Kujo
+- **83/83 tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
   Git-transport auth tests (401/403), SQLite store transaction/contract tests,
-  and multi-tenant org-management/tenant-isolation tests.
+  multi-tenant org-management/tenant-isolation tests, and TLS/deployment tests
+  (HTTPS + `git clone` over HTTPS).
 - Zero runtime dependencies (Node.js ≥ 18, `git` on PATH). The SQLite backend
   requires Node ≥ 22.5 (`node:sqlite`); the JSON store works on Node ≥ 18.
 - Deterministic-first: no LLM is required for any operation in the slice.
@@ -60,6 +62,10 @@ node bin/source.js serve --port 8787
 #   GET /api/v1/orgs/O1/projects/P1/work              (machine interface, requires capability)
 #   git clone http://localhost:8787/git/O1/P1/R1.git (smart-HTTP)
 
+# Serve over HTTPS (in-process TLS termination)
+node bin/source.js serve --host 0.0.0.0 --port 443 \
+  --tls-key /path/to/privkey.pem --tls-cert /path/to/fullchain.pem
+
 # Contribute as a Git-only developer (no Source concepts required)
 #   public repos clone anonymously; private repos and all pushes need a credential
 git clone http://source:<credential>@localhost:8787/git/O1/P1/R1.git
@@ -87,6 +93,14 @@ node bin/source.js --store sqlite init --name source.kujolang.ai
 
 See `docs/source/20-sqlite-store.md`.
 
+### Deployment
+
+`source serve` is plain HTTP by default. For a real deployment, terminate TLS
+either in-process (`--tls-key`/`--tls-cert`) or at a reverse proxy (nginx,
+Caddy, HAProxy). See `docs/source/23-tls-deployment.md` for the full self-host
+path, certificate management, custom domains, and data-durability/backup
+requirements.
+
 ## Architecture
 
 A **modular monolith** in Node.js (ESM), zero dependencies:
@@ -102,7 +116,7 @@ src/
   policy.js      — deterministic required-evidence evaluation
   capability.js  — bounded, expiring capability grants
   auth.js        — capability-gated API (bearer) + Git (basic) authorization
-  api.js         — HTTP API + /.well-known/source discovery + /git/ transport
+  api.js         — HTTP API + /.well-known/source discovery + /git/ transport + TLS
   web.js         — minimal human-facing HTML views (org/project/work/change)
   cli.js         — CLI (same services as the API)
   submit.js      — `source submit` contribution client
@@ -131,6 +145,7 @@ The full architecture, domain model, threat model, and MVP scope are in
 - `20-sqlite-store.md` — the SQLite store backend and transactions
 - `21-multi-tenant-orgs.md` — the org-scoped tenant boundary
 - `22-git-transport-auth.md` — capability-gated Git transport (Basic auth)
+- `23-tls-deployment.md` — TLS termination + self-host deployment path
 - `decisions/` — architecture decision records
 
 ## License

@@ -54,8 +54,8 @@ never a control.
 - **Preventive:** TLS in deployment; tokens not logged.
 - **Detective:** audit log.
 - **Recovery:** revoke.
-- **Remaining risk:** MVP localhost has no TLS; documented as deployment
-  requirement.
+- **Remaining risk:** TLS is now available (in-process or reverse proxy, see
+  `23-tls-deployment.md`); plain HTTP remains only for local development.
 
 ### T5 — Unauthorized Change acceptance
 - **Asset:** canonical state. **Attacker:** principal without accept authority.
@@ -182,7 +182,8 @@ never a control.
 - **Preventive:** TLS; short-lived session capabilities.
 - **Detective:** audit.
 - **Recovery:** end session.
-- **Remaining risk:** localhost MVP.
+- **Remaining risk:** TLS is now available (see `23-tls-deployment.md`); plain
+  HTTP remains only for local development.
 
 ### T18 — Unsafe webhook/event consumption
 - **Asset:** server. **Attacker:** external event source.
@@ -256,3 +257,4 @@ never a control.
 - `08-identity-capability-model.md` — capability controls.
 - `10-git-integration.md` — Git endpoint controls.
 - `15-acceptance-tests.md` — security tests.
+- `23-tls-deployment.md` — TLS termination and deployment.
