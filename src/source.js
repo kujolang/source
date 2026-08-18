@@ -119,6 +119,7 @@ export class Source {
     };
     const git = new GitRepo(repo.barePath);
     git.init(defaultBranch);
+    git.enableReceivePack();
     project.repositories.push(id);
     this.store.writeJson(`${this._projectRel(orgId, projectId)}/project.json`, project);
     this.store.writeJson(`${this._projectRel(orgId, projectId)}/repos/${id}.json`, repo);
@@ -134,6 +135,23 @@ export class Source {
     const repo = this.getRepository(orgId, projectId, repoId);
     if (!repo) throw new Error(`repository not found: ${repoId}`);
     return new GitRepo(repo.barePath);
+  }
+
+  // Absolute path to the directory containing a project's bare repositories.
+  // This is the GIT_PROJECT_ROOT for the smart-HTTP transport.
+  reposRoot(orgId, projectId) {
+    return path.join(this.dataRoot, this._projectRel(orgId, projectId), 'repos');
+  }
+
+  // Resolve a repository by id (R1) or name (main) within a project.
+  resolveRepository(orgId, projectId, repoRef) {
+    const project = this.getProject(orgId, projectId);
+    if (!project) return null;
+    for (const id of project.repositories) {
+      const repo = this.getRepository(orgId, projectId, id);
+      if (repo && (repo.id === repoRef || repo.name === repoRef)) return repo;
+    }
+    return null;
   }
 
   // --- principals -------------------------------------------------------

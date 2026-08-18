@@ -1,0 +1,108 @@
+// Source — smart-HTTP Git transport.
+//
+// Serves Git repositories over HTTP using Git's own `git http-backend` CGI
+// program. Source never reimplements the packfile/network protocol; it maps an
+// HTTP request to a bare repository and delegates to Git. This is the seam that
+// makes `git clone https://…` and `git push https://…` work for real
+// contributors without requiring them to understand Source concepts.
+//
+// Responsibilities:
+//   Git   — packfile/network protocol, ref advertisement, object transfer.
+//   Source — URL → repository mapping, tenant isolation, (future) authN/authZ.
+
+import { spawn } from 'node:child_process';
+
+// Parse a CGI response (headers, blank line, body) into {status, headers, body}.
+// `git http-backend` writes a `Status:` header plus normal headers, then a blank
+// line, then the (possibly binary) body.
+function parseCgiResponse(raw) {
+  const crlf = raw.indexOf('\r\n\r\n');
+  const lf = raw.indexOf('\n\n');
+  let headerEnd;
+  let bodyStart;
+  if (crlf >= 0 && (lf < 0 || crlf <= lf)) {
+    headerEnd = crlf;
+    bodyStart = crlf + 4;
+  } else if (lf >= 0) {
+    headerEnd = lf;
+    bodyStart = lf + 2;
+  } else {
+    headerEnd = raw.length;
+    bodyStart = raw.length;
+  }
+  const headerText = raw.slice(0, headerEnd).toString('utf8');
+  const body = raw.slice(bodyStart);
+  const headers = {};
+  let status = 200;
+  for (const line of headerText.split(/\r?\n/)) {
+    const i = line.indexOf(':');
+    if (i < 0) continue;
+    const k = line.slice(0, i).trim().toLowerCase();
+    const v = line.slice(i + 1).trim();
+    if (k === 'status') {
+      const m = v.match(/^(\d+)/);
+      if (m) status = parseInt(m[1], 10);
+    } else {
+      headers[k] = v;
+    }
+  }
+  return { status, headers, body };
+}
+
+// Serve a single Git smart-HTTP request via `git http-backend`.
+//
+//   projectRoot — absolute path to the directory containing bare repos
+//   pathInfo    — repo path + service, e.g. "/R1.git/info/refs"
+//   queryString — raw query string (no leading "?"), e.g. "service=git-upload-pack"
+//   method      — "GET" or "POST"
+//   contentType — request Content-Type (for POST)
+//   body        — request body Buffer (for POST)
+//   remoteUser  — authenticated principal (empty for anonymous MVP)
+//   remoteAddr  — client address (for reflog identification)
+//   headers     — request headers (for Git-Protocol passthrough)
+//
+// Resolves to { status, headers, body, stderr, exitCode }.
+export function gitHttpBackend({
+  projectRoot,
+  pathInfo,
+  queryString = '',
+  method = 'GET',
+  contentType = '',
+  body = null,
+  remoteUser = '',
+  remoteAddr = '',
+  headers = {},
+}) {
+  return new Promise((resolve, reject) => {
+    const env = {
+      ...process.env,
+      GIT_PROJECT_ROOT: projectRoot,
+      GIT_HTTP_EXPORT_ALL: '1',
+      PATH_INFO: pathInfo,
+      QUERY_STRING: queryString,
+      REQUEST_METHOD: method,
+      CONTENT_TYPE: contentType,
+      CONTENT_LENGTH: String(body ? body.length : 0),
+      REMOTE_ADDR: remoteAddr,
+    };
+    if (remoteUser) env.REMOTE_USER = remoteUser;
+    // Protocol v2 negotiation: the client sends `Git-Protocol: version=2`.
+    // `git http-backend` copies HTTP_GIT_PROTOCOL into GIT_PROTOCOL.
+    if (headers['git-protocol']) env.HTTP_GIT_PROTOCOL = headers['git-protocol'];
+
+    const child = spawn('git', ['http-backend'], { env, stdio: ['pipe', 'pipe', 'pipe'] });
+    const stdout = [];
+    const stderr = [];
+    child.stdout.on('data', (c) => stdout.push(c));
+    child.stderr.on('data', (c) => stderr.push(c));
+    child.on('error', reject);
+    child.on('close', (code) => {
+      const parsed = parseCgiResponse(Buffer.concat(stdout));
+      parsed.stderr = Buffer.concat(stderr).toString('utf8');
+      parsed.exitCode = code;
+      resolve(parsed);
+    });
+    if (body) child.stdin.write(body);
+    child.stdin.end();
+  });
+}

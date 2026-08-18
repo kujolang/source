@@ -20,13 +20,44 @@ Status: **Evidence-backed.** Git is a dependency, not a competitor.
 
 - **Bare repositories** on disk, one per Repository, under a per-tenant
   directory (e.g. `data/instances/<i>/orgs/<o>/repos/<r>.git`).
-- **Transport:** local `file://` and `git` CLI for MVP; smart-HTTP is a
-  documented next step (the API server can serve `git-http-backend`).
+- **Transport:** local `file://` and `git` CLI, plus **smart-HTTP** (see below).
 - **Clone/fetch/pull/push** all work through normal Git; Source does not
   reimplement any of it.
 - **Safe concurrent access:** Git's own locking (ref locks, `gc` via
   `git maintenance`) plus Source serializing writes per repository. No custom
   locking protocol.
+
+## Smart-HTTP transport (implemented)
+
+`git clone https://…`, `git fetch`, and `git push` work against a Source bare
+repository. Source delegates to Git's own `git http-backend` CGI program
+(`src/git-http.js`); it never reimplements the packfile/network protocol.
+
+URL scheme:
+
+```text
+/git/{project}/{repo}.git/{service}
+```
+
+`{repo}` may be the repository id (`R1`) or name (`main`); the bare directory is
+keyed by id, so the route resolves the repository and maps `pathInfo` to the id.
+
+Implementation facts:
+
+- `GIT_PROJECT_ROOT` is the project's `repos/` directory; `PATH_INFO` is
+  `/{repoId}.git/{service}`.
+- `GIT_HTTP_EXPORT_ALL=1` serves all repos (MVP has no per-repo export control;
+  this is replaced by capability-gated auth).
+- `http.receivepack=true` is set on each bare repo at creation, because
+  `git http-backend` disables push for unauthenticated users by default and the
+  MVP has no auth.
+- `Git-Protocol: version=2` is passed through as `HTTP_GIT_PROTOCOL`, so
+  protocol v2 negotiation works.
+- `REMOTE_USER=anonymous` is a placeholder for the MVP; capability-gated auth
+  (next phase) will populate it with the real principal.
+- Tenant isolation is server-side: the route resolves the repository against the
+  project's repository list and rejects unknown refs and path traversal with
+  404. It never trusts the URL to address a bare directory directly.
 
 ## Hooks / event integration
 
@@ -57,10 +88,10 @@ evaluation is required — never a silent merge. See `06-change-model.md`.
 
 A developer who knows Git but not Source can:
 
-```
-git clone <url>
+```text
+git clone https://source.example.com/git/{project}/{repo}.git
 # make changes
-source submit
+git push origin main        # or: source submit
 ```
 
 `source submit` determines the Project, reads contribution policy, identifies

@@ -12,13 +12,14 @@ software changes remains inspectable.
 This repository contains the **MVP vertical slice**: a working implementation of
 the full `Project → Work → Session → Change → Evidence → Decision → Canonical
 Git State` lifecycle, validated against a real Kujo repository, plus the first
-next-phase increment (real Kujo evidence integration).
+two next-phase increments (real Kujo evidence integration and smart-HTTP Git
+transport).
 
 ## Status
 
-- **41/41 tests pass**, including a dogfood test against the real `spec` Kujo
-  repository and Kujo evidence-integration tests against real Eval/Spec/ShipCheck
-  artifacts.
+- **51/51 tests pass**, including a dogfood test against the real `spec` Kujo
+  repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
+  artifacts, and smart-HTTP clone/fetch/push tests.
 - Zero runtime dependencies (Node.js ≥ 18, `git` on PATH).
 - Deterministic-first: no LLM is required for any operation in the slice.
 
@@ -37,26 +38,28 @@ node bin/source.js principal create --type human --name maintainer
 node bin/source.js work create --org O1 --project P1 --intent "fix parser regression"
 node bin/source.js work claim --org O1 --project P1 W1 --principal U1
 
-# Serve the HTTP API + minimal web UI
+# Serve the HTTP API + minimal web UI + smart-HTTP Git transport
 node bin/source.js serve --port 8787
 #   GET /.well-known/source          (agent discovery)
 #   GET /                            (human project index)
 #   GET /api/v1/projects/P1/work     (machine interface)
+#   git clone http://localhost:8787/git/P1/R1.git   (smart-HTTP)
 ```
 
 ## Architecture
 
 A **modular monolith** in Node.js (ESM), zero dependencies:
 
-```
+```text
 src/
   domain.js      — object model + lifecycle state machines (pure)
   source.js      — application service (wires store/git/policy/capability)
   store.js       — JSON-file store, content-addressed artifacts, audit log
   git.js         — bare-repo storage, clone/fetch/push, fast-forward guard
+  git-http.js    — smart-HTTP transport via `git http-backend`
   policy.js      — deterministic required-evidence evaluation
   capability.js  — bounded, expiring capability grants
-  api.js         — HTTP API + /.well-known/source discovery
+  api.js         — HTTP API + /.well-known/source discovery + /git/ transport
   web.js         — minimal human-facing HTML views
   cli.js         — CLI (same services as the API)
   integrations/

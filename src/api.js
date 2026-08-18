@@ -3,10 +3,14 @@
 // The machine interface. No critical capability requires HTML. Responses are
 // compact JSON with field selection and pagination. Mutating operations are
 // capability-gated via `Authorization: Bearer <credential>`.
+//
+// The same server also serves Git over smart HTTP (`/git/…`) by delegating to
+// `git http-backend`; see `git-http.js`.
 
 import http from 'node:http';
 import { Source } from './source.js';
 import { renderIndex, renderProject, renderWork, renderChange } from './web.js';
+import { gitHttpBackend } from './git-http.js';
 
 const ORG = 'O1';
 
@@ -35,6 +39,21 @@ function readBody(req) {
         reject(new Error('invalid JSON body'));
       }
     });
+    req.on('error', reject);
+  });
+}
+
+// Read a raw (possibly binary) request body, e.g. a Git packfile upload.
+function readRawBody(req, maxBytes = 100_000_000) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (c) => {
+      chunks.push(c);
+      size += c.length;
+      if (size > maxBytes) reject(new Error('body too large'));
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
     req.on('error', reject);
   });
 }
@@ -73,7 +92,7 @@ export function createServer(src, { port = 8787 } = {}) {
         return json(res, 200, {
           instance: src.getInstance()?.name ?? 'source',
           api_version: '1',
-          protocols: ['http+json'],
+          protocols: ['http+json', 'git-smart-http'],
           endpoints: {
             projects: '/api/v1/projects',
             work: '/api/v1/projects/{project}/work',
@@ -85,6 +104,41 @@ export function createServer(src, { port = 8787 } = {}) {
           capabilities: ['read_source', 'read_context', 'submit_change', 'submit_evidence'],
           auth: ['capability'],
         });
+      }
+
+      // --- smart-HTTP Git transport --------------------------------------
+      // Maps /git/{project}/{repo}.git/{service} to a bare repository and
+      // delegates to `git http-backend`. Supports clone, fetch, pull, and push.
+      // The URL may use the repository id (R1) or name (main); the bare
+      // directory is always keyed by id, so pathInfo uses the resolved id.
+      const gitMatch = pathname.match(/^\/git\/([^/]+)\/([^/]+\.git)(\/.*)?$/);
+      if (gitMatch && (req.method === 'GET' || req.method === 'POST')) {
+        const [, projectId, repoFile, rest = ''] = gitMatch;
+        const repoRef = repoFile.slice(0, -'.git'.length);
+        const repo = src.resolveRepository(ORG, projectId, repoRef);
+        if (!repo) return json(res, 404, { error: 'repository not found' });
+
+        let body = null;
+        if (req.method === 'POST') body = await readRawBody(req);
+
+        const result = await gitHttpBackend({
+          projectRoot: src.reposRoot(ORG, projectId),
+          pathInfo: `/${repo.id}.git${rest}`,
+          queryString: url.search ? url.search.slice(1) : '',
+          method: req.method,
+          contentType: req.headers['content-type'] || '',
+          body,
+          remoteUser: 'anonymous', // MVP has no auth; replaced by capability-gated auth
+          remoteAddr: req.socket.remoteAddress || '',
+          headers: req.headers,
+        });
+
+        const headers = { ...result.headers };
+        if (result.body && result.body.length && !headers['content-length']) {
+          headers['Content-Length'] = String(result.body.length);
+        }
+        res.writeHead(result.status, headers);
+        return res.end(result.body);
       }
 
       // --- projects ------------------------------------------------------
