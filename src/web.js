@@ -108,3 +108,19 @@ export function renderChange(src, orgId, projectId, changeId) {
 <h2>Technical details</h2><pre>${esc(JSON.stringify({ baseCommit: c.baseCommit, headCommit: c.headCommit, reviewState: c.reviewState, decisionState: c.decisionState }, null, 2))}</pre>`,
   );
 }
+
+export function renderLogin(opts = {}) {
+  const error = opts.error ? `<p style="color:#b00020">Error: ${esc(opts.error)}</p>` : '';
+  return page(
+    'Source Login',
+    `<h1>Sign in with a human principal</h1>
+${error}
+<form method="POST" action="/login">
+  <label>Principal ID <input name="principalId" placeholder="human principal id" /></label><br/><br/>
+  <label>Org ID (optional for organization-wide session)<input name="orgId" /></label><br/><br/>
+  <label>Project ID (optional)<input name="projectId" /></label><br/><br/>
+  <label>Allowed actions (comma-separated)<input name="allowed" placeholder="read_source,read_context,accept_change" /></label><br/><br/>
+  <button type="submit">Sign in</button>
+</form>`,
+  );
+}

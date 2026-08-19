@@ -12,10 +12,71 @@ import path from 'node:path';
 import { Source } from '../src/source.js';
 import { Store } from '../src/store.js';
 import { SqliteStore } from '../src/sqlite-store.js';
+import { PostgresStore } from '../src/postgres-store.js';
 import { seedRepo } from './helpers.js';
 
 function tmp() {
   return mkdtempSync(path.join(tmpdir(), 'source-store-'));
+}
+
+const PG_DSN = process.env.SOURCE_DATABASE_URL || process.env.DATABASE_URL;
+
+function newUniqueSchema() {
+  return `source_test_${Date.now()}_${Math.random().toString(16).slice(2)}`.replace(/\W/g, '');
+}
+
+function buildRelationshipFixture(src) {
+  src.initInstance({ name: 'test' });
+  const org = src.createOrg({ name: 'o', slug: 'o' });
+  const project = src.createProject({ orgId: org.id, slug: 'p', name: 'P' });
+  const human = src.createPrincipal({ type: 'human', name: 'h' });
+  const agent = src.createPrincipal({ type: 'agent', name: 'a' });
+  const service = src.createPrincipal({ type: 'service', name: 's' });
+  const work = src.createWork({ orgId: org.id, projectId: project.id, intent: 'x', requester: human.id });
+  src.claimWork({ orgId: org.id, projectId: project.id, workId: work.id, principalId: agent.id });
+  const session = src.startSession({ orgId: org.id, projectId: project.id, workId: work.id, principalId: agent.id });
+  const change = src.submitChange({ orgId: org.id, projectId: project.id, workId: work.id, sessionId: session.id, baseCommit: 'base', headCommit: 'head' });
+  const evidence1 = src.addEvidence({ orgId: org.id, projectId: project.id, changeId: change.id, subject: 't', claim: 'tests pass', type: 'test', producer: service.id, result: { status: 'pass' } });
+  const evidence2 = src.addEvidence({ orgId: org.id, projectId: project.id, changeId: change.id, subject: 'e', claim: 'deterministic checks pass', type: 'eval', producer: service.id, result: { status: 'pass' } });
+  const decision = src.makeDecision({ orgId: org.id, projectId: project.id, changeId: change.id, decision: 'accepted', decider: human.id, reasoning: 'ok' });
+  const graph = src.queryWorkGraph(org.id, project.id, work.id);
+  const serviceActivity = src.queryPrincipalActivity(org.id, project.id, service.id);
+  const humanActivity = src.queryPrincipalActivity(org.id, project.id, human.id);
+  return {
+    org,
+    project,
+    human,
+    agent,
+    service,
+    work,
+    session,
+    change,
+    evidence1,
+    evidence2,
+    decision,
+    graph,
+    activity: serviceActivity,
+    serviceActivity,
+    humanActivity,
+  };
+}
+
+function lifecycleSummary(store) {
+  const src = new Source(tmp(), { store });
+  src.initInstance({ name: 'test' });
+  const org = src.createOrg({ name: 'o', slug: 'o' });
+  const project = src.createProject({ orgId: org.id, slug: 'p', name: 'P' });
+  const human = src.createPrincipal({ type: 'human', name: 'h' });
+  const work = src.createWork({ orgId: org.id, projectId: project.id, intent: 'x', requester: human.id });
+  return {
+    projectId: project.id,
+    ownerOrg: project.ownerOrg,
+    workId: work.id,
+    orgId: org.id,
+    intent: work.intent,
+    status: work.status,
+    policy: src.getPolicy(org.id, project.id),
+  };
 }
 
 // --- transaction semantics ------------------------------------------------
@@ -172,3 +233,79 @@ test('JSON and SQLite stores produce equivalent lifecycle results', () => {
   assert.equal(jsonResult.work.status, sqliteResult.work.status);
   assert.deepEqual(jsonResult.policy, sqliteResult.policy);
 });
+
+if (PG_DSN) {
+  test('JSON, SQLite, and Postgres stores produce equivalent lifecycle results', () => {
+    const json = lifecycleSummary(new Store(tmp()));
+    const sqlite = lifecycleSummary(new SqliteStore(tmp()));
+    const pg = lifecycleSummary(new PostgresStore({ dsn: PG_DSN, schema: newUniqueSchema() }));
+
+    assert.equal(json.ownerOrg, sqlite.ownerOrg);
+    assert.equal(json.ownerOrg, pg.ownerOrg);
+    assert.equal(json.intent, sqlite.intent);
+    assert.equal(json.intent, pg.intent);
+    assert.equal(json.status, sqlite.status);
+    assert.equal(json.status, pg.status);
+    assert.deepEqual(json.policy, sqlite.policy);
+    assert.deepEqual(json.policy, pg.policy);
+  });
+}
+
+test('JSON and SQLite query relationship APIs behave consistently', () => {
+  const jsonSource = new Source(tmp());
+  const jsonResult = buildRelationshipFixture(jsonSource);
+  const jsonGraph = jsonResult.graph;
+
+  const sqliteSource = new Source(tmp(), { store: new SqliteStore(tmp()) });
+  const sqliteResult = buildRelationshipFixture(sqliteSource);
+  const sqliteGraph = sqliteResult.graph;
+
+  assert.equal(jsonGraph.workId, sqliteGraph.workId);
+  assert.equal(jsonGraph.changes.length, 1);
+  assert.equal(sqliteGraph.changes.length, 1);
+  assert.equal(jsonGraph.changes[0].decisions.length, 1);
+  assert.equal(sqliteGraph.changes[0].decisions.length, 1);
+  assert.equal(jsonResult.serviceActivity.evidence.length, 2);
+  assert.equal(sqliteResult.serviceActivity.evidence.length, 2);
+  assert.equal(jsonResult.humanActivity.decisions.length, 1);
+  assert.equal(sqliteResult.humanActivity.decisions.length, 1);
+});
+
+if (PG_DSN) {
+  test('Postgres store supports relationship queries', () => {
+    const store = new PostgresStore({ dsn: PG_DSN, schema: newUniqueSchema() });
+    const src = new Source(tmp(), { store });
+    const fixture = buildRelationshipFixture(src);
+    const graph = fixture.graph;
+    const { serviceActivity, humanActivity } = fixture;
+
+    assert.ok(graph);
+    assert.equal(graph.workId, fixture.work.id);
+    assert.equal(graph.changes.length, 1);
+    assert.equal(graph.changes[0].evidence.length, 2);
+    assert.equal(graph.changes[0].decisions[0].decision.decision, 'accepted');
+    assert.equal(serviceActivity.evidence.length, 2);
+    assert.equal(humanActivity.decisions.length, 1);
+    assert.equal(humanActivity.decisions[0].id, fixture.decision.id);
+  });
+
+  test('Postgres migration from JSON preserves relational data', () => {
+    const schema = newUniqueSchema();
+    const legacy = new Source(tmp());
+    const legacyResult = buildRelationshipFixture(legacy);
+    const pg = new PostgresStore({ dsn: PG_DSN, schema });
+    const counts = pg.migrateFromStore(legacy.store);
+    const migrated = new Source(legacy.dir, { store: pg });
+    const graph = migrated.queryWorkGraph(legacyResult.org.id, legacyResult.project.id, legacyResult.work.id);
+    const serviceActivity = migrated.queryPrincipalActivity(legacyResult.org.id, legacyResult.project.id, legacyResult.service.id);
+    const humanActivity = migrated.queryPrincipalActivity(legacyResult.org.id, legacyResult.project.id, legacyResult.human.id);
+
+    assert.equal(counts.orgs, 1);
+    assert.equal(counts.works, 1);
+    assert.equal(counts.projects, 1);
+    assert.equal(graph.work.id, legacyResult.work.id);
+    assert.equal(graph.changes[0].id, legacyResult.change.id);
+    assert.equal(serviceActivity.evidence.length, 2);
+    assert.equal(humanActivity.decisions.length, 1);
+  });
+}

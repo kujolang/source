@@ -39,13 +39,18 @@ export async function run(argv) {
   };
   const hasFlag = (name) => all.includes(name);
 
-  // Select the store backend: --store sqlite|json, or SOURCE_STORE env var.
-  // SQLite requires Node >= 22.5 (node:sqlite); JSON is the default.
+  // Select the store backend: --store json|sqlite|postgres, or SOURCE_STORE.
+  // SQLite requires Node >= 22.5 (node:sqlite); PostgreSQL requires a DSN.
   const backend = flag('--store') || process.env.SOURCE_STORE || 'json';
   let src;
   if (backend === 'sqlite') {
     const { SqliteStore } = await import('./sqlite-store.js');
     src = new Source(dataRoot(), { store: new SqliteStore(dataRoot()) });
+  } else if (backend === 'postgres') {
+    const { PostgresStore } = await import('./postgres-store.js');
+    const dsn = flag('--database-url') || process.env.SOURCE_DATABASE_URL || process.env.DATABASE_URL;
+    const schema = flag('--schema') || undefined;
+    src = new Source(dataRoot(), { store: new PostgresStore({ dsn, schema }) });
   } else {
     src = new Source(dataRoot());
   }
@@ -332,8 +337,9 @@ export async function run(argv) {
           '  serve --port <n> [--host <addr>] [--tls-key <pem> --tls-cert <pem>]',
           '  submit [--intent <s>] [--url <base>] [--credential <c>] [--cwd <dir>]',
           '',
-          'Env: SOURCE_DATA (default .source), SOURCE_STORE (json|sqlite)',
-          'Flags: --store json|sqlite (select the storage backend)',
+          'Env: SOURCE_DATA (default .source), SOURCE_STORE (json|sqlite|postgres)',
+          'Flags: --store json|sqlite|postgres (select the storage backend)',
+          'Postgres flags: --database-url <dsn>, --schema <schema>',
         ]);
         return;
       }

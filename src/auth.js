@@ -72,9 +72,9 @@ function statusFor(reason) {
 
 // Authorize a request against a capability service.
 // Returns {ok:true, cap} or {ok:false, status, error}.
-export function authorizeRequest(capabilities, req, action, { org, project, work } = {}) {
-  const credential = bearerCredential(req);
-  const auth = capabilities.authorize(credential, action);
+export function authorizeRequest(capabilities, req, action, { org, project, work, credential } = {}) {
+  const effectiveCredential = credential ?? bearerCredential(req);
+  const auth = capabilities.authorize(effectiveCredential, action);
   if (!auth.ok) {
     return { ok: false, status: statusFor(auth.reason), error: auth.reason };
   }

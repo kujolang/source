@@ -24,9 +24,9 @@
 import http from 'node:http';
 import https from 'node:https';
 import { Source } from './source.js';
-import { renderOrgIndex, renderIndex, renderProject, renderWork, renderChange } from './web.js';
+import { renderOrgIndex, renderIndex, renderProject, renderWork, renderChange, renderLogin } from './web.js';
 import { gitHttpBackend } from './git-http.js';
-import { ACTIONS, authorizeRequest, authorizeGit } from './auth.js';
+import { ACTIONS, authorizeRequest, authorizeGit, bearerCredential } from './auth.js';
 import { RateLimiter } from './ratelimit.js';
 
 function json(res, status, obj) {
@@ -40,22 +40,44 @@ function html(res, status, body) {
   res.end(body);
 }
 
-function readBody(req) {
+function readText(req, maxBytes = 1_000_000) {
   return new Promise((resolve, reject) => {
     let data = '';
     req.on('data', (c) => {
       data += c;
-      if (data.length > 1_000_000) reject(new Error('body too large'));
+      if (data.length > maxBytes) reject(new Error('body too large'));
     });
-    req.on('end', () => {
-      try {
-        resolve(data ? JSON.parse(data) : {});
-      } catch (e) {
-        reject(new Error('invalid JSON body'));
-      }
-    });
+    req.on('end', () => resolve(data));
     req.on('error', reject);
   });
+}
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    readText(req)
+      .then((data) => {
+        try {
+          resolve(data ? JSON.parse(data) : {});
+        } catch (e) {
+          reject(new Error('invalid JSON body'));
+        }
+      })
+      .catch(reject);
+  });
+}
+
+async function readLoginBody(req) {
+  const raw = await readText(req, 10_000);
+  if (!raw) return {};
+  const ct = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+  if (ct === 'application/x-www-form-urlencoded') {
+    return Object.fromEntries(new URLSearchParams(raw));
+  }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error('invalid body');
+  }
 }
 
 // Read a raw (possibly binary) request body, e.g. a Git packfile upload.
@@ -73,6 +95,47 @@ function readRawBody(req, maxBytes = 100_000_000) {
   });
 }
 
+const SESSION_COOKIE = 'source_session';
+
+function parseSessionCookie(header) {
+  if (!header) return null;
+  const match = String(header)
+    .split(';')
+    .find((segment) => segment.trim().startsWith(`${SESSION_COOKIE}=`));
+  if (!match) return null;
+  return match.trim().slice(SESSION_COOKIE.length + 1);
+}
+
+function sessionCredential(src, req) {
+  const bearer = bearerCredential(req);
+  if (bearer) return bearer;
+  const sessionId = parseSessionCookie(req.headers.cookie);
+  if (!sessionId) return null;
+  const session = src.getHumanSession(sessionId);
+  return session?.credential || null;
+}
+
+function sessionHeaders(session) {
+  const maxAge = session?.expiresAt ? Math.max(1, Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000)) : 0;
+  return `${SESSION_COOKIE}=${session.id}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}`;
+}
+
+function clearSessionHeader() {
+  return `${SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`;
+}
+
+function wantsHtml(req) {
+  return String(req.headers.accept || '').includes('text/html');
+}
+
+function wantsJson(req) {
+  return String(req.headers.accept || '').includes('application/json');
+}
+
+function loginPage(res, status = 200, error) {
+  return html(res, status, renderLogin({ error }));
+}
+
 // Apply field selection to an object (or array of objects).
 function selectFields(obj, fields) {
   if (!fields) return obj;
@@ -86,7 +149,8 @@ function selectFields(obj, fields) {
 // Authorize a request against a capability action and scope. Returns null when
 // authorized, or {status, body} to send as the rejection response.
 function guard(src, req, action, scope) {
-  const r = authorizeRequest(src.capabilities, req, action, scope);
+  const credential = sessionCredential(src, req);
+  const r = authorizeRequest(src.capabilities, req, action, { ...scope, credential });
   if (r.ok) return null;
   return { status: r.status, body: { error: r.error } };
 }
@@ -123,19 +187,99 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {} } = {
     const fields = url.searchParams.get('fields') || undefined;
 
     try {
-      // --- human-facing HTML views (public; human auth is a later phase) ---
+      // --- login ---------------------------------------------------------
+      if (req.method === 'GET' && pathname === '/login') {
+        return loginPage(res, 200);
+      }
+
+      if (req.method === 'POST' && pathname === '/login') {
+        const body = await readLoginBody(req);
+        const principalId = body.principalId || null;
+        const orgId = body.orgId || undefined;
+        const projectId = body.projectId || undefined;
+        const parsedTtl = body.ttlMs !== undefined && body.ttlMs !== null ? Number(body.ttlMs) : undefined;
+        const ttlMs = Number.isFinite(parsedTtl) ? parsedTtl : undefined;
+        const allowed = body.allowed
+          ? typeof body.allowed === 'string'
+            ? body.allowed
+                .split(',')
+                .map((value) => value.trim())
+                .filter(Boolean)
+            : Array.isArray(body.allowed)
+              ? body.allowed
+              : undefined
+          : undefined;
+
+        const principal = principalId ? src.getPrincipal(principalId) : null;
+        if (!principal) {
+          if (wantsJson(req)) return json(res, 401, { error: 'principal id required' });
+          return loginPage(res, 401, 'principal id required');
+        }
+        if (principal.type !== 'human') {
+          if (wantsJson(req)) return json(res, 403, { error: `principal is not human: ${principal.type}` });
+          return loginPage(res, 403, `principal is not human: ${principal.type}`);
+        }
+
+        const session = src.createHumanSession({ principalId: principal.id, orgId, projectId, ttlMs, allowed });
+        const headers = { 'Set-Cookie': sessionHeaders(session), 'Content-Type': 'application/json' };
+
+        if (wantsHtml(req)) {
+          headers.Location = '/';
+          res.writeHead(303, headers);
+          return res.end();
+        }
+
+        const bodyOut = JSON.stringify(session);
+        headers['Content-Length'] = Buffer.byteLength(bodyOut);
+        res.writeHead(200, headers);
+        return res.end(bodyOut);
+      }
+
+      if (req.method === 'POST' && pathname === '/logout') {
+        const sessionId = parseSessionCookie(req.headers.cookie);
+        if (sessionId) src.revokeHumanSession(sessionId);
+        const cookie = clearSessionHeader();
+        if (wantsHtml(req)) {
+          res.writeHead(303, { Location: '/login', 'Set-Cookie': cookie });
+          return res.end();
+        }
+        const bodyOut = JSON.stringify({ ok: true, revoked: Boolean(sessionId) });
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': cookie, 'Content-Length': Buffer.byteLength(bodyOut) });
+        res.end(bodyOut);
+      }
+
+      // --- human-facing HTML views ---------------------------------------
       if (req.method === 'GET' && pathname === '/') {
+        const g = guard(src, req, ACTIONS.read_source, {});
+        if (g) return loginPage(res, g.status, g.body.error);
         return html(res, 200, renderOrgIndex(src));
       }
+
       const orgPageMatch = pathname.match(/^\/o\/([^/]+)$/);
       if (req.method === 'GET' && orgPageMatch) {
-        return html(res, 200, renderIndex(src, orgPageMatch[1]));
+        const [, orgId] = orgPageMatch;
+        const g = guard(src, req, ACTIONS.read_source, { org: orgId });
+        if (g) return loginPage(res, g.status, g.body.error);
+        return html(res, 200, renderIndex(src, orgId));
       }
+
       const pMatch = pathname.match(/^\/o\/([^/]+)\/p\/([^/]+)(?:\/w\/([^/]+))?(?:\/c\/([^/]+))?$/);
       if (req.method === 'GET' && pMatch) {
         const [, orgId, projectId, workId, changeId] = pMatch;
-        if (changeId) return html(res, 200, renderChange(src, orgId, projectId, changeId));
-        if (workId) return html(res, 200, renderWork(src, orgId, projectId, workId));
+        const g = guard(src, req, ACTIONS.read_source, { org: orgId, project: projectId });
+        if (g) return loginPage(res, g.status, g.body.error);
+
+        if (changeId) {
+          const c = src.getChange(orgId, projectId, changeId);
+          if (!c) return html(res, 404, '<!doctype html><html><body><h1>Not found</h1></body></html>');
+          return html(res, 200, renderChange(src, orgId, projectId, changeId));
+        }
+
+        if (workId) {
+          const wc = guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
+          if (wc) return loginPage(res, wc.status, wc.body.error);
+          return html(res, 200, renderWork(src, orgId, projectId, workId));
+        }
         return html(res, 200, renderProject(src, orgId, projectId));
       }
 

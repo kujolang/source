@@ -14,6 +14,12 @@ async function withServer(src, fn) {
   }
 }
 
+function parseCookieHeader(headers) {
+  const cookie = headers.get('set-cookie');
+  if (!cookie) return null;
+  return cookie.split(';')[0];
+}
+
 function auth(credential) {
   return { Authorization: `Bearer ${credential}` };
 }
@@ -128,6 +134,71 @@ test('a session-scoped capability can submit but cannot accept (denied)', async 
     const humanCap = src.capabilities.issue({ principalId: human.id, scope: { org: org.id, project: project.id }, allowed: ['accept_change'] });
     const ok = await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/changes/${change.id}/decision`, { method: 'POST', headers: auth(humanCap.credential), body: JSON.stringify({ decision: 'rejected', decider: human.id, reasoning: 'not ready' }) });
     assert.equal(ok.status, 201);
+  });
+});
+
+test('human login issues a session and gates HTML/API with session cookies', async () => {
+  const { src, org, project, human } = freshSource();
+  await withServer(src, async (base) => {
+    const login = await fetch(`${base}/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ principalId: human.id, orgId: org.id, projectId: project.id, allowed: ['read_source', 'read_context'] }),
+    });
+    assert.equal(login.status, 200);
+    const session = await login.json();
+    assert.equal(session.principal.id, human.id);
+    assert.equal(session.capability.principalId, human.id);
+    assert.ok(session.credential);
+    const sessionCookie = parseCookieHeader(login.headers);
+    assert.ok(sessionCookie);
+    const cookieHeader = { Cookie: sessionCookie };
+    const protectedProject = await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}`, { headers: cookieHeader });
+    assert.equal(protectedProject.status, 200);
+    const anonymous = await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}`, {});
+    assert.equal(anonymous.status, 401);
+  });
+});
+
+test('human sessions control authorization for human-facing actions', async () => {
+  const { src, org, project, human, agent, service } = freshSource();
+  const work = src.createWork({ orgId: org.id, projectId: project.id, intent: 'login action test', requester: human.id });
+  src.claimWork({ orgId: org.id, projectId: project.id, workId: work.id, principalId: agent.id });
+  const session = src.startSession({ orgId: org.id, projectId: project.id, workId: work.id, principalId: agent.id, baseCommit: 'base' });
+  const change = src.submitChange({ orgId: org.id, projectId: project.id, workId: work.id, sessionId: session.id, baseCommit: 'base', headCommit: 'head' });
+  src.addEvidence({ orgId: org.id, projectId: project.id, changeId: change.id, subject: 't', claim: 'tests pass', type: 'test', producer: service.id, result: { status: 'pass' } });
+  src.addEvidence({ orgId: org.id, projectId: project.id, changeId: change.id, subject: 'e', claim: 'deterministic checks pass', type: 'eval', producer: service.id, result: { status: 'pass' } });
+
+  await withServer(src, async (base) => {
+    const readOnly = await fetch(`${base}/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ principalId: human.id, orgId: org.id, projectId: project.id, allowed: ['read_source'] }),
+    });
+    const cookie = parseCookieHeader(readOnly.headers);
+    assert.ok(cookie);
+
+    const denied = await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/changes/${change.id}/decision`, {
+      method: 'POST',
+      headers: { Cookie: cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'accepted', decider: human.id }),
+    });
+    assert.equal(denied.status, 403);
+
+    const empowered = await fetch(`${base}/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ principalId: human.id, orgId: org.id, projectId: project.id, allowed: ['read_source', 'accept_change'] }),
+    });
+    const empoweredCookie = parseCookieHeader(empowered.headers);
+    assert.ok(empoweredCookie);
+
+    const accepted = await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/changes/${change.id}/decision`, {
+      method: 'POST',
+      headers: { Cookie: empoweredCookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'accepted', decider: human.id, reasoning: 'ready' }),
+    });
+    assert.equal(accepted.status, 201);
   });
 });
 

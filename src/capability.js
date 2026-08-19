@@ -10,6 +10,9 @@ import { nextId, randomHex } from './ids.js';
 export class CapabilityService {
   constructor(store) {
     this.store = store;
+    this._cache = new Map();
+    this._cacheAt = 0;
+    this._cacheTtlMs = 5_000;
   }
 
   _rel(id) {
@@ -23,17 +26,30 @@ export class CapabilityService {
     const expiresAt = new Date(Date.now() + ttlMs).toISOString();
     const cap = createCapability({ id, principalId, scope, allowed, denied, expiresAt, credential });
     this.store.writeJson(this._rel(id), cap);
+    this._cache.set(credential, cap);
     return cap;
   }
 
   // Look up a grant by credential. Returns null if unknown.
   lookup(credential) {
+    this._refreshCache();
+    const cached = this._cache.get(credential);
+    if (cached) return cached;
+    return null;
+  }
+
+  _refreshCache() {
+    const now = Date.now();
+    if (this._cache.size > 0 && now - this._cacheAt < this._cacheTtlMs) return;
+
+    const next = new Map();
     const ids = this.store.listJson('capabilities');
     for (const id of ids) {
       const cap = this.store.readJson(this._rel(id));
-      if (cap && cap.credential === credential) return cap;
+      if (cap && cap.credential) next.set(cap.credential, cap);
     }
-    return null;
+    this._cache = next;
+    this._cacheAt = now;
   }
 
   // Verify a credential authorizes an action. Returns {ok, reason, cap}.
@@ -59,6 +75,8 @@ export class CapabilityService {
     if (!cap) return false;
     cap.revoked = true;
     this.store.writeJson(this._rel(id), cap);
+    this._cache.delete(cap.credential);
+    this._cacheAt = 0;
     return true;
   }
 }

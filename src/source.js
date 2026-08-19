@@ -23,9 +23,12 @@ import {
   decisionToChangeState,
 } from './domain.js';
 import { defaultPolicy, evaluateEvidence, interpret, canApprove } from './policy.js';
-import { nextId } from './ids.js';
+import { nextId, randomHex } from './ids.js';
 import { normalizeEvalSummary, normalizeEvalManifest, normalizeEvalRun, readEvalArtifacts } from './integrations/kujo.js';
 import { scanSecrets } from './scan.js';
+
+const DEFAULT_HUMAN_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_HUMAN_SESSION_ACTIONS = ['read_source', 'read_context', 'accept_change', 'modify_policy', 'publish_release'];
 
 export class Source {
   // `store` is optional; defaults to the JSON-file store. Pass a SqliteStore
@@ -211,6 +214,91 @@ export class Source {
     });
     this.store.audit({ event: 'capability.issue', orgId, projectId, principalId, capabilityId: cap.id, kind: 'git' });
     return cap;
+  }
+
+  // --- human sessions -------------------------------------------------
+  _humanSessionRel(sessionId) {
+    return `human-sessions/${sessionId}.json`;
+  }
+
+  createHumanSession({
+    principalId,
+    orgId,
+    projectId,
+    ttlMs = DEFAULT_HUMAN_SESSION_TTL_MS,
+    allowed = DEFAULT_HUMAN_SESSION_ACTIONS,
+  }) {
+    const principal = this.getPrincipal(principalId);
+    if (!principal) throw new Error(`principal not found: ${principalId}`);
+    if (principal.type !== 'human') throw new Error(`principal is not human: ${principal.type}`);
+
+    const scope = {};
+    if (orgId) scope.org = orgId;
+    if (projectId) scope.project = projectId;
+
+    const capability = this.capabilities.issue({
+      principalId,
+      scope,
+      allowed,
+      ttlMs,
+    });
+
+    const sessionBase = {
+      principalId,
+      scope,
+      credential: capability.credential,
+      capabilityId: capability.id,
+      createdAt: new Date().toISOString(),
+      expiresAt: capability.expiresAt,
+    };
+
+    let session;
+    if (typeof this.store.createHumanSessionRow === 'function') {
+      session = this.store.createHumanSessionRow(principalId, capability.credential, ttlMs);
+      session.scope = scope;
+      session.capabilityId = capability.id;
+      session.credential = capability.credential;
+      session.principalId = principalId;
+      session.createdAt = session.createdAt || sessionBase.createdAt;
+    } else {
+      session = {
+        id: randomHex(24),
+        ...sessionBase,
+      };
+      this.store.writeJson(this._humanSessionRel(session.id), session);
+    }
+
+    this.store.audit({ event: 'human.session.create', principalId, sessionId: session.id, capabilityId: capability.id, scope });
+    return { ...session, principal, capability };
+  }
+
+  getHumanSession(sessionId) {
+    const session = typeof this.store.readHumanSession === 'function'
+      ? this.store.readHumanSession(sessionId)
+      : this.store.readJson(this._humanSessionRel(sessionId));
+
+    if (!session) return null;
+    if (session.revoked) {
+      this.revokeHumanSession(sessionId);
+      return null;
+    }
+    if (session.expiresAt && new Date(session.expiresAt).getTime() < Date.now()) {
+      this.revokeHumanSession(sessionId);
+      return null;
+    }
+    return session;
+  }
+
+  revokeHumanSession(sessionId) {
+    if (typeof this.store.deleteHumanSession === 'function') {
+      this.store.deleteHumanSession(sessionId);
+      return;
+    }
+    const rel = this._humanSessionRel(sessionId);
+    const session = this.store.readJson(rel);
+    if (!session) return;
+    session.revoked = true;
+    this.store.writeJson(rel, session);
   }
 
   // --- work -------------------------------------------------------------
@@ -459,6 +547,8 @@ export class Source {
     if (decision === 'accepted') transitionChange(change, 'approved');
     else if (decision === 'rejected') transitionChange(change, 'rejected');
     else if (decision === 'revision_requested') transitionChange(change, 'changes_requested');
+    if (!change.decisions) change.decisions = [];
+    if (!change.decisions.includes(id)) change.decisions.push(id);
 
     const work = this.getWork(orgId, projectId, change.workId);
     if (work) {
@@ -640,6 +730,77 @@ export class Source {
   }
 
   // --- audit ------------------------------------------------------------
+  queryWorkGraph(orgId, projectId, workId) {
+    if (typeof this.store.queryWorkGraph === 'function') {
+      return this.store.queryWorkGraph(orgId, projectId, workId);
+    }
+
+    const work = this.getWork(orgId, projectId, workId);
+    if (!work) return null;
+    const requester = this.getPrincipal(work.requester);
+
+    const changes = this.listChanges(orgId, projectId)
+      .filter((c) => c.workId === workId)
+      .map((change) => {
+        const session = change.sessionId ? this.getSession(orgId, projectId, change.sessionId) : null;
+        return {
+          id: change.id,
+          change,
+          session: session
+            ? {
+                id: session.id,
+                principal: this.getPrincipal(session.principal)
+                  ? {
+                      id: session.principal,
+                      name: this.getPrincipal(session.principal).name,
+                    }
+                  : null,
+              }
+            : null,
+          evidence: change.evidence
+            .map((id) => ({ id, evidence: this.getEvidence(orgId, projectId, id) }))
+            .filter((entry) => entry.evidence)
+            .map((entry) => ({ id: entry.id, evidence: entry.evidence })),
+          decisions: (change.decisions || [])
+            .map((id) => ({ id, decision: this.getDecision(orgId, projectId, id) }))
+            .filter((entry) => entry.decision)
+            .map((entry) => ({ id: entry.id, decision: entry.decision })),
+        };
+      });
+
+    return {
+      work,
+      workId,
+      requester,
+      changes,
+    };
+  }
+
+  queryPrincipalActivity(orgId, projectId, principalId) {
+    if (typeof this.store.queryChangesForPrincipal === 'function') {
+      return this.store.queryChangesForPrincipal(orgId, projectId, principalId);
+    }
+
+    const evidence = [];
+    for (const change of this.listChanges(orgId, projectId)) {
+      for (const evidenceId of change.evidence || []) {
+        const e = this.getEvidence(orgId, projectId, evidenceId);
+        if (e?.producer === principalId) {
+          evidence.push({ id: e.id, workId: change.workId, changeId: change.id, evidence: e });
+        }
+      }
+    }
+
+    const decisions = this.store.listJson(`${this._projectRel(orgId, projectId)}/decisions`).map((decisionId) => {
+      const d = this.getDecision(orgId, projectId, decisionId);
+      if (!d || d.decider !== principalId) return null;
+      const change = this.getChange(orgId, projectId, d.changeId);
+      return change ? { id: d.id, changeId: d.changeId, decision: d } : null;
+    }).filter(Boolean);
+
+    return { principalId, evidence, decisions };
+  }
+
   readAudit() {
     return this.store.readAudit();
   }
