@@ -117,6 +117,18 @@ The JSON and SQLite backends remain useful for local development and
 single-node deployments. They are not evidence of Postgres production load
 capacity.
 
+The live Postgres gate is opt-in because it requires an operator-provided test
+database:
+
+```bash
+SOURCE_TEST_DATABASE_URL='postgresql://source:password@db/source' npm run test:postgres
+```
+
+It creates an isolated temporary schema, exercises 1,000 concurrent async
+lifecycle writes and 1,000 concurrent HTTP discovery requests, then removes
+the schema. Run the external `npm run load` harness separately from another
+host to include network and load-balancer behavior.
+
 ## Node version
 
 `node:sqlite` requires Node ≥ 22.5 (unflagged in 23.4+, stable in 24). The

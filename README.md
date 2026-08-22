@@ -39,6 +39,9 @@ scanning).
 # Run the test suite (includes the dogfood test against ../spec)
 npm test
 
+# Run the live Postgres scale gate when a test database is available
+SOURCE_TEST_DATABASE_URL='postgresql://source:password@db/source' npm run test:postgres
+
 # Exercise the CLI
 node bin/source.js help
 node bin/source.js init --name source.kujolang.ai

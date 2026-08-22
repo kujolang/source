@@ -98,7 +98,7 @@ class PostgresStore {
       '--set',
       'ON_ERROR_STOP=1',
       '-v',
-      'VERBOSITY=error',
+      'VERBOSITY=terse',
       '-q',
       '-d',
       this.dsn,
@@ -848,7 +848,7 @@ class PostgresStore {
     const value = this._run(`
       INSERT INTO ${this._qualified('meta')} (key, value)
       VALUES (${escapeSqlLiteral(key)}, '1'::jsonb)
-      ON CONFLICT (key) DO UPDATE SET value = to_jsonb(((value)::text)::bigint + 1)
+      ON CONFLICT (key) DO UPDATE SET value = to_jsonb(((${this._qualified('meta')}.value)::text)::bigint + 1)
       RETURNING value
     `);
     return `${prefix}${Number(JSON.parse(value))}`;
@@ -859,7 +859,7 @@ class PostgresStore {
     const value = await this._runAsync(`
       INSERT INTO ${this._qualified('meta')} (key, value)
       VALUES (${escapeSqlLiteral(key)}, '1'::jsonb)
-      ON CONFLICT (key) DO UPDATE SET value = to_jsonb(((value)::text)::bigint + 1)
+      ON CONFLICT (key) DO UPDATE SET value = to_jsonb(((${this._qualified('meta')}.value)::text)::bigint + 1)
       RETURNING value
     `);
     return `${prefix}${Number(JSON.parse(value))}`;

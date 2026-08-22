@@ -148,6 +148,18 @@ export class Source {
     return project;
   }
 
+  async createProjectAsync({ orgId, slug, name, description = '', visibility = 'private' }) {
+    const id = await nextIdAsync(this.store, 'project');
+    const project = createProject({ id, slug, name, description, visibility, ownerOrg: orgId });
+    const rel = this._projectRel(orgId, id);
+    await this._asyncTransaction(async () => {
+      await this._asyncWrite(`${rel}/project.json`, project);
+      await this._asyncWrite(`${rel}/policy.json`, defaultPolicy());
+    });
+    await this._asyncAudit({ event: 'project.create', orgId, projectId: id, name });
+    return project;
+  }
+
   getProject(orgId, projectId) {
     return this.store.readJson(`${this._projectRel(orgId, projectId)}/project.json`);
   }
