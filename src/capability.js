@@ -5,7 +5,7 @@
 // record (scope, allowed/denied, expiry, revocation).
 
 import { createCapability } from './domain.js';
-import { nextId, randomHex } from './ids.js';
+import { nextId, nextIdAsync, randomHex } from './ids.js';
 
 export class CapabilityService {
   constructor(store) {
@@ -26,6 +26,17 @@ export class CapabilityService {
     const expiresAt = new Date(Date.now() + ttlMs).toISOString();
     const cap = createCapability({ id, principalId, scope, allowed, denied, expiresAt, credential });
     this.store.writeJson(this._rel(id), cap);
+    this._cache.set(credential, cap);
+    return cap;
+  }
+
+  async issueAsync({ principalId, scope, allowed = [], denied = [], ttlMs = 4 * 60 * 60 * 1000 }) {
+    const id = await nextIdAsync(this.store, 'capability');
+    const credential = randomHex(24);
+    const expiresAt = new Date(Date.now() + ttlMs).toISOString();
+    const cap = createCapability({ id, principalId, scope, allowed, denied, expiresAt, credential });
+    if (typeof this.store.writeJsonAsync === 'function') await this.store.writeJsonAsync(this._rel(id), cap);
+    else this.store.writeJson(this._rel(id), cap);
     this._cache.set(credential, cap);
     return cap;
   }

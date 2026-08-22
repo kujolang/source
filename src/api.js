@@ -538,7 +538,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
             const g = await guard(src, req, ACTIONS.claim_work, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
             const body = await readBody(req, maxJsonBodyBytes);
-            const w = src.claimWork({ orgId, projectId, workId, principalId: body.principalId });
+            const w = await src.claimWorkAsync({ orgId, projectId, workId, principalId: body.principalId });
             return json(res, 200, w);
           }
 
@@ -550,10 +550,10 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
             const g = await guard(src, req, ACTIONS.start_session, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
             const body = await readBody(req, maxJsonBodyBytes);
-            const s = src.startSession({ orgId, projectId, workId, principalId: body.principalId, environment: body.environment, baseCommit: body.baseCommit });
+            const s = await src.startSessionAsync({ orgId, projectId, workId, principalId: body.principalId, environment: body.environment, baseCommit: body.baseCommit });
             // Issue a session-scoped capability (temporary session identity):
             // bounded to this org/project/work, expiring, denied accept/policy.
-            const cap = src.issueSessionCapability({ orgId, projectId, workId, principalId: body.principalId });
+            const cap = await src.issueSessionCapabilityAsync({ orgId, projectId, workId, principalId: body.principalId });
             return json(res, 201, { ...s, capability: cap });
           }
 
@@ -578,7 +578,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
             const g = await guard(src, req, ACTIONS.submit_change, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
             const body = await readBody(req, maxJsonBodyBytes);
-            const c = src.submitChange({ orgId, projectId, workId, sessionId: body.sessionId, baseCommit: body.baseCommit, headCommit: body.headCommit, repositories: body.repositories, repositoryChanges: body.repositoryChanges });
+            const c = await src.submitChangeAsync({ orgId, projectId, workId, sessionId: body.sessionId, baseCommit: body.baseCommit, headCommit: body.headCommit, repositories: body.repositories, repositoryChanges: body.repositoryChanges });
             return json(res, 201, c);
           }
         }
@@ -601,14 +601,14 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
             const g = await guard(src, req, ACTIONS.submit_evidence, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
             const body = await readBody(req, maxJsonBodyBytes);
-            const e = src.addEvidence({ orgId, projectId, changeId, ...body });
+            const e = await src.addEvidenceAsync({ orgId, projectId, changeId, ...body });
             return json(res, 201, e);
           }
 
           if (crest === '/evaluate' && req.method === 'POST') {
             const g = await guard(src, req, ACTIONS.submit_evidence, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
-            const r = src.evaluateChange({ orgId, projectId, changeId });
+            const r = await src.evaluateChangeAsync({ orgId, projectId, changeId });
             return json(res, 200, { evaluation: r.evaluation, interpretation: r.interpretation });
           }
 

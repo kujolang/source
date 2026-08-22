@@ -39,6 +39,18 @@ export class Source {
     this.capabilities = new CapabilityService(this.store);
   }
 
+  _asyncWrite(rel, value) {
+    return typeof this.store.writeJsonAsync === 'function' ? this.store.writeJsonAsync(rel, value) : this.store.writeJson(rel, value);
+  }
+
+  _asyncAudit(entry) {
+    return typeof this.store.auditAsync === 'function' ? this.store.auditAsync(entry) : this.store.audit(entry);
+  }
+
+  _asyncTransaction(fn) {
+    return typeof this.store.transactionAsync === 'function' ? this.store.transactionAsync(fn) : fn();
+  }
+
   // --- path helpers -----------------------------------------------------
   _orgRel(orgId) {
     return `orgs/${orgId}`;
@@ -228,6 +240,15 @@ export class Source {
     return this._publicPrincipal(principal);
   }
 
+  async createPrincipalAsync({ type, name, password } = {}) {
+    const id = await nextIdAsync(this.store, 'principal');
+    const passwordHash = type === 'human' && password ? this._hashPassword(password) : null;
+    const principal = createPrincipal({ id, type, name, passwordHash });
+    await this._asyncWrite(`principals/${id}.json`, principal);
+    await this._asyncAudit({ event: 'principal.create', principalId: id, type, name });
+    return this._publicPrincipal(principal);
+  }
+
   _publicPrincipal(principal) {
     if (!principal) return principal;
     const { passwordHash, ...publicPrincipal } = principal;
@@ -271,6 +292,17 @@ export class Source {
       denied: ['accept_change', 'modify_policy', 'publish_release'],
     });
     this.store.audit({ event: 'capability.issue', orgId, projectId, workId, principalId, capabilityId: cap.id });
+    return cap;
+  }
+
+  async issueSessionCapabilityAsync({ orgId, projectId, workId, principalId }) {
+    const cap = await this.capabilities.issueAsync({
+      principalId,
+      scope: { org: orgId, project: projectId, work: workId },
+      allowed: ['read_source', 'read_context', 'submit_change', 'submit_evidence'],
+      denied: ['accept_change', 'modify_policy', 'publish_release'],
+    });
+    await this._asyncAudit({ event: 'capability.issue', orgId, projectId, workId, principalId, capabilityId: cap.id });
     return cap;
   }
 
@@ -402,6 +434,14 @@ export class Source {
     return work;
   }
 
+  async createWorkAsync({ orgId, projectId, intent, type = 'task', requester, requirements = [], acceptanceConditions = [], requiredEvidence = [], priority = 'medium' }) {
+    const id = await nextIdAsync(this.store, 'work');
+    const work = createWork({ id, type, intent, requester, requirements, acceptanceConditions, requiredEvidence, priority });
+    await this._asyncWrite(`${this._projectRel(orgId, projectId)}/work/${id}.json`, work);
+    await this._asyncAudit({ event: 'work.create', orgId, projectId, workId: id, intent });
+    return work;
+  }
+
   getWork(orgId, projectId, workId) {
     return this.store.readJson(`${this._projectRel(orgId, projectId)}/work/${workId}.json`);
   }
@@ -438,6 +478,16 @@ export class Source {
     return work;
   }
 
+  async claimWorkAsync({ orgId, projectId, workId, principalId }) {
+    const work = await this.getWorkAsync(orgId, projectId, workId);
+    if (!work) throw new Error(`work not found: ${workId}`);
+    transitionWork(work, 'claimed');
+    work.assignee = principalId;
+    await this._asyncWrite(`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work);
+    await this._asyncAudit({ event: 'work.claim', orgId, projectId, workId, principalId });
+    return work;
+  }
+
   assignWork({ orgId, projectId, workId, principalId }) {
     const work = this.getWork(orgId, projectId, workId);
     if (!work) throw new Error(`work not found: ${workId}`);
@@ -460,6 +510,21 @@ export class Source {
       this._saveWork(orgId, projectId, work);
     });
     this.store.audit({ event: 'session.start', orgId, projectId, workId, sessionId: id, principalId });
+    return session;
+  }
+
+  async startSessionAsync({ orgId, projectId, workId, principalId, environment = {}, baseCommit = '' }) {
+    const work = await this.getWorkAsync(orgId, projectId, workId);
+    if (!work) throw new Error(`work not found: ${workId}`);
+    transitionWork(work, 'in_progress');
+    const id = await nextIdAsync(this.store, 'session');
+    const session = createSession({ id, workId, principal: principalId, environment, baseCommit });
+    work.sessions.push(id);
+    await this._asyncTransaction(async () => {
+      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/sessions/${id}.json`, session);
+      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work);
+    });
+    await this._asyncAudit({ event: 'session.start', orgId, projectId, workId, sessionId: id, principalId });
     return session;
   }
 
@@ -493,6 +558,24 @@ export class Source {
       if (session) this.store.writeJson(`${this._projectRel(orgId, projectId)}/sessions/${sessionId}.json`, session);
     });
     this.store.audit({ event: 'change.submit', orgId, projectId, workId, changeId: id, baseCommit, headCommit });
+    return change;
+  }
+
+  async submitChangeAsync({ orgId, projectId, workId, sessionId, baseCommit = '', headCommit = '', repositories = [], repositoryChanges = null }) {
+    const work = await this.getWorkAsync(orgId, projectId, workId);
+    if (!work) throw new Error(`work not found: ${workId}`);
+    transitionWork(work, 'submitted');
+    const id = await nextIdAsync(this.store, 'change');
+    const change = createChange({ id, workId, sessionId, baseCommit, headCommit, repositories, repositoryChanges });
+    work.changes.push(id);
+    const session = sessionId ? await this.store.readJsonAsync?.(`${this._projectRel(orgId, projectId)}/sessions/${sessionId}.json`) ?? this.getSession(orgId, projectId, sessionId) : null;
+    if (session) session.changes.push(id);
+    await this._asyncTransaction(async () => {
+      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/changes/${id}.json`, change);
+      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work);
+      if (session) await this._asyncWrite(`${this._projectRel(orgId, projectId)}/sessions/${sessionId}.json`, session);
+    });
+    await this._asyncAudit({ event: 'change.submit', orgId, projectId, workId, changeId: id, baseCommit, headCommit });
     return change;
   }
 
@@ -531,6 +614,25 @@ export class Source {
       this._saveChange(orgId, projectId, change);
     });
     this.store.audit({ event: 'evidence.add', orgId, projectId, changeId, evidenceId: id, type, claim, validity });
+    return evidence;
+  }
+
+  async addEvidenceAsync({ orgId, projectId, changeId, subject, claim, type, producer, artifact = null, result = null, provenance = {}, environment = {}, sourceRevision = null, validity = 'valid' }) {
+    const change = await this.getChangeAsync(orgId, projectId, changeId);
+    if (!change) throw new Error(`change not found: ${changeId}`);
+    const id = await nextIdAsync(this.store, 'evidence');
+    let artifactRef = null;
+    if (artifact != null) {
+      const bytes = Buffer.isBuffer(artifact) ? artifact : Buffer.from(String(artifact), 'utf8');
+      artifactRef = typeof this.store.putArtifactAsync === 'function' ? await this.store.putArtifactAsync(bytes) : this.store.putArtifact(bytes);
+    }
+    const evidence = createEvidence({ id, subject, claim, type, producer, artifactRef, result, provenance, environment, sourceRevision, validity });
+    change.evidence.push(id);
+    await this._asyncTransaction(async () => {
+      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/evidence/${id}.json`, evidence);
+      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/changes/${change.id}.json`, change);
+    });
+    await this._asyncAudit({ event: 'evidence.add', orgId, projectId, changeId, evidenceId: id, type, claim, validity });
     return evidence;
   }
 
@@ -616,6 +718,21 @@ export class Source {
       this._saveChange(orgId, projectId, change);
     }
     this.store.audit({ event: 'policy.evaluate', orgId, projectId, changeId, ok: evaluation.ok, missing: evaluation.missing.length });
+    return { evaluation, interpretation, change };
+  }
+
+  async evaluateChangeAsync({ orgId, projectId, changeId }) {
+    const change = await this.getChangeAsync(orgId, projectId, changeId);
+    if (!change) throw new Error(`change not found: ${changeId}`);
+    const policy = await this.getPolicyAsync(orgId, projectId);
+    const evidenceList = (await Promise.all(change.evidence.map((id) => this.getEvidenceAsync(orgId, projectId, id)))).filter(Boolean);
+    const evaluation = evaluateEvidence(policy, evidenceList);
+    const interpretation = interpret(evaluation);
+    if (change.reviewState === 'pending') {
+      transitionChange(change, 'in_review');
+      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/changes/${change.id}.json`, change);
+    }
+    await this._asyncAudit({ event: 'policy.evaluate', orgId, projectId, changeId, ok: evaluation.ok, missing: evaluation.missing.length });
     return { evaluation, interpretation, change };
   }
 
@@ -908,26 +1025,26 @@ export class Source {
     if (baseCommit && !(await git.hasCommitAsync(baseCommit))) throw new Error('base commit not present in repository');
     if (baseCommit === headCommit) throw new Error('no changes to submit (base == head)');
 
-    const principal = this.createPrincipal({ type: 'human', name: contributorName });
-    const work = this.createWork({ orgId, projectId, intent: intent || `Contribution to ${repo.name}`, type: 'contribution', requester: principal.id });
-    this.claimWork({ orgId, projectId, workId: work.id, principalId: principal.id });
-    const session = this.startSession({ orgId, projectId, workId: work.id, principalId: principal.id, baseCommit });
-    const change = this.submitChange({ orgId, projectId, workId: work.id, sessionId: session.id, baseCommit, headCommit, repositories: [repo.id] });
+    const principal = await this.createPrincipalAsync({ type: 'human', name: contributorName });
+    const work = await this.createWorkAsync({ orgId, projectId, intent: intent || `Contribution to ${repo.name}`, type: 'contribution', requester: principal.id });
+    await this.claimWorkAsync({ orgId, projectId, workId: work.id, principalId: principal.id });
+    const session = await this.startSessionAsync({ orgId, projectId, workId: work.id, principalId: principal.id, baseCommit });
+    const change = await this.submitChangeAsync({ orgId, projectId, workId: work.id, sessionId: session.id, baseCommit, headCommit, repositories: [repo.id] });
     const changed = await git.changedFilesAsync(baseCommit, headCommit);
     const nonEmpty = changed.length > 0;
-    const footprint = this.addEvidence({
+    const footprint = await this.addEvidenceAsync({
       orgId, projectId, changeId: change.id, subject: 'change footprint', claim: 'change is non-empty', type: 'test', producer: principal.id,
       artifact: JSON.stringify({ changedFiles: changed, nonEmpty }), result: { status: nonEmpty ? 'pass' : 'fail' }, validity: nonEmpty ? 'valid' : 'invalid',
     });
     const findings = await this.scanChangeSecretsAsync({ orgId, projectId, changeId: change.id });
     let securityEvidence = null;
     if (findings.length > 0) {
-      securityEvidence = this.addEvidence({
+      securityEvidence = await this.addEvidenceAsync({
         orgId, projectId, changeId: change.id, subject: 'credential scan', claim: 'no credentials in change', type: 'security', producer: principal.id,
         artifact: JSON.stringify({ findings }), result: { status: 'fail', findings }, validity: 'invalid',
       });
     }
-    const evaluation = this.evaluateChange({ orgId, projectId, changeId: change.id });
+    const evaluation = await this.evaluateChangeAsync({ orgId, projectId, changeId: change.id });
     return { work, session, change, evidence: footprint, securityEvidence, findings, evaluation: evaluation.evaluation, interpretation: evaluation.interpretation };
   }
 

@@ -660,6 +660,60 @@ class PostgresStore {
       await this._runAsync(`INSERT INTO ${this._qualified('projects')} (id, org_id, json)
         VALUES (${escapeSqlLiteral(classified.projectId)}, ${escapeSqlLiteral(classified.orgId)}, ${toJson(obj)})
         ON CONFLICT (id) DO UPDATE SET org_id = EXCLUDED.org_id, json = EXCLUDED.json`);
+    } else if (classified.kind === 'principal') {
+      await this._runAsync(`INSERT INTO ${this._qualified('principals')} (id, principal_type, name, json)
+        VALUES (${escapeSqlLiteral(classified.id)}, ${escapeSqlLiteral(obj.type)}, ${escapeSqlLiteral(obj.name)}, ${toJson(obj)})
+        ON CONFLICT (id) DO UPDATE SET principal_type = EXCLUDED.principal_type, name = EXCLUDED.name, json = EXCLUDED.json`);
+    } else if (classified.kind === 'work') {
+      await this._runAsync(`INSERT INTO ${this._qualified('works')} (id, org_id, project_id, requester_id, json)
+        VALUES (${escapeSqlLiteral(classified.id)}, ${escapeSqlLiteral(classified.orgId)}, ${escapeSqlLiteral(classified.projectId)}, ${escapeSqlLiteral(obj.requester)}, ${toJson(obj)})
+        ON CONFLICT (id) DO UPDATE SET org_id = EXCLUDED.org_id, project_id = EXCLUDED.project_id, requester_id = EXCLUDED.requester_id, json = EXCLUDED.json`);
+      await this._runAsync(`DELETE FROM ${this._qualified('work_sessions')} WHERE work_id = ${escapeSqlLiteral(classified.id)}`);
+      for (const sessionId of Array.isArray(obj.sessions) ? obj.sessions : []) {
+        await this._runAsync(`INSERT INTO ${this._qualified('work_sessions')} (work_id, session_id)
+          VALUES (${escapeSqlLiteral(classified.id)}, ${escapeSqlLiteral(sessionId)}) ON CONFLICT DO NOTHING`);
+      }
+      await this._runAsync(`DELETE FROM ${this._qualified('work_decisions')} WHERE work_id = ${escapeSqlLiteral(classified.id)}`);
+      for (const decisionId of Array.isArray(obj.decisions) ? obj.decisions : []) {
+        await this._runAsync(`INSERT INTO ${this._qualified('work_decisions')} (work_id, decision_id)
+          VALUES (${escapeSqlLiteral(classified.id)}, ${escapeSqlLiteral(decisionId)}) ON CONFLICT DO NOTHING`);
+      }
+    } else if (classified.kind === 'session') {
+      await this._runAsync(`INSERT INTO ${this._qualified('sessions')} (id, work_id, principal_id, json)
+        VALUES (${escapeSqlLiteral(classified.id)}, ${escapeSqlLiteral(obj.workId)}, ${escapeSqlLiteral(obj.principal)}, ${toJson(obj)})
+        ON CONFLICT (id) DO UPDATE SET work_id = EXCLUDED.work_id, principal_id = EXCLUDED.principal_id, json = EXCLUDED.json`);
+      await this._runAsync(`INSERT INTO ${this._qualified('principals')} (id, principal_type, name, json)
+        VALUES (${escapeSqlLiteral(obj.principal)}, 'agent', 'session principal', ${toJson({ id: obj.principal })})
+        ON CONFLICT (id) DO NOTHING`);
+      await this._runAsync(`INSERT INTO ${this._qualified('work_sessions')} (work_id, session_id)
+        VALUES (${escapeSqlLiteral(obj.workId)}, ${escapeSqlLiteral(classified.id)}) ON CONFLICT DO NOTHING`);
+    } else if (classified.kind === 'change') {
+      await this._runAsync(`INSERT INTO ${this._qualified('changes')} (id, org_id, project_id, work_id, session_id, json)
+        VALUES (${escapeSqlLiteral(classified.id)}, ${escapeSqlLiteral(classified.orgId)}, ${escapeSqlLiteral(classified.projectId)}, ${escapeSqlLiteral(obj.workId)}, ${escapeSqlLiteral(obj.sessionId)}, ${toJson(obj)})
+        ON CONFLICT (id) DO UPDATE SET work_id = EXCLUDED.work_id, session_id = EXCLUDED.session_id, json = EXCLUDED.json`);
+      await this._runAsync(`DELETE FROM ${this._qualified('change_evidence')} WHERE change_id = ${escapeSqlLiteral(classified.id)}`);
+      for (const evidenceId of Array.isArray(obj.evidence) ? obj.evidence : []) {
+        await this._runAsync(`INSERT INTO ${this._qualified('change_evidence')} (change_id, evidence_id)
+          VALUES (${escapeSqlLiteral(classified.id)}, ${escapeSqlLiteral(evidenceId)}) ON CONFLICT DO NOTHING`);
+      }
+      await this._runAsync(`DELETE FROM ${this._qualified('change_decisions')} WHERE change_id = ${escapeSqlLiteral(classified.id)}`);
+      for (const decisionId of Array.isArray(obj.decisions) ? obj.decisions : []) {
+        await this._runAsync(`INSERT INTO ${this._qualified('change_decisions')} (change_id, decision_id)
+          VALUES (${escapeSqlLiteral(classified.id)}, ${escapeSqlLiteral(decisionId)}) ON CONFLICT DO NOTHING`);
+      }
+    } else if (classified.kind === 'evidence') {
+      await this._runAsync(`INSERT INTO ${this._qualified('evidence')} (id, org_id, project_id, producer_id, json)
+        VALUES (${escapeSqlLiteral(classified.id)}, ${escapeSqlLiteral(classified.orgId)}, ${escapeSqlLiteral(classified.projectId)}, ${escapeSqlLiteral(obj.producer)}, ${toJson(obj)})
+        ON CONFLICT (id) DO UPDATE SET producer_id = EXCLUDED.producer_id, json = EXCLUDED.json`);
+      await this._runAsync(`INSERT INTO ${this._qualified('principals')} (id, principal_type, name, json)
+        VALUES (${escapeSqlLiteral(obj.producer)}, 'service', 'evidence producer', ${toJson({ id: obj.producer })})
+        ON CONFLICT (id) DO NOTHING`);
+    } else if (classified.kind === 'decision') {
+      await this._runAsync(`INSERT INTO ${this._qualified('decisions')} (id, org_id, project_id, change_id, decider_id, json)
+        VALUES (${escapeSqlLiteral(classified.id)}, ${escapeSqlLiteral(classified.orgId)}, ${escapeSqlLiteral(classified.projectId)}, ${escapeSqlLiteral(obj.changeId)}, ${escapeSqlLiteral(obj.decider)}, ${toJson(obj)})
+        ON CONFLICT (id) DO UPDATE SET change_id = EXCLUDED.change_id, decider_id = EXCLUDED.decider_id, json = EXCLUDED.json`);
+      await this._runAsync(`INSERT INTO ${this._qualified('change_decisions')} (change_id, decision_id)
+        VALUES (${escapeSqlLiteral(obj.changeId)}, ${escapeSqlLiteral(classified.id)}) ON CONFLICT DO NOTHING`);
     }
   }
 
@@ -817,6 +871,15 @@ class PostgresStore {
       ON CONFLICT (hash) DO UPDATE SET bytes = EXCLUDED.bytes`);
     const rel = `artifacts/${hash.slice(0, 2)}/${hash}`;
     return { hash, rel };
+  }
+
+  async putArtifactAsync(bytes) {
+    const buffer = Buffer.isBuffer(bytes) ? bytes : Buffer.from(String(bytes), 'utf8');
+    const hash = createHash('sha256').update(buffer).digest('hex');
+    await this._runAsync(`INSERT INTO ${this._qualified('artifacts')} (hash, bytes)
+      VALUES (${escapeSqlLiteral(hash)}, ${escapeSqlLiteral(buffer)})
+      ON CONFLICT (hash) DO UPDATE SET bytes = EXCLUDED.bytes`);
+    return { hash, rel: `artifacts/${hash.slice(0, 2)}/${hash}` };
   }
 
   getArtifact(hash) {
