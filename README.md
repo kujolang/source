@@ -101,7 +101,7 @@ default), a 10-second connection timeout, a 30-second idle timeout, and a
 the deployment's database capacity.
 
 `/healthz` reports process liveness. `/readyz` verifies that the Source
-instance is initialized and the selected store can be read; remove an instance
+instance, metadata store, and Git root are available; remove an instance
 from service when readiness returns `503`. On shutdown the CLI marks the
 instance draining, rejects new work with `503`, allows active requests to
 finish, and force-closes connections after 30 seconds.

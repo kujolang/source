@@ -6,6 +6,7 @@
 // thin clients over it.
 
 import path from 'node:path';
+import { access } from 'node:fs/promises';
 import { randomBytes, scrypt, scryptSync, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { Store } from './store.js';
@@ -87,6 +88,13 @@ export class Source {
 
   getInstance() {
     return this.store.readJson('instance.json');
+  }
+
+  async checkHealthAsync() {
+    if (typeof this.store.checkHealthAsync === 'function') await this.store.checkHealthAsync();
+    await access(this.dataRoot);
+    await access(this.gitRoot);
+    return true;
   }
 
   async getInstanceAsync() {
