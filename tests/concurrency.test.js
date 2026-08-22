@@ -154,6 +154,19 @@ test('HTTP discovery withstands a thousand concurrent agent connections', async 
   }
 });
 
+test('health and readiness endpoints expose process and storage state', async () => {
+  const { src } = freshSource();
+  const server = await startServer(src, { port: 0 });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    assert.equal((await fetch(`${base}/healthz`)).status, 200);
+    assert.equal((await fetch(`${base}/readyz`)).status, 200);
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});
+
 test('Git CGI output is bounded when a caller configures a response cap', async () => {
   const root = mkdtempSync(path.join(tmpdir(), 'source-git-output-cap-'));
   const repo = path.join(root, 'repo.git');

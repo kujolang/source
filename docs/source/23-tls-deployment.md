@@ -50,6 +50,11 @@ source.example.com {
 }
 ```
 
+The server exposes `GET /healthz` for liveness and `GET /readyz` for
+readiness. The CLI drains connections and closes the selected store on
+`SIGTERM`/`SIGINT`, so orchestrators can remove an instance from service before
+process termination.
+
 Example (nginx, manual certificate):
 
 ```text

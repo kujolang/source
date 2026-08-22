@@ -300,6 +300,17 @@ export async function run(argv) {
             const addr = server.address();
             const hostStr = host || 'localhost';
             process.stdout.write(`listening on ${scheme}://${hostStr}:${addr.port}\n`);
+            let shuttingDown = false;
+            const shutdown = async () => {
+              if (shuttingDown) return;
+              shuttingDown = true;
+              server.closeAllConnections?.();
+              await new Promise((resolve) => server.close(() => resolve()));
+              await src.store.closeAsync?.();
+            };
+            for (const signal of ['SIGTERM', 'SIGINT']) {
+              process.once(signal, () => shutdown().finally(() => process.exit(0)));
+            }
           })
           .catch((e) => fail(e.message));
         return;
