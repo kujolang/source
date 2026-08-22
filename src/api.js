@@ -469,6 +469,8 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         if (!release) return gitAuthError(res, 503, 'Git service busy; retry later');
         let body = null;
         try {
+          const abortController = new AbortController();
+          req.once('aborted', () => abortController.abort());
           let input = null;
           let contentLength = null;
           if (req.method === 'POST') {
@@ -492,6 +494,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           input,
           contentLength,
           maxInputBytes: maxGitBodyBytes,
+          abortSignal: abortController.signal,
           remoteUser: auth.remoteUser,
           remoteAddr: req.socket.remoteAddress || '',
           headers: req.headers,

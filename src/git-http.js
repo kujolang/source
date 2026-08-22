@@ -81,6 +81,7 @@ export function gitHttpBackend({
   input = null,
   maxInputBytes = 100 * 1024 * 1024,
   contentLength = null,
+  abortSignal = null,
 }) {
   return new Promise((resolve, reject) => {
     const env = {
@@ -122,6 +123,13 @@ export function gitHttpBackend({
       reject(error);
     };
 
+    if (abortSignal?.aborted) {
+      fail(new Error('Git request was aborted'));
+      return;
+    }
+    const onAbort = () => fail(new Error('Git request was aborted'));
+    abortSignal?.addEventListener('abort', onAbort, { once: true });
+
     const emitHeadersAndBody = (chunk) => {
       const crlf = chunk.indexOf('\r\n\r\n');
       const lf = chunk.indexOf('\n\n');
@@ -159,6 +167,7 @@ export function gitHttpBackend({
     child.on('close', (code) => {
       if (settled) return;
       settled = true;
+      abortSignal?.removeEventListener('abort', onAbort);
       const errorText = Buffer.concat(stderr).toString('utf8');
       if (stream) {
         if (!streamed && headerBuffer.length) {
