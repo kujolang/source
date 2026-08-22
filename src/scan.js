@@ -16,11 +16,12 @@ const AI = 'AI' + 'za'; // Google API key prefix
 const XOX = 'x' + 'ox'; // Slack token prefix
 const SK = 'sk_' + 'live'; // Stripe live secret prefix
 const EYJ = 'ey' + 'J'; // JWT header prefix
+const PRIVATE_KEY_LABEL = ['PRIVATE', 'KEY'].join(' ');
 
 const PATTERNS = [
   { name: 'aws_access_key_id', re: re('\\b' + AK + '[0-9A-Z]{16}\\b') },
   { name: 'aws_secret_access_key', re: re('\\baws.{0,24}secret.{0,24}[\'"][0-9a-zA-Z/+]{40}[\'"]', 'i') },
-  { name: 'private_key', re: re('-----BEGIN (RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY( BLOCK)?-----') },
+  { name: 'private_key', re: re('-----BEGIN (RSA |EC |OPENSSH |DSA |PGP )?' + PRIVATE_KEY_LABEL + '( BLOCK)?-----') },
   { name: 'github_token', re: re('\\bgh[pousr]_[0-9A-Za-z]{36,}\\b') },
   { name: 'google_api_key', re: re('\\b' + AI + '[0-9A-Za-z_-]{35}\\b') },
   { name: 'slack_token', re: re('\\b' + XOX + '[baprs]-[0-9A-Za-z-]{10,}\\b') },
