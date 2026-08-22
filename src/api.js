@@ -632,7 +632,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
             const g = await guard(src, req, ACTIONS.accept_change, { org: orgId, project: projectId });
             if (g) return json(res, g.status, g.body);
             const body = await readBody(req, maxJsonBodyBytes);
-            const d = src.makeDecision({ orgId, projectId, changeId, decision: body.decision, decider: body.decider, reasoning: body.reasoning });
+            const d = await src.makeDecisionAsync({ orgId, projectId, changeId, decision: body.decision, decider: body.decider, reasoning: body.reasoning });
             return json(res, 201, d);
           }
         }

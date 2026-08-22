@@ -279,6 +279,11 @@ export class Source {
     return this.store.readJson(`principals/${id}.json`);
   }
 
+  async getPrincipalAsync(id) {
+    const rel = `principals/${id}.json`;
+    return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.getPrincipal(id);
+  }
+
   // --- capabilities -----------------------------------------------------
   // Issue a session-scoped capability for an agent working a specific Work item.
   // This is the "temporary session identity" grant: bounded to the org, project,
@@ -808,6 +813,50 @@ export class Source {
     });
 
     this.store.audit({ event: 'decision.make', orgId, projectId, changeId, decisionId: id, decision, decider });
+    return decisionRecord;
+  }
+
+  async makeDecisionAsync({ orgId, projectId, changeId, decision, decider, reasoning = '' }) {
+    const change = await this.getChangeAsync(orgId, projectId, changeId);
+    if (!change) throw new Error(`change not found: ${changeId}`);
+    const policy = await this.getPolicyAsync(orgId, projectId);
+    const deciderPrincipal = await this.getPrincipalAsync(decider);
+    if (!deciderPrincipal) throw new Error(`principal not found: ${decider}`);
+    if (decision === 'accepted' && !canApprove(policy, deciderPrincipal.type)) {
+      throw new Error(`principal type ${deciderPrincipal.type} may not accept (policy requires human)`);
+    }
+    const evidenceList = (await Promise.all(change.evidence.map((id) => this.getEvidenceAsync(orgId, projectId, id)))).filter(Boolean);
+    if (decision === 'accepted') {
+      const evaluation = evaluateEvidence(policy, evidenceList);
+      if (!evaluation.ok) throw new Error(`cannot accept: missing evidence (${evaluation.missing.map((m) => m.type).join(', ')})`);
+    }
+    const id = await nextIdAsync(this.store, 'decision');
+    const evidenceSnapshot = evidenceList.map((e) => ({ id: e.id, integrity: e.integrity }));
+    const decisionRecord = createDecision({
+      id, changeId, decision, decider, authority: 'policy', policyRef: policy.id,
+      evidenceSnapshot, reasoning, sourceState: change.headCommit, sourceStates: change.repositoryChanges,
+    });
+    if (change.reviewState === 'pending') transitionChange(change, 'in_review');
+    change.decisionState = decisionToChangeState(decision);
+    if (decision === 'accepted') transitionChange(change, 'approved');
+    else if (decision === 'rejected') transitionChange(change, 'rejected');
+    else if (decision === 'revision_requested') transitionChange(change, 'changes_requested');
+    if (!change.decisions) change.decisions = [];
+    if (!change.decisions.includes(id)) change.decisions.push(id);
+    const work = await this.getWorkAsync(orgId, projectId, change.workId);
+    if (work) {
+      work.decisions.push(id);
+      if (work.status === 'submitted') transitionWork(work, 'in_review');
+      if (decision === 'accepted') transitionWork(work, 'accepted');
+      else if (decision === 'rejected') transitionWork(work, 'rejected');
+      else if (decision === 'revision_requested') transitionWork(work, 'revision_requested');
+    }
+    await this._asyncTransaction(async () => {
+      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/decisions/${id}.json`, decisionRecord);
+      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/changes/${change.id}.json`, change);
+      if (work) await this._asyncWrite(`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work);
+    });
+    await this._asyncAudit({ event: 'decision.make', orgId, projectId, changeId, decisionId: id, decision, decider });
     return decisionRecord;
   }
 
