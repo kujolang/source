@@ -64,10 +64,14 @@ class PostgresStore {
     delete poolOptions.env;
     delete poolOptions.noPassword;
     delete poolOptions.maxConnections;
+    const maxConnections = connectionOptions.maxConnections || poolOptions.max || 32;
     this.pool = pool || new pg.Pool({
       connectionString: dsn,
       ...poolOptions,
-      max: connectionOptions.maxConnections || poolOptions.max || 32,
+      max: maxConnections,
+      connectionTimeoutMillis: poolOptions.connectionTimeoutMillis ?? 10_000,
+      idleTimeoutMillis: poolOptions.idleTimeoutMillis ?? 30_000,
+      query_timeout: poolOptions.query_timeout ?? 30_000,
     });
     this.lastPoolError = null;
     this.pool.on?.('error', (error) => { this.lastPoolError = error; });

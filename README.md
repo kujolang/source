@@ -95,7 +95,10 @@ large clones and fetches do not require a full packfile-sized buffer per
 request. Override these through `startServer`/`createServer` options for a
 deployment sized to its CPU, memory, and Git workload. For multi-process
 deployments use SQLite or Postgres for durable coordination; the JSON backend
-is single-process only.
+is single-process only. Postgres uses a bounded pool (32 connections by
+default), a 10-second connection timeout, a 30-second idle timeout, and a
+30-second query timeout; tune these through the store's `connectionOptions` for
+the deployment's database capacity.
 
 `/healthz` reports process liveness. `/readyz` verifies that the Source
 instance is initialized and the selected store can be read; remove an instance
