@@ -15,15 +15,22 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
   const schema = `source_test_${Date.now()}_${process.pid}`;
   let store;
   let src;
+  let peerStore;
   let server;
   try {
     store = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 16 } });
     const dataRoot = mkdtempSync(path.join(tmpdir(), 'source-pg-live-'));
-    src = new Source(dataRoot, { store });
+    const gitRoot = mkdtempSync(path.join(tmpdir(), 'source-pg-git-'));
+    src = new Source(dataRoot, { store, gitRoot });
     await store.writeJsonAsync('instance.json', { id: 'instance', name: 'postgres-live', apiVersion: '1' });
     const org = await src.createOrgAsync({ name: 'load-org', slug: 'load-org' });
     const project = await src.createProjectAsync({ orgId: org.id, name: 'load-project', slug: 'load-project' });
     const principal = await src.createPrincipalAsync({ type: 'agent', name: 'load-agent' });
+    peerStore = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 16 } });
+    const peerSrc = new Source(dataRoot, { store: peerStore, gitRoot });
+    assert.equal((await peerSrc.getProjectAsync(org.id, project.id)).id, project.id);
+    const peerRepo = src.createRepository({ orgId: org.id, projectId: project.id, name: 'shared-main' });
+    assert.equal((await peerSrc.getRepositoryAsync(org.id, project.id, peerRepo.id)).barePath, peerRepo.barePath);
     const works = await Promise.all(Array.from({ length: 1_000 }, (_, i) => src.createWorkAsync({
       orgId: org.id,
       projectId: project.id,
@@ -55,7 +62,7 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     assert.equal(restartLease.id, restartJob.id);
     await store.closeAsync();
     store = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 16 } });
-    src = new Source(dataRoot, { store });
+    src = new Source(dataRoot, { store, gitRoot });
     await new Promise((resolve) => setTimeout(resolve, 20));
     const afterRestart = (await src.jobs.claim({ workerId: 'restarted-worker', limit: 1, leaseMs: 5_000 }))[0];
     assert.equal(afterRestart.id, restartJob.id);
@@ -136,6 +143,7 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
       await new Promise((resolve) => server.close(() => resolve()));
     }
     await store?.closeAsync().catch(() => {});
+    await peerStore?.closeAsync().catch(() => {});
     execFileSync('psql', ['-d', dsn, '-v', 'ON_ERROR_STOP=1', '-c', `DROP SCHEMA IF EXISTS "${schema}" CASCADE`], { stdio: 'ignore' });
   }
 });
