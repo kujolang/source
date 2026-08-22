@@ -4,6 +4,8 @@ import { Semaphore } from '../src/concurrency.js';
 import { RateLimiter } from '../src/ratelimit.js';
 import { SqliteStore } from '../src/sqlite-store.js';
 import { GitRepo } from '../src/git.js';
+import { startServer } from '../src/api.js';
+import { freshSource } from './helpers.js';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -76,4 +78,24 @@ test('SQLite counters and rate limits survive concurrent processes', async () =>
   assert.equal(ids.length, 160);
   assert.equal(new Set(ids).size, 160);
   assert.equal(Math.max(...ids.map((id) => Number(id.slice(1)))), 160);
+});
+
+test('smart-HTTP Git remains responsive under concurrent requests', async () => {
+  const { src, org, project } = freshSource();
+  project.visibility = 'public';
+  src.store.writeJson(`orgs/${org.id}/projects/${project.id}/project.json`, project);
+  const repo = src.createRepository({ orgId: org.id, projectId: project.id, name: 'public', visibility: 'public' });
+  const server = await startServer(src, { port: 0, gitConcurrency: 4, gitQueue: 64 });
+  const base = `http://127.0.0.1:${server.address().port}/git/${org.id}/${project.id}/${repo.id}.git/info/refs?service=git-upload-pack`;
+  let ticks = 0;
+  const timer = setInterval(() => { ticks += 1; }, 1);
+  try {
+    const responses = await Promise.all(Array.from({ length: 48 }, () => fetch(base)));
+    assert.ok(responses.every((response) => response.status === 200), [...new Set(responses.map((response) => response.status))].join(','));
+    assert.ok(ticks > 0, 'HTTP Git requests starved the event loop');
+  } finally {
+    clearInterval(timer);
+    server.closeAllConnections?.();
+    server.close();
+  }
 });

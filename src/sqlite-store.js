@@ -20,9 +20,9 @@ export class SqliteStore {
     fs.mkdirSync(root, { recursive: true });
     this.db = new DatabaseSync(path.join(root, 'source.sqlite'));
     this.db.exec(`
+      PRAGMA busy_timeout = 5000;
       PRAGMA journal_mode = WAL;
       PRAGMA synchronous = FULL;
-      PRAGMA busy_timeout = 5000;
       CREATE TABLE IF NOT EXISTS records (
         path TEXT PRIMARY KEY,
         json TEXT NOT NULL
