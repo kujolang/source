@@ -17,6 +17,7 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
   let src;
   let peerStore;
   let server;
+  let peerServer;
   try {
     store = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 16 } });
     const dataRoot = mkdtempSync(path.join(tmpdir(), 'source-pg-live-'));
@@ -160,10 +161,22 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     const url = `http://127.0.0.1:${server.address().port}/.well-known/source`;
     const responses = await Promise.all(Array.from({ length: 1_000 }, () => fetch(url)));
     assert.ok(responses.every((response) => response.status === 200));
+
+    peerServer = await startServer(peerSrc, { port: 0, maxConnections: 2_000 });
+    const peerUrl = `http://127.0.0.1:${peerServer.address().port}/.well-known/source`;
+    assert.equal((await fetch(peerUrl)).status, 200);
+    server.closeAllConnections?.();
+    await new Promise((resolve) => server.close(() => resolve()));
+    server = null;
+    assert.equal((await fetch(peerUrl)).status, 200);
   } finally {
     if (server) {
       server.closeAllConnections?.();
       await new Promise((resolve) => server.close(() => resolve()));
+    }
+    if (peerServer) {
+      peerServer.closeAllConnections?.();
+      await new Promise((resolve) => peerServer.close(() => resolve()));
     }
     await store?.closeAsync().catch(() => {});
     await peerStore?.closeAsync().catch(() => {});
