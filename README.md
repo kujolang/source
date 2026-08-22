@@ -91,8 +91,9 @@ The server applies bounded resource controls by default: JSON requests are
 limited to 1 MiB, Git request bodies to 100 MiB, Git CGI subprocesses to 32
 active requests with a 256-request queue, Git CGI responses to 512 MiB, and
 connections to 10,000. Git responses are streamed with HTTP backpressure so
-large clones and fetches do not require a full packfile-sized buffer per
-request. Override these through `startServer`/`createServer` options for a
+large clones, fetches, and known-length pushes do not require a full
+packfile-sized buffer per request. Override these through
+`startServer`/`createServer` options for a
 deployment sized to its CPU, memory, and Git workload. For multi-process
 deployments use SQLite or Postgres for durable coordination; the JSON backend
 is single-process only. Postgres uses a bounded pool (32 connections by
