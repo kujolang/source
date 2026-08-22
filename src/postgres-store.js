@@ -155,6 +155,11 @@ class PostgresStore {
     return JSON.parse(out);
   }
 
+  async _runJsonCommandAsync(sql) {
+    const out = await this._runAsync(sql);
+    return out ? JSON.parse(out) : [];
+  }
+
   _fetchJsonRow(sql) {
     const out = this._run(`SELECT row_to_json(r)::text AS row FROM (${sql}) AS r LIMIT 1`);
     if (!out) return null;
@@ -359,10 +364,28 @@ class PostgresStore {
       )
     `);
 
+    this._run(`
+      CREATE TABLE IF NOT EXISTS ${this._qualified('jobs')} (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL,
+        payload JSONB NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('queued', 'leased', 'completed', 'failed')),
+        attempts INTEGER NOT NULL DEFAULT 0,
+        available_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        leased_until TIMESTAMPTZ,
+        worker_id TEXT,
+        result JSONB,
+        last_error TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_records_path`)} ON ${this._qualified('records')} (path)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_evidence_project`)} ON ${this._qualified('evidence')} (org_id, project_id)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_changes_work`)} ON ${this._qualified('changes')} (org_id, project_id, work_id)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_decisions_change`)} ON ${this._qualified('decisions')} (org_id, project_id, change_id)`);
+    this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_claim`)} ON ${this._qualified('jobs')} (status, available_at, created_at)`);
   }
 
   _queryPathRow(relPath) {
@@ -889,6 +912,71 @@ class PostgresStore {
       RETURNING count
     `);
     return Number(out) <= limit;
+  }
+
+  async enqueueJobAsync({ kind, payload = {}, availableAt = new Date() }) {
+    if (!kind || typeof kind !== 'string') throw new Error('job kind is required');
+    const id = await this.nextIdAsync('job', 'J');
+    const at = new Date(availableAt).toISOString();
+    await this._runAsync(`INSERT INTO ${this._qualified('jobs')} (id, kind, payload, status, available_at)
+      VALUES (${escapeSqlLiteral(id)}, ${escapeSqlLiteral(kind)}, ${toJson(payload)}, 'queued', ${escapeSqlLiteral(at)})`);
+    return { id, kind, payload, status: 'queued', attempts: 0, availableAt: at };
+  }
+
+  async claimJobsAsync({ workerId, limit = 10, leaseMs = 30_000 }) {
+    if (!workerId || typeof workerId !== 'string') throw new Error('workerId is required');
+    const safeLimit = Math.min(1000, Math.max(1, Math.trunc(limit)));
+    const safeLease = Math.min(86_400_000, Math.max(1, Math.trunc(leaseMs)));
+    return this._runJsonCommandAsync(`
+      WITH candidates AS (
+        SELECT id
+        FROM ${this._qualified('jobs')}
+        WHERE (status = 'queued' AND available_at <= NOW())
+           OR (status = 'leased' AND leased_until < NOW())
+        ORDER BY created_at, id
+        FOR UPDATE SKIP LOCKED
+        LIMIT ${safeLimit}
+      )
+      , updated AS (
+        UPDATE ${this._qualified('jobs')} j
+        SET status = 'leased', attempts = j.attempts + 1, worker_id = ${escapeSqlLiteral(workerId)},
+            leased_until = NOW() + (${safeLease} * INTERVAL '1 millisecond'), updated_at = NOW()
+        FROM candidates
+        WHERE j.id = candidates.id
+        RETURNING j.id, j.kind, j.payload, j.status, j.attempts,
+                  j.available_at, j.leased_until, j.worker_id
+      )
+      SELECT COALESCE(json_agg(row_to_json(updated)), '[]'::json)::text AS rows FROM updated
+    `);
+  }
+
+  async completeJobAsync({ id, workerId, result = null }) {
+    const rows = await this._runJsonCommandAsync(`
+      WITH updated AS (
+        UPDATE ${this._qualified('jobs')}
+        SET status = 'completed', result = ${toJson(result)}, leased_until = NULL,
+            worker_id = NULL, updated_at = NOW()
+        WHERE id = ${escapeSqlLiteral(id)} AND status = 'leased' AND worker_id = ${escapeSqlLiteral(workerId)}
+        RETURNING id
+      ) SELECT COALESCE(json_agg(row_to_json(updated)), '[]'::json)::text AS rows FROM updated
+    `);
+    return Boolean(rows[0]);
+  }
+
+  async failJobAsync({ id, workerId, error, retryDelayMs = 1_000, maxAttempts = 5 }) {
+    const delay = Math.min(86_400_000, Math.max(0, Math.trunc(retryDelayMs)));
+    const attempts = Math.min(100, Math.max(1, Math.trunc(maxAttempts)));
+    const rows = await this._runJsonCommandAsync(`
+      WITH updated AS (
+        UPDATE ${this._qualified('jobs')}
+        SET status = CASE WHEN attempts >= ${attempts} THEN 'failed' ELSE 'queued' END,
+            available_at = CASE WHEN attempts >= ${attempts} THEN available_at ELSE NOW() + (${delay} * INTERVAL '1 millisecond') END,
+            leased_until = NULL, worker_id = NULL, last_error = ${escapeSqlLiteral(String(error || 'job failed'))}, updated_at = NOW()
+        WHERE id = ${escapeSqlLiteral(id)} AND status = 'leased' AND worker_id = ${escapeSqlLiteral(workerId)}
+        RETURNING id, status, attempts
+      ) SELECT COALESCE(json_agg(row_to_json(updated)), '[]'::json)::text AS rows FROM updated
+    `);
+    return rows[0] || null;
   }
 
   putArtifact(bytes) {

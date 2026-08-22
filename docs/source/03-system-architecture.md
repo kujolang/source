@@ -21,7 +21,8 @@ boundaries required for later scaling.
                         │      ├─ Decision / Policy / Capability      │
                         │      ├─ Store (JSON files, atomic writes)   │
                         │      ├─ Artifact store (content-addressed)  │
-                        │      └─ Audit log (append-only)             │
+                        │      ├─ Audit log (append-only)             │
+                        │      └─ Durable job queue (Postgres)        │
                         └─────────────────────────────────────────────┘
 ```
 
@@ -49,13 +50,12 @@ boundaries required for later scaling.
 | Artifact storage | **Filesystem, content-addressed by SHA-256** | Evidence-backed | Immutable artifacts keyed by hash; provenance links to source revision. |
 | API | **HTTP + JSON (REST-shaped), discovery endpoint** | Evidence-backed | Compact, cacheable, content-negotiable; `/.well-known/source` for agent discovery. |
 | Frontend | **Static HTML + vanilla JS** | Implementation hypothesis | MVP needs enough UI to understand a Change; no framework. |
-| Events | **Bounded in-process request work; external queue is the production scale-out seam** | Implementation hypothesis | Git subprocesses and request bodies are bounded in-process. Durable workflows and fan-out still require a queue/worker deployment for thousands of agents. |
+| Events | **Bounded request work plus a Postgres lease queue** | Evidence-backed increment | Git subprocesses and request bodies are bounded in-process; deferred workflows can be claimed by independent workers with `SKIP LOCKED`, leases, retries, and recovery. |
 | Identity | **Principal records + opaque capability tokens (HMAC-signed)** | Evidence-backed | No custom cryptography; Node `crypto` HMAC-SHA256 for capability tokens. |
 | Crypto | **Node built-in `crypto`** | Evidence-backed | SHA-256 hashing, HMAC signing, `randomBytes` for tokens. No custom primitives. |
 
 ## Explicitly deferred (not over-engineered in MVP)
 
-- Durable message queue / async job execution (bounded in-process now; required for large deployments).
 - Multi-region replication and object storage for Git/artifacts.
 - Distributed replication / geographic scaling.
 - Full SaaS control plane / billing.
@@ -64,7 +64,7 @@ boundaries required for later scaling.
 ## Why a modular monolith
 
 The bounded monolith is suitable for a single deployment unit, but thousands of
-agents require SQLite/Postgres, a queue-backed worker plane, shared artifact
+agents require Postgres, a queue-backed worker plane, shared artifact
 storage, and horizontally sharded Git hosting. Git CGI responses are streamed
 with backpressure and bounded output, reducing per-request memory pressure in
 the monolith. The storage, events, and Git boundaries above are the explicit

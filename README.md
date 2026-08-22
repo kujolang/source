@@ -112,6 +112,11 @@ It reports success rate, event-loop progress, and p50/p95/p99/max latency.
 Run it against the Postgres-backed deployment from a separate host; local
 tests do not prove database, network, or multi-node capacity.
 
+Postgres-backed workers can claim deferred jobs through `src/job-queue.js`.
+Claims use row locking with `SKIP LOCKED`; expired leases are reclaimable and
+failed jobs can be retried with bounded attempts. This is the worker-plane seam
+for batch workflows that should not run inside request handlers.
+
 The machine interface (`/api/v1/…`) is capability-gated: send
 `Authorization: Bearer <credential>` on every request. The Git transport
 (`/git/…`) is capability-gated via HTTP Basic auth: public repos allow anonymous
@@ -176,6 +181,7 @@ src/
   submit.js      — `source submit` contribution client
   integrations/
     kujo.js      — Eval/Spec/ShipCheck artifact normalizers + KujoRunner
+  job-queue.js   — durable Postgres lease/retry queue for worker fleets
 bin/source.js    — CLI entry
 ```
 

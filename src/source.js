@@ -27,6 +27,7 @@ import { defaultPolicy, evaluateEvidence, interpret, canApprove } from './policy
 import { nextId, nextIdAsync, randomHex } from './ids.js';
 import { normalizeEvalSummary, normalizeEvalManifest, normalizeEvalRun, readEvalArtifacts } from './integrations/kujo.js';
 import { scanSecrets } from './scan.js';
+import { JobQueue } from './job-queue.js';
 
 const DEFAULT_HUMAN_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_HUMAN_SESSION_ACTIONS = ['read_source', 'read_context', 'accept_change'];
@@ -39,6 +40,7 @@ export class Source {
     this.dataRoot = dataRoot;
     this.store = store ?? new Store(dataRoot);
     this.capabilities = new CapabilityService(this.store);
+    this.jobs = new JobQueue(this.store);
   }
 
   _asyncWrite(rel, value) {

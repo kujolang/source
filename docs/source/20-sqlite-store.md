@@ -104,7 +104,9 @@ path-keyed compatibility records while also synchronizing normalized tables
 for lifecycle entities, capabilities, and relationship junctions. The async
 API path uses a native `pg.Pool`, async transactions, and one pooled client per
 transaction; the legacy synchronous methods remain available for CLI and
-compatibility callers.
+compatibility callers. The same schema provides a durable job queue with
+parallel `SKIP LOCKED` claims, lease expiry recovery, and bounded retries for
+worker fleets.
 
 Select it with:
 

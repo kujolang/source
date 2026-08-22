@@ -30,6 +30,18 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     assert.equal(works.length, 1_000);
     assert.equal((await src.listWorkAsync(org.id, project.id, { limit: 1_001 })).length, 1_000);
 
+    const queued = await Promise.all(Array.from({ length: 100 }, (_, i) => src.jobs.enqueue({ kind: 'agent.batch', payload: { index: i } })));
+    const claims = (await Promise.all(Array.from({ length: 8 }, (_, i) => src.jobs.claim({ workerId: `worker-${i}`, limit: 20 })))).flat();
+    assert.equal(new Set(claims.map((job) => job.id)).size, queued.length);
+    await Promise.all(claims.map((job) => src.jobs.complete({ id: job.id, workerId: job.workerId, result: { ok: true } })));
+    const leaseJob = await src.jobs.enqueue({ kind: 'agent.recover', payload: {} });
+    const leased = (await src.jobs.claim({ workerId: 'crashed-worker', limit: 1, leaseMs: 1 }))[0];
+    assert.equal(leased.id, leaseJob.id);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const recovered = (await src.jobs.claim({ workerId: 'recovery-worker', limit: 1, leaseMs: 5_000 }))[0];
+    assert.equal(recovered.id, leaseJob.id);
+    await src.jobs.complete({ id: recovered.id, workerId: 'recovery-worker', result: { recovered: true } });
+
     server = await startServer(src, { port: 0, maxConnections: 2_000 });
     const url = `http://127.0.0.1:${server.address().port}/.well-known/source`;
     const responses = await Promise.all(Array.from({ length: 1_000 }, () => fetch(url)));
