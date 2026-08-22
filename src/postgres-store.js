@@ -69,6 +69,8 @@ class PostgresStore {
       ...poolOptions,
       max: connectionOptions.maxConnections || poolOptions.max || 32,
     });
+    this.lastPoolError = null;
+    this.pool.on?.('error', (error) => { this.lastPoolError = error; });
     this._asyncTransaction = new AsyncLocalStorage();
     this._txDepth = 0;
     this._rateLimitOps = 0;
@@ -122,6 +124,7 @@ class PostgresStore {
     }
     try {
       const result = await this.pool.query(String(sql).trim());
+      this.lastPoolError = null;
       return this._formatAsyncRows(result.rows);
     } catch (error) {
       // Preserve the legacy psql fallback for installations that have not
@@ -1121,6 +1124,11 @@ class PostgresStore {
 
   async closeAsync() {
     await this.pool.end();
+  }
+
+  async checkHealthAsync() {
+    await this._runAsync('SELECT 1');
+    return true;
   }
 
   createHumanSessionRow(principalId, credential, ttlMs = 24 * 60 * 60 * 1000) {

@@ -345,6 +345,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
       if (req.method === 'GET' && pathname === '/readyz') {
         if (server.draining) return json(res, 503, { status: 'not_ready', reason: 'server is draining' });
         try {
+          if (typeof src.store.checkHealthAsync === 'function') await src.store.checkHealthAsync();
           const instance = await src.getInstanceAsync();
           if (!instance) return json(res, 503, { status: 'not_ready', reason: 'instance not initialized' });
           return json(res, 200, { status: 'ready', storage: 'ok' });
