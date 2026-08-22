@@ -71,6 +71,7 @@ class PostgresStore {
     });
     this._asyncTransaction = new AsyncLocalStorage();
     this._txDepth = 0;
+    this._rateLimitOps = 0;
 
     this._initSchema();
   }
@@ -393,6 +394,8 @@ class PostgresStore {
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_decisions_change`)} ON ${this._qualified('decisions')} (org_id, project_id, change_id)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_claim`)} ON ${this._qualified('jobs')} (status, available_at, created_at)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_scope`)} ON ${this._qualified('jobs')} (org_id, project_id, work_id, created_at)`);
+    this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_leased`)} ON ${this._qualified('jobs')} (leased_until, created_at) WHERE status = 'leased'`);
+    this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_rate_limits_reset`)} ON ${this._qualified('rate_limits')} (reset_at)`);
   }
 
   _queryPathRow(relPath) {
@@ -894,6 +897,7 @@ class PostgresStore {
   }
 
   allowRateLimit(key, limit, windowMs, now = Date.now()) {
+    this._cleanupRateLimits(now);
     const out = this._run(`
       INSERT INTO ${this._qualified('rate_limits')} (key, count, reset_at)
       VALUES (${escapeSqlLiteral(key)}, 1, ${escapeSqlLiteral(now + windowMs)})
@@ -908,6 +912,7 @@ class PostgresStore {
   // Async counterpart for request-path throttles. This uses the pooled client
   // when available while preserving the same atomic SQL update.
   async allowRateLimitAsync(key, limit, windowMs, now = Date.now()) {
+    await this._cleanupRateLimitsAsync(now);
     const out = await this._runAsync(`
       INSERT INTO ${this._qualified('rate_limits')} (key, count, reset_at)
       VALUES (${escapeSqlLiteral(key)}, 1, ${escapeSqlLiteral(now + windowMs)})
@@ -917,6 +922,22 @@ class PostgresStore {
       RETURNING count
     `);
     return Number(out) <= limit;
+  }
+
+  _cleanupRateLimits(now) {
+    this._rateLimitOps += 1;
+    if (this._rateLimitOps % 1_000 !== 0) return;
+    this._run(`DELETE FROM ${this._qualified('rate_limits')} WHERE key IN (
+      SELECT key FROM ${this._qualified('rate_limits')} WHERE reset_at < ${escapeSqlLiteral(now)} LIMIT 1_000
+    )`);
+  }
+
+  async _cleanupRateLimitsAsync(now) {
+    this._rateLimitOps += 1;
+    if (this._rateLimitOps % 1_000 !== 0) return;
+    await this._runAsync(`DELETE FROM ${this._qualified('rate_limits')} WHERE key IN (
+      SELECT key FROM ${this._qualified('rate_limits')} WHERE reset_at < ${escapeSqlLiteral(now)} LIMIT 1_000
+    )`);
   }
 
   async enqueueJobAsync({ kind, payload = {}, availableAt = new Date(), orgId = null, projectId = null, workId = null }) {
