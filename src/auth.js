@@ -21,6 +21,8 @@ export const ACTIONS = {
   modify_policy: 'modify_policy',
   publish_release: 'publish_release',
   manage_org: 'manage_org',
+  enqueue_job: 'enqueue_job',
+  read_jobs: 'read_jobs',
   git_push: 'git_push',
 };
 

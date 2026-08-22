@@ -86,6 +86,21 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     assert.equal(retryAttempts, 2);
 
     server = await startServer(src, { port: 0, maxConnections: 2_000 });
+    const jobCapability = await src.capabilities.issueAsync({
+      principalId: principal.id,
+      scope: { org: org.id, project: project.id },
+      allowed: ['enqueue_job', 'read_jobs'],
+    });
+    const jobUrl = `http://127.0.0.1:${server.address().port}/api/v1/orgs/${org.id}/projects/${project.id}/jobs`;
+    const enqueuedResponse = await fetch(jobUrl, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${jobCapability.credential}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'agent.api', payload: { source: 'live-test' } }),
+    });
+    assert.equal(enqueuedResponse.status, 202);
+    const listedResponse = await fetch(`${jobUrl}?limit=2`, { headers: { Authorization: `Bearer ${jobCapability.credential}` } });
+    assert.equal(listedResponse.status, 200);
+    assert.ok(Array.isArray((await listedResponse.json()).items));
     const url = `http://127.0.0.1:${server.address().port}/.well-known/source`;
     const responses = await Promise.all(Array.from({ length: 1_000 }, () => fetch(url)));
     assert.ok(responses.every((response) => response.status === 200));

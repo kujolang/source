@@ -395,6 +395,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
             projects: '/api/v1/orgs/{org}/projects',
             work: '/api/v1/orgs/{org}/projects/{project}/work',
             changes: '/api/v1/orgs/{org}/projects/{project}/changes',
+            jobs: '/api/v1/orgs/{org}/projects/{project}/jobs',
             evidence: '/api/v1/orgs/{org}/projects/{project}/evidence',
             git: '/git/{org}/{project}/{repo}.git',
             policy: '/api/v1/orgs/{org}/projects/{project}/policy',
@@ -572,6 +573,41 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
               fields,
             ),
           );
+        }
+
+        if (rest === '/jobs' && req.method === 'GET') {
+          const g = await guard(src, req, ACTIONS.read_jobs, { org: orgId, project: projectId });
+          if (g) return json(res, g.status, g.body);
+          const pagination = parseListParams(url);
+          const jobs = await src.jobs.list({
+            orgId,
+            projectId,
+            workId: url.searchParams.get('work') || null,
+            cursor: pagination.cursor,
+            limit: pagination.limit ? pagination.limit + 1 : 100,
+          });
+          return json(res, 200, paginatedResponse(jobs, pagination, fields));
+        }
+
+        if (rest === '/jobs' && req.method === 'POST') {
+          const body = await readBody(req, maxJsonBodyBytes);
+          const g = await guard(src, req, ACTIONS.enqueue_job, {
+            org: orgId,
+            project: projectId,
+            work: body.workId,
+          });
+          if (g) return json(res, g.status, g.body);
+          if (typeof body.kind !== 'string' || !/^[A-Za-z0-9_.:-]{1,120}$/.test(body.kind)) {
+            return json(res, 400, { error: 'kind must be 1-120 safe characters' });
+          }
+          const job = await src.jobs.enqueue({
+            kind: body.kind,
+            payload: body.payload ?? {},
+            orgId,
+            projectId,
+            workId: body.workId || null,
+          });
+          return json(res, 202, job);
         }
 
         // Contribution flow: a Git-only developer submits a change from a

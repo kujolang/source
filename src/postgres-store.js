@@ -369,6 +369,9 @@ class PostgresStore {
         id TEXT PRIMARY KEY,
         kind TEXT NOT NULL,
         payload JSONB NOT NULL,
+        org_id TEXT,
+        project_id TEXT,
+        work_id TEXT,
         status TEXT NOT NULL CHECK (status IN ('queued', 'leased', 'completed', 'failed')),
         attempts INTEGER NOT NULL DEFAULT 0,
         available_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -380,12 +383,16 @@ class PostgresStore {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
+    for (const column of ['org_id TEXT', 'project_id TEXT', 'work_id TEXT']) {
+      this._run(`ALTER TABLE ${this._qualified('jobs')} ADD COLUMN IF NOT EXISTS ${column}`);
+    }
 
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_records_path`)} ON ${this._qualified('records')} (path)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_evidence_project`)} ON ${this._qualified('evidence')} (org_id, project_id)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_changes_work`)} ON ${this._qualified('changes')} (org_id, project_id, work_id)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_decisions_change`)} ON ${this._qualified('decisions')} (org_id, project_id, change_id)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_claim`)} ON ${this._qualified('jobs')} (status, available_at, created_at)`);
+    this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_scope`)} ON ${this._qualified('jobs')} (org_id, project_id, work_id, created_at)`);
   }
 
   _queryPathRow(relPath) {
@@ -914,13 +921,28 @@ class PostgresStore {
     return Number(out) <= limit;
   }
 
-  async enqueueJobAsync({ kind, payload = {}, availableAt = new Date() }) {
+  async enqueueJobAsync({ kind, payload = {}, availableAt = new Date(), orgId = null, projectId = null, workId = null }) {
     if (!kind || typeof kind !== 'string') throw new Error('job kind is required');
     const id = await this.nextIdAsync('job', 'J');
     const at = new Date(availableAt).toISOString();
-    await this._runAsync(`INSERT INTO ${this._qualified('jobs')} (id, kind, payload, status, available_at)
-      VALUES (${escapeSqlLiteral(id)}, ${escapeSqlLiteral(kind)}, ${toJson(payload)}, 'queued', ${escapeSqlLiteral(at)})`);
-    return { id, kind, payload, status: 'queued', attempts: 0, availableAt: at };
+    await this._runAsync(`INSERT INTO ${this._qualified('jobs')} (id, kind, payload, org_id, project_id, work_id, status, available_at)
+      VALUES (${escapeSqlLiteral(id)}, ${escapeSqlLiteral(kind)}, ${toJson(payload)}, ${escapeSqlLiteral(orgId)}, ${escapeSqlLiteral(projectId)}, ${escapeSqlLiteral(workId)}, 'queued', ${escapeSqlLiteral(at)})`);
+    return { id, kind, payload, orgId, projectId, workId, status: 'queued', attempts: 0, availableAt: at };
+  }
+
+  async listJobsAsync({ orgId, projectId, workId = null, cursor = null, limit = 100 }) {
+    const safeLimit = Math.min(1000, Math.max(1, Math.trunc(limit)));
+    const cursorClause = cursor ? `AND id > ${escapeSqlLiteral(cursor)}` : '';
+    const workClause = workId ? `AND work_id = ${escapeSqlLiteral(workId)}` : '';
+    return this._fetchJsonRowsAsync(`
+      SELECT id, kind, payload, org_id, project_id, work_id, status, attempts,
+             available_at, leased_until, worker_id, result, last_error, created_at, updated_at
+      FROM ${this._qualified('jobs')}
+      WHERE org_id = ${escapeSqlLiteral(orgId)} AND project_id = ${escapeSqlLiteral(projectId)}
+        ${workClause} ${cursorClause}
+      ORDER BY id
+      LIMIT ${safeLimit}
+    `);
   }
 
   async claimJobsAsync({ workerId, limit = 10, leaseMs = 30_000 }) {

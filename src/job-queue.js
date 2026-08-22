@@ -6,11 +6,11 @@ export class JobQueue {
     this.store = store;
   }
 
-  async enqueue({ kind, payload = {}, availableAt = new Date() }) {
+  async enqueue({ kind, payload = {}, availableAt = new Date(), orgId = null, projectId = null, workId = null }) {
     if (typeof this.store.enqueueJobAsync !== 'function') {
       throw new Error('durable job queue requires a Postgres-backed store');
     }
-    return this.store.enqueueJobAsync({ kind, payload, availableAt });
+    return this.store.enqueueJobAsync({ kind, payload, availableAt, orgId, projectId, workId });
   }
 
   async claim({ workerId, limit = 10, leaseMs = 30_000 }) {
@@ -30,5 +30,12 @@ export class JobQueue {
 
   async extend({ id, workerId, leaseMs = 30_000 }) {
     return this.store.extendJobAsync({ id, workerId, leaseMs });
+  }
+
+  async list({ orgId, projectId, workId = null, cursor = null, limit = 100 }) {
+    if (typeof this.store.listJobsAsync !== 'function') {
+      throw new Error('durable job queue requires a Postgres-backed store');
+    }
+    return this.store.listJobsAsync({ orgId, projectId, workId, cursor, limit });
   }
 }
