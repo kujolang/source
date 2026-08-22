@@ -65,8 +65,10 @@ boundaries required for later scaling.
 
 The bounded monolith is suitable for a single deployment unit, but thousands of
 agents require SQLite/Postgres, a queue-backed worker plane, shared artifact
-storage, and horizontally sharded Git hosting. The storage, events, and Git
-boundaries above are the explicit split seams.
+storage, and horizontally sharded Git hosting. Git CGI responses are streamed
+with backpressure and bounded output, reducing per-request memory pressure in
+the monolith. The storage, events, and Git boundaries above are the explicit
+split seams.
 
 ## Cross-references
 

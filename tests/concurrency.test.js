@@ -5,6 +5,7 @@ import { RateLimiter } from '../src/ratelimit.js';
 import { SqliteStore } from '../src/sqlite-store.js';
 import { GitRepo } from '../src/git.js';
 import { startServer } from '../src/api.js';
+import { gitHttpBackend } from '../src/git-http.js';
 import { freshSource } from './helpers.js';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -98,4 +99,18 @@ test('smart-HTTP Git remains responsive under concurrent requests', async () => 
     server.closeAllConnections?.();
     server.close();
   }
+});
+
+test('Git CGI output is bounded when a caller configures a response cap', async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'source-git-output-cap-'));
+  const repo = path.join(root, 'repo.git');
+  execFileSync('git', ['init', '--bare', repo], { stdio: 'ignore' });
+  await assert.rejects(
+    gitHttpBackend({
+      projectRoot: root,
+      pathInfo: '/repo.git/info/refs',
+      maxOutputBytes: 1,
+    }),
+    /output limit/,
+  );
 });

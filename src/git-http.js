@@ -61,7 +61,9 @@ function parseCgiResponse(raw) {
 //   remoteAddr  — client address (for reflog identification)
 //   headers     — request headers (for Git-Protocol passthrough)
 //
-// Resolves to { status, headers, body, stderr, exitCode }.
+// Resolves to { status, headers, body, stderr, exitCode }. When `stream` is
+// provided, CGI headers and body chunks are delivered incrementally through
+// the callbacks, preserving backpressure and avoiding packfile-sized buffers.
 export function gitHttpBackend({
   projectRoot,
   pathInfo,
@@ -72,6 +74,8 @@ export function gitHttpBackend({
   remoteUser = '',
   remoteAddr = '',
   headers = {},
+  stream = null,
+  maxOutputBytes = 512 * 1024 * 1024,
 }) {
   return new Promise((resolve, reject) => {
     const env = {
@@ -93,13 +97,77 @@ export function gitHttpBackend({
     const child = spawn('git', ['http-backend'], { env, stdio: ['pipe', 'pipe', 'pipe'] });
     const stdout = [];
     const stderr = [];
-    child.stdout.on('data', (c) => stdout.push(c));
+    let outputBytes = 0;
+    let headerBuffer = Buffer.alloc(0);
+    let streamed = false;
+    let settled = false;
+
+    const emitBody = (chunk) => {
+      if (!chunk.length || stream.onBody?.(chunk) !== false) return;
+      child.stdout.pause();
+      stream.onDrain?.(() => child.stdout.resume());
+    };
+
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      stream?.onError?.(error);
+      child.kill('SIGTERM');
+      reject(error);
+    };
+
+    const emitHeadersAndBody = (chunk) => {
+      const crlf = chunk.indexOf('\r\n\r\n');
+      const lf = chunk.indexOf('\n\n');
+      let bodyStart;
+      if (crlf >= 0 && (lf < 0 || crlf <= lf)) bodyStart = crlf + 4;
+      else if (lf >= 0) bodyStart = lf + 2;
+      else return false;
+      const parsed = parseCgiResponse(chunk);
+      stream.onHeaders?.(parsed);
+      streamed = true;
+      if (chunk.length > bodyStart) emitBody(chunk.subarray(bodyStart));
+      return true;
+    };
+
+    child.stdout.on('data', (c) => {
+      outputBytes += c.length;
+      if (outputBytes > maxOutputBytes) {
+        fail(new Error('Git response exceeded configured output limit'));
+        return;
+      }
+      if (!stream) {
+        stdout.push(c);
+        return;
+      }
+      if (!streamed) {
+        headerBuffer = Buffer.concat([headerBuffer, c]);
+        if (!emitHeadersAndBody(headerBuffer)) return;
+        headerBuffer = Buffer.alloc(0);
+        return;
+      }
+      emitBody(c);
+    });
     child.stderr.on('data', (c) => stderr.push(c));
-    child.on('error', reject);
+    child.on('error', fail);
     child.on('close', (code) => {
+      if (settled) return;
+      settled = true;
+      const errorText = Buffer.concat(stderr).toString('utf8');
+      if (stream) {
+        if (!streamed && headerBuffer.length) {
+          const parsed = parseCgiResponse(headerBuffer);
+          stream.onHeaders?.(parsed);
+          if (parsed.body.length) emitBody(parsed.body);
+        }
+        stream.onEnd?.({ exitCode: code, outputBytes, stderr: errorText });
+        resolve({ status: streamed ? 200 : 502, headers: {}, body: null, streamed: true, stderr: errorText, exitCode: code, outputBytes });
+        return;
+      }
       const parsed = parseCgiResponse(Buffer.concat(stdout));
-      parsed.stderr = Buffer.concat(stderr).toString('utf8');
+      parsed.stderr = errorText;
       parsed.exitCode = code;
+      parsed.outputBytes = outputBytes;
       resolve(parsed);
     });
     if (body) child.stdin.write(body);

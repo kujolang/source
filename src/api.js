@@ -201,7 +201,7 @@ function changeWork(src, orgId, projectId, changeId) {
   return c ? c.workId : undefined;
 }
 
-export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxGitBodyBytes = 100_000_000, gitConcurrency = 32, gitQueue = 256, maxConnections = 10_000 } = {}) {
+export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxGitBodyBytes = 100_000_000, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, maxConnections = 10_000 } = {}) {
   const limiter = new RateLimiter({ maxKeys: rateLimit.maxKeys || 100_000, store: rateLimit.store || src.store });
   const gitSlots = new Semaphore({ capacity: gitConcurrency, queue: gitQueue });
   const limits = {
@@ -386,6 +386,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         try {
           if (req.method === 'POST') body = await readRawBody(req, maxGitBodyBytes);
 
+          let streamed = false;
           const result = await gitHttpBackend({
           projectRoot: src.reposRoot(orgId, projectId),
           pathInfo: `/${repo.id}.git${rest}`,
@@ -396,7 +397,25 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           remoteUser: auth.remoteUser,
           remoteAddr: req.socket.remoteAddress || '',
           headers: req.headers,
+          maxOutputBytes: maxGitResponseBytes,
+          stream: {
+            onHeaders: (cgi) => {
+              streamed = true;
+              const responseHeaders = { ...cgi.headers };
+              res.writeHead(cgi.status, responseHeaders);
+            },
+            onBody: (chunk) => res.write(chunk),
+            onDrain: (resume) => res.once('drain', resume),
+            onError: (error) => {
+              if (!res.writableEnded) res.destroy(error);
+            },
+            onEnd: () => {
+              if (streamed && !res.writableEnded) res.end();
+            },
+          },
           });
+
+          if (streamed) return;
 
           const headers = { ...result.headers };
           if (result.body && result.body.length && !headers['content-length']) {
@@ -633,6 +652,10 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
 
       return json(res, 404, { error: 'not found' });
     } catch (e) {
+      if (res.headersSent) {
+        if (!res.writableEnded) res.destroy(e);
+        return;
+      }
       return json(res, 400, { error: e.message });
     }
   };
