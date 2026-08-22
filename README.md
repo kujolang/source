@@ -177,7 +177,9 @@ SOURCE_DATABASE_URL='postgres://source:password@db/source' \
 
 Postgres is the recommended backend for large agent fleets; configure pool
 options through the store integration and place Git repositories on shared,
-durable storage.
+durable storage. Set `SOURCE_GIT_ROOT` to the shared Git volume when metadata
+and repository objects need separate mounts; all serving nodes must use the
+same Git root.
 
 ### Deployment
 

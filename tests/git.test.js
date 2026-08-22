@@ -5,8 +5,21 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { freshSource, seedRepo } from './helpers.js';
+import { Source } from '../src/source.js';
 
 const run = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+
+test('Git repositories can live on a separate shared root', () => {
+  const dataRoot = mkdtempSync(path.join(tmpdir(), 'source-metadata-'));
+  const gitRoot = mkdtempSync(path.join(tmpdir(), 'source-git-root-'));
+  const src = new Source(dataRoot, { gitRoot });
+  src.initInstance({ name: 'shared-git-root' });
+  const org = src.createOrg({ name: 'org', slug: 'org' });
+  const project = src.createProject({ orgId: org.id, name: 'project', slug: 'project' });
+  const repo = src.createRepository({ orgId: org.id, projectId: project.id, name: 'main' });
+  assert.equal(repo.barePath.startsWith(gitRoot), true);
+  assert.equal(repo.barePath.startsWith(dataRoot), false);
+});
 
 test('git clone works against a Source bare repository', () => {
   const { src, org, project } = freshSource();

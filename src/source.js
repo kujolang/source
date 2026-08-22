@@ -36,8 +36,9 @@ const scryptAsync = promisify(scrypt);
 export class Source {
   // `store` is optional; defaults to the JSON-file store. Pass a SqliteStore
   // (see sqlite-store.js) for ACID transactions across records.
-  constructor(dataRoot, { store } = {}) {
+  constructor(dataRoot, { store, gitRoot = process.env.SOURCE_GIT_ROOT || dataRoot } = {}) {
     this.dataRoot = dataRoot;
+    this.gitRoot = gitRoot;
     this.store = store ?? new Store(dataRoot);
     this.capabilities = new CapabilityService(this.store);
     this.jobs = new JobQueue(this.store);
@@ -63,7 +64,7 @@ export class Source {
     return `orgs/${orgId}/projects/${projectId}`;
   }
   _repoPath(orgId, projectId, repoId) {
-    return path.join(this.dataRoot, this._projectRel(orgId, projectId), 'repos', `${repoId}.git`);
+    return path.join(this.gitRoot, this._projectRel(orgId, projectId), 'repos', `${repoId}.git`);
   }
 
   // --- instance / org / project ----------------------------------------
@@ -225,7 +226,7 @@ export class Source {
   // Absolute path to the directory containing a project's bare repositories.
   // This is the GIT_PROJECT_ROOT for the smart-HTTP transport.
   reposRoot(orgId, projectId) {
-    return path.join(this.dataRoot, this._projectRel(orgId, projectId), 'repos');
+    return path.join(this.gitRoot, this._projectRel(orgId, projectId), 'repos');
   }
 
   // Resolve a repository by id (R1) or name (main) within a project.

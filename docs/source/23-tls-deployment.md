@@ -118,10 +118,11 @@ What is catastrophic to lose (MEGA_PROMPT §41), and the recovery requirement:
 | Identity + audit history | `<data>/principals`, `<data>/audit` | Backup; the audit log is append-only and must not be truncated. |
 | Evidence metadata + artifacts | `<data>/orgs/*/projects/*/evidence`, `<data>/artifacts` | Backup; artifacts are content-addressed and immutable. |
 
-The data root is `SOURCE_DATA` (default `.source`). A single consistent backup
-of the data root captures everything. Full backup automation (scheduling,
-off-site replication, restore drills) is outside the MVP but the boundary is a
-single directory, so it is straightforward to add.
+The data root is `SOURCE_DATA` (default `.source`). Set `SOURCE_GIT_ROOT` when
+Git objects live on a separate shared durable volume; every serving node must
+mount the same Git root. A consistent backup of both roots captures
+everything. Full backup automation (scheduling, off-site replication, restore
+drills) is outside the MVP but these are the required durability boundaries.
 
 ## Security notes
 
