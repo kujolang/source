@@ -7,6 +7,7 @@
 
 import path from 'node:path';
 import { access } from 'node:fs/promises';
+import { constants as fsConstants } from 'node:fs';
 import { randomBytes, scrypt, scryptSync, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { Store } from './store.js';
@@ -92,8 +93,8 @@ export class Source {
 
   async checkHealthAsync() {
     if (typeof this.store.checkHealthAsync === 'function') await this.store.checkHealthAsync();
-    await access(this.dataRoot);
-    await access(this.gitRoot);
+    await access(this.dataRoot, fsConstants.R_OK | fsConstants.W_OK);
+    await access(this.gitRoot, fsConstants.R_OK | fsConstants.W_OK);
     return true;
   }
 

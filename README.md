@@ -109,8 +109,8 @@ the deployment's database capacity.
 Prometheus-compatible request, response, active-request, and abort counters,
 plus Postgres pool connection and wait gauges when the Postgres backend is in
 use.
-`/readyz` verifies that the Source
-instance, metadata store, and Git root are available; remove an instance
+`/readyz` verifies that the Source instance, metadata store, and Git root are
+available and writable; remove an instance
 from service when readiness returns `503`. On shutdown the CLI marks the
 instance draining, rejects new work with `503`, allows active requests to
 finish, and force-closes connections after 30 seconds.
