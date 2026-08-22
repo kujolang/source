@@ -469,7 +469,17 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         if (!release) return gitAuthError(res, 503, 'Git service busy; retry later');
         let body = null;
         try {
-          if (req.method === 'POST') body = await readRawBody(req, maxGitBodyBytes);
+          let input = null;
+          let contentLength = null;
+          if (req.method === 'POST') {
+            const length = Number(req.headers['content-length']);
+            if (Number.isFinite(length)) {
+              input = req;
+              contentLength = length;
+            } else {
+              body = await readRawBody(req, maxGitBodyBytes);
+            }
+          }
 
           let streamed = false;
           const result = await gitHttpBackend({
@@ -479,6 +489,9 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           method: req.method,
           contentType: req.headers['content-type'] || '',
           body,
+          input,
+          contentLength,
+          maxInputBytes: maxGitBodyBytes,
           remoteUser: auth.remoteUser,
           remoteAddr: req.socket.remoteAddress || '',
           headers: req.headers,

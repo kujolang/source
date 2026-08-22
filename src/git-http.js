@@ -57,6 +57,8 @@ function parseCgiResponse(raw) {
 //   method      — "GET" or "POST"
 //   contentType — request Content-Type (for POST)
 //   body        — request body Buffer (for POST)
+//   input       — optional readable request stream; used for bounded streaming
+//                 of packfiles without buffering the full upload in memory
 //   remoteUser  — authenticated principal (empty for anonymous MVP)
 //   remoteAddr  — client address (for reflog identification)
 //   headers     — request headers (for Git-Protocol passthrough)
@@ -76,6 +78,9 @@ export function gitHttpBackend({
   headers = {},
   stream = null,
   maxOutputBytes = 512 * 1024 * 1024,
+  input = null,
+  maxInputBytes = 100 * 1024 * 1024,
+  contentLength = null,
 }) {
   return new Promise((resolve, reject) => {
     const env = {
@@ -86,7 +91,7 @@ export function gitHttpBackend({
       QUERY_STRING: queryString,
       REQUEST_METHOD: method,
       CONTENT_TYPE: contentType,
-      CONTENT_LENGTH: String(body ? body.length : 0),
+      CONTENT_LENGTH: String(contentLength ?? (body ? body.length : 0)),
       REMOTE_ADDR: remoteAddr,
     };
     if (remoteUser) env.REMOTE_USER = remoteUser;
@@ -101,6 +106,7 @@ export function gitHttpBackend({
     let headerBuffer = Buffer.alloc(0);
     let streamed = false;
     let settled = false;
+    let inputBytes = 0;
 
     const emitBody = (chunk) => {
       if (!chunk.length || stream.onBody?.(chunk) !== false) return;
@@ -170,7 +176,19 @@ export function gitHttpBackend({
       parsed.outputBytes = outputBytes;
       resolve(parsed);
     });
-    if (body) child.stdin.write(body);
-    child.stdin.end();
+    if (input) {
+      input.on('data', (chunk) => {
+        inputBytes += chunk.length;
+        if (inputBytes > maxInputBytes) {
+          input.unpipe(child.stdin);
+          input.destroy();
+          fail(new Error('Git request body exceeded configured input limit'));
+        }
+      });
+      input.pipe(child.stdin);
+    } else {
+      if (body) child.stdin.write(body);
+      child.stdin.end();
+    }
   });
 }
