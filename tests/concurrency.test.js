@@ -6,6 +6,7 @@ import { SqliteStore } from '../src/sqlite-store.js';
 import { GitRepo } from '../src/git.js';
 import { startServer } from '../src/api.js';
 import { gitHttpBackend } from '../src/git-http.js';
+import { PostgresStore } from '../src/postgres-store.js';
 import { freshSource } from './helpers.js';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -51,6 +52,23 @@ test('RateLimiter async path delegates to an async durable store', async () => {
   });
   assert.equal(await limiter.allowAsync('agent:async', { limit: 1, windowMs: 1000 }), true);
   assert.equal(syncCalls, 0);
+});
+
+test('Postgres async transactions keep all statements on one pooled client', async () => {
+  const calls = [];
+  const client = {
+    async query(sql) {
+      calls.push(String(sql).trim());
+      return { rows: sql.includes('SELECT 1') ? [{ value: 1 }] : [] };
+    },
+    release() { calls.push('RELEASE'); },
+  };
+  const store = Object.create(PostgresStore.prototype);
+  store.pool = { connect: async () => client };
+  store._asyncTransaction = new (await import('node:async_hooks')).AsyncLocalStorage();
+  const value = await store.transactionAsync(() => store._runAsync('SELECT 1'));
+  assert.equal(value, '1');
+  assert.deepEqual(calls, ['BEGIN', 'SELECT 1', 'COMMIT', 'RELEASE']);
 });
 
 test('SQLite counter allocation returns unique monotonic IDs', () => {

@@ -6,12 +6,14 @@
 // normalized tables with foreign keys and join-ready junctions.
 //
 // Synchronous execution is preserved for the legacy store contract. Hot
-// request-path rate-limit updates also expose an async `psql` seam so durable
-// throttling does not block the Node event loop.
+// request-path operations also expose an async pooled `pg` seam so durable
+// storage and throttling do not block the Node event loop.
 
 import { createHash, randomBytes } from 'node:crypto';
 import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import pg from 'pg';
 
 const execFileAsync = promisify(execFile);
 
@@ -47,6 +49,7 @@ class PostgresStore {
     psql = 'psql',
     projectPrefix = 'source',
     connectionOptions = {},
+    pool = null,
   } = {}) {
     if (!dsn) {
       throw new Error('Postgres DSN is required (SOURCE_DATABASE_URL, DATABASE_URL, or { dsn })');
@@ -57,6 +60,8 @@ class PostgresStore {
     this.psqlPath = psql;
     this.projectPrefix = projectPrefix;
     this.connectionOptions = connectionOptions;
+    this.pool = pool || new pg.Pool({ connectionString: dsn, max: connectionOptions.maxConnections || 32 });
+    this._asyncTransaction = new AsyncLocalStorage();
     this._txDepth = 0;
 
     this._initSchema();
@@ -101,12 +106,33 @@ class PostgresStore {
   }
 
   async _runAsync(sql) {
-    const { stdout } = await execFileAsync(this.psqlPath, this._psqlArgs(sql), {
-      encoding: 'utf8',
-      maxBuffer: 8 * 1024 * 1024,
-      env: { ...process.env, ...(this.connectionOptions.env || {}) },
-    });
-    return String(stdout || '').replace(/\r/g, '').trim();
+    const context = this._asyncTransaction.getStore();
+    if (context?.client) {
+      const result = await context.client.query(String(sql).trim());
+      return this._formatAsyncRows(result.rows);
+    }
+    try {
+      const result = await this.pool.query(String(sql).trim());
+      return this._formatAsyncRows(result.rows);
+    } catch (error) {
+      // Preserve the legacy psql fallback for installations that have not
+      // configured a reachable native Postgres client yet.
+      if (error?.code !== 'ECONNREFUSED' && error?.code !== 'ENOTFOUND') throw error;
+      const { stdout } = await execFileAsync(this.psqlPath, this._psqlArgs(sql), {
+        encoding: 'utf8',
+        maxBuffer: 8 * 1024 * 1024,
+        env: { ...process.env, ...(this.connectionOptions.env || {}) },
+      });
+      return String(stdout || '').replace(/\r/g, '').trim();
+    }
+  }
+
+  _formatAsyncRows(rows) {
+    if (!rows?.length) return '';
+    return rows.map((row) => Object.values(row).map((value) => {
+      if (value === null || value === undefined) return '';
+      return typeof value === 'object' ? JSON.stringify(value) : String(value);
+    }).join('\t')).join('\n').trim();
   }
 
   _fetchJsonRows(sql) {
@@ -564,10 +590,12 @@ class PostgresStore {
       return;
     }
 
-    if (classified.kind === 'project' || classified.kind === 'policy') {
+    if (classified.kind === 'project') {
       this._syncProject(classified.projectId, obj, classified.orgId);
       return;
     }
+
+    if (classified.kind === 'policy') return;
 
     if (classified.kind === 'work') {
       this._syncWork(classified.id, obj, classified.projectId, classified.orgId);
@@ -617,6 +645,22 @@ class PostgresStore {
     }
 
     this._syncPolicy(classified.projectId, obj, classified.projectId, classified.orgId);
+  }
+
+  async writeJsonAsync(relPath, obj) {
+    const classified = this._classifyRelPath(relPath);
+    await this._runAsync(`INSERT INTO ${this._qualified('records')} (path, kind, org_id, project_id, entity_id, json)
+      VALUES (${escapeSqlLiteral(relPath)}, ${escapeSqlLiteral(classified.kind)}, ${escapeSqlLiteral(classified.orgId || null)}, ${escapeSqlLiteral(classified.projectId || null)}, ${escapeSqlLiteral(classified.id || null)}, ${toJson(obj)})
+      ON CONFLICT (path) DO UPDATE SET kind = EXCLUDED.kind, org_id = EXCLUDED.org_id, project_id = EXCLUDED.project_id, entity_id = EXCLUDED.entity_id, json = EXCLUDED.json`);
+    if (classified.kind === 'org') {
+      await this._runAsync(`INSERT INTO ${this._qualified('orgs')} (id, json)
+        VALUES (${escapeSqlLiteral(classified.orgId)}, ${toJson(obj)})
+        ON CONFLICT (id) DO UPDATE SET json = EXCLUDED.json`);
+    } else if (classified.kind === 'project') {
+      await this._runAsync(`INSERT INTO ${this._qualified('projects')} (id, org_id, json)
+        VALUES (${escapeSqlLiteral(classified.projectId)}, ${escapeSqlLiteral(classified.orgId)}, ${toJson(obj)})
+        ON CONFLICT (id) DO UPDATE SET org_id = EXCLUDED.org_id, json = EXCLUDED.json`);
+    }
   }
 
   listJson(dirRel, { cursor, limit, includeDirs = false } = {}) {
@@ -728,6 +772,17 @@ class PostgresStore {
     return `${prefix}${Number(JSON.parse(value))}`;
   }
 
+  async nextIdAsync(kind, prefix) {
+    const key = `counter:${kind}`;
+    const value = await this._runAsync(`
+      INSERT INTO ${this._qualified('meta')} (key, value)
+      VALUES (${escapeSqlLiteral(key)}, '1'::jsonb)
+      ON CONFLICT (key) DO UPDATE SET value = to_jsonb(((value)::text)::bigint + 1)
+      RETURNING value
+    `);
+    return `${prefix}${Number(JSON.parse(value))}`;
+  }
+
   allowRateLimit(key, limit, windowMs, now = Date.now()) {
     const out = this._run(`
       INSERT INTO ${this._qualified('rate_limits')} (key, count, reset_at)
@@ -740,8 +795,8 @@ class PostgresStore {
     return Number(out) <= limit;
   }
 
-  // Async counterpart for request-path throttles. This keeps psql subprocess
-  // I/O off the Node event loop while preserving the same atomic SQL update.
+  // Async counterpart for request-path throttles. This uses the pooled client
+  // when available while preserving the same atomic SQL update.
   async allowRateLimitAsync(key, limit, windowMs, now = Date.now()) {
     const out = await this._runAsync(`
       INSERT INTO ${this._qualified('rate_limits')} (key, count, reset_at)
@@ -775,6 +830,11 @@ class PostgresStore {
     this._run(`INSERT INTO ${this._qualified('audit')} (line) VALUES (${toJson(line)})`);
   }
 
+  async auditAsync(entry) {
+    const line = { at: nowIso(), ...entry };
+    await this._runAsync(`INSERT INTO ${this._qualified('audit')} (line) VALUES (${toJson(line)})`);
+  }
+
   readAudit() {
     return this._fetchJsonRows(`SELECT line FROM ${this._qualified('audit')} ORDER BY seq ASC`).map((r) => r.line);
   }
@@ -801,6 +861,27 @@ class PostgresStore {
     } finally {
       this._txDepth = 0;
     }
+  }
+
+  async transactionAsync(fn) {
+    const existing = this._asyncTransaction.getStore();
+    if (existing?.client) return fn();
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await this._asyncTransaction.run({ client }, fn);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async closeAsync() {
+    await this.pool.end();
   }
 
   createHumanSessionRow(principalId, credential, ttlMs = 24 * 60 * 60 * 1000) {

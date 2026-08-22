@@ -453,7 +453,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         const g = await guard(src, req, ACTIONS.manage_org, {});
         if (g) return json(res, g.status, g.body);
         const body = await readBody(req, maxJsonBodyBytes);
-        const org = src.createOrg({ name: body.name, slug: body.slug });
+        const org = await src.createOrgAsync({ name: body.name, slug: body.slug });
         return json(res, 201, org);
       }
 

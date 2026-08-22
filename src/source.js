@@ -23,7 +23,7 @@ import {
   decisionToChangeState,
 } from './domain.js';
 import { defaultPolicy, evaluateEvidence, interpret, canApprove } from './policy.js';
-import { nextId, randomHex } from './ids.js';
+import { nextId, nextIdAsync, randomHex } from './ids.js';
 import { normalizeEvalSummary, normalizeEvalManifest, normalizeEvalRun, readEvalArtifacts } from './integrations/kujo.js';
 import { scanSecrets } from './scan.js';
 
@@ -81,6 +81,23 @@ export class Source {
     const org = { id: orgId, name, slug, visibility: 'private', createdAt: new Date().toISOString() };
     this.store.writeJson(`${this._orgRel(orgId)}/org.json`, org);
     this.store.audit({ event: 'org.create', orgId, name });
+    return org;
+  }
+
+  async createOrgAsync({ name, slug }) {
+    const id = await nextIdAsync(this.store, 'org');
+    const org = { id, name, slug, visibility: 'private', createdAt: new Date().toISOString() };
+    const write = typeof this.store.writeJsonAsync === 'function'
+      ? (rel, value) => this.store.writeJsonAsync(rel, value)
+      : (rel, value) => this.store.writeJson(rel, value);
+    const audit = typeof this.store.auditAsync === 'function'
+      ? (entry) => this.store.auditAsync(entry)
+      : (entry) => this.store.audit(entry);
+    const tx = typeof this.store.transactionAsync === 'function'
+      ? (fn) => this.store.transactionAsync(fn)
+      : (fn) => fn();
+    await tx(async () => write(`${this._orgRel(id)}/org.json`, org));
+    await audit({ event: 'org.create', orgId: id, name });
     return org;
   }
 

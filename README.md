@@ -115,7 +115,8 @@ requirements.
 
 ## Architecture
 
-A **modular monolith** in Node.js (ESM), zero dependencies:
+A **modular monolith** in Node.js (ESM), with a small native Postgres client
+dependency for pooled production storage:
 
 ```text
 src/
