@@ -701,6 +701,10 @@ class PostgresStore {
         await this._runAsync(`INSERT INTO ${this._qualified('change_decisions')} (change_id, decision_id)
           VALUES (${escapeSqlLiteral(classified.id)}, ${escapeSqlLiteral(decisionId)}) ON CONFLICT DO NOTHING`);
       }
+      await this._runAsync(`INSERT INTO ${this._qualified('work_sessions')} (work_id, session_id)
+        SELECT ${escapeSqlLiteral(obj.workId)}, ${escapeSqlLiteral(obj.sessionId)}
+        WHERE ${escapeSqlLiteral(obj.sessionId)} IS NOT NULL
+        ON CONFLICT DO NOTHING`);
     } else if (classified.kind === 'evidence') {
       await this._runAsync(`INSERT INTO ${this._qualified('evidence')} (id, org_id, project_id, producer_id, json)
         VALUES (${escapeSqlLiteral(classified.id)}, ${escapeSqlLiteral(classified.orgId)}, ${escapeSqlLiteral(classified.projectId)}, ${escapeSqlLiteral(obj.producer)}, ${toJson(obj)})
@@ -714,6 +718,22 @@ class PostgresStore {
         ON CONFLICT (id) DO UPDATE SET change_id = EXCLUDED.change_id, decider_id = EXCLUDED.decider_id, json = EXCLUDED.json`);
       await this._runAsync(`INSERT INTO ${this._qualified('change_decisions')} (change_id, decision_id)
         VALUES (${escapeSqlLiteral(obj.changeId)}, ${escapeSqlLiteral(classified.id)}) ON CONFLICT DO NOTHING`);
+      const rows = await this._runAsync(`SELECT work_id FROM ${this._qualified('changes')}
+        WHERE id = ${escapeSqlLiteral(obj.changeId)}
+          AND org_id = ${escapeSqlLiteral(classified.orgId)}
+          AND project_id = ${escapeSqlLiteral(classified.projectId)}`);
+      if (rows.rows?.[0]?.work_id) {
+        await this._runAsync(`INSERT INTO ${this._qualified('work_decisions')} (work_id, decision_id)
+          VALUES (${escapeSqlLiteral(rows.rows[0].work_id)}, ${escapeSqlLiteral(classified.id)}) ON CONFLICT DO NOTHING`);
+      }
+    } else if (classified.kind === 'capability') {
+      await this._runAsync(`INSERT INTO ${this._qualified('capabilities')} (id, principal_id, scope, allowed, denied, expires_at, credential, json)
+        VALUES (${escapeSqlLiteral(classified.id)}, ${escapeSqlLiteral(obj.principalId)}, ${toJson(obj.scope)}, ${toJson(obj.allowed)}, ${toJson(obj.denied)}, ${escapeSqlLiteral(obj.expiresAt)}, ${escapeSqlLiteral(obj.credential)}, ${toJson(obj)})
+        ON CONFLICT (id) DO UPDATE SET principal_id = EXCLUDED.principal_id, scope = EXCLUDED.scope, allowed = EXCLUDED.allowed,
+          denied = EXCLUDED.denied, expires_at = EXCLUDED.expires_at, credential = EXCLUDED.credential, json = EXCLUDED.json`);
+      await this._runAsync(`INSERT INTO ${this._qualified('principals')} (id, principal_type, name, json)
+        VALUES (${escapeSqlLiteral(obj.principalId)}, 'human', 'capability principal', ${toJson({ id: obj.principalId })})
+        ON CONFLICT (id) DO NOTHING`);
     }
   }
 

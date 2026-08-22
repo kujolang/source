@@ -1022,7 +1022,7 @@ export class Source {
   }
 
   async updateCanonicalStateAsync({ orgId, projectId, changeId, repoId = null }) {
-    const change = this.getChange(orgId, projectId, changeId);
+    const change = await this.getChangeAsync(orgId, projectId, changeId);
     if (!change) throw new Error(`change not found: ${changeId}`);
     if (change.decisionState !== 'accepted') throw new Error(`change not accepted (state: ${change.decisionState})`);
     let targets;
@@ -1032,24 +1032,22 @@ export class Source {
     } else targets = change.repositoryChanges;
     if (targets.length === 0) throw new Error('no repository changes to update');
 
-    const results = [];
-    for (const target of targets) {
+    const results = await Promise.all(targets.map(async (target) => {
       const git = this.gitRepo(orgId, projectId, target.repoId);
       if (!(await git.hasCommitAsync(target.headCommit))) {
-        results.push({ repoId: target.repoId, ok: false, reason: 'head commit not present in repository' });
-        continue;
+        return { repoId: target.repoId, ok: false, reason: 'head commit not present in repository' };
       }
       const branch = await git.defaultBranchAsync();
       const result = await git.fastForwardAsync(target.baseCommit, target.headCommit, branch);
-      this.store.audit({ event: 'canonical.update', orgId, projectId, changeId, repoId: target.repoId, branch, ...result });
-      results.push({ repoId: target.repoId, ...result });
-    }
+      await this._asyncAudit({ event: 'canonical.update', orgId, projectId, changeId, repoId: target.repoId, branch, ...result });
+      return { repoId: target.repoId, ...result };
+    }));
     const ok = results.every((result) => result.ok);
     if (ok) {
-      const work = this.getWork(orgId, projectId, change.workId);
+      const work = await this.getWorkAsync(orgId, projectId, change.workId);
       if (work && work.status === 'accepted') {
         transitionWork(work, 'closed');
-        this._saveWork(orgId, projectId, work);
+        await this._asyncTransaction(() => this._asyncWrite(`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work));
       }
     }
     return repoId ? results[0] : { ok, results };
