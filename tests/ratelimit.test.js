@@ -57,3 +57,68 @@ test('the submit endpoint is rate-limited by client address', async () => {
     server.close();
   }
 });
+
+test('human login is rate-limited by client address', async () => {
+  const { src, org, project, human } = freshSource();
+  const server = await startServer(src, { port: 0, rateLimit: { login: { limit: 1, windowMs: 60_000 } } });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const headers = { 'content-type': 'application/json', accept: 'application/json' };
+    const r1 = await fetch(`${base}/login`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ principalId: human.id, password: 'test-password-123', orgId: org.id, projectId: project.id }),
+    });
+    assert.equal(r1.status, 200);
+
+    const r2 = await fetch(`${base}/login`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ principalId: human.id, password: 'test-password-123', orgId: org.id, projectId: project.id }),
+    });
+    assert.equal(r2.status, 429);
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});
+
+test('session issuance is rate-limited by client address', async () => {
+  const { src, org, project, human, agent } = freshSource();
+  const work = src.createWork({ orgId: org.id, projectId: project.id, intent: 'session throttle', requester: human.id });
+  const sessionBootstrap = src.capabilities.issue({
+    principalId: agent.id,
+    scope: { org: org.id, project: project.id },
+    allowed: ['claim_work', 'start_session'],
+  });
+
+  const server = await startServer(src, { port: 0, rateLimit: { session: { limit: 1, windowMs: 60_000 } } });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/work/${work.id}/claim`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${sessionBootstrap.credential}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ principalId: agent.id }),
+    });
+
+    const body = JSON.stringify({ principalId: agent.id, baseCommit: 'base' });
+    const headers = { Authorization: `Bearer ${sessionBootstrap.credential}`, 'content-type': 'application/json' };
+
+    const r1 = await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/work/${work.id}/sessions`, {
+      method: 'POST',
+      headers,
+      body,
+    });
+    assert.equal(r1.status, 201);
+
+    const r2 = await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/work/${work.id}/sessions`, {
+      method: 'POST',
+      headers,
+      body,
+    });
+    assert.equal(r2.status, 429);
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});

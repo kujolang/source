@@ -103,3 +103,44 @@ test('field selection reduces response size (token efficiency)', async () => {
     assert.ok(slim.length < full.length, `slim (${slim.length}) should be smaller than full (${full.length})`);
   });
 });
+
+test('org listing supports cursor+limit pagination', async () => {
+  const { src, org, project, agent } = freshSource();
+  const otherOrg = src.createOrg({ name: 'other', slug: 'other' });
+  const thirdOrg = src.createOrg({ name: 'third', slug: 'third' });
+  src.createWork({ orgId: org.id, projectId: project.id, intent: 'first', requester: 'U1' });
+  src.createWork({ orgId: org.id, projectId: project.id, intent: 'second', requester: 'U1' });
+  const cap = src.capabilities.issue({ principalId: agent.id, scope: {}, allowed: ['manage_org', 'read_source', 'read_context'] });
+
+  await withServer(src, async (base) => {
+    const first = await (await fetch(`${base}/api/v1/orgs?limit=2`, { headers: auth(cap.credential) })).json();
+    assert.ok(first.nextCursor);
+    assert.equal(first.items.length, 2);
+
+    const second = await (await fetch(`${base}/api/v1/orgs?limit=2&cursor=${first.nextCursor}`, { headers: auth(cap.credential) })).json();
+    assert.ok(Array.isArray(second.items));
+    assert.equal(second.items.length, 1);
+  });
+});
+
+test('work listing supports cursor+limit pagination', async () => {
+  const { src, org, project, agent, human } = freshSource();
+  src.createWork({ orgId: org.id, projectId: project.id, intent: 'a', requester: human.id });
+  src.createWork({ orgId: org.id, projectId: project.id, intent: 'b', requester: human.id });
+  src.createWork({ orgId: org.id, projectId: project.id, intent: 'c', requester: human.id });
+  const cap = src.capabilities.issue({
+    principalId: agent.id,
+    scope: { org: org.id, project: project.id },
+    allowed: ['read_context'],
+  });
+
+  await withServer(src, async (base) => {
+    const first = await (await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/work?limit=2`, { headers: auth(cap.credential) })).json();
+    assert.ok(first.nextCursor);
+    assert.equal(first.items.length, 2);
+
+    const second = await (await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/work?limit=2&cursor=${first.nextCursor}`, { headers: auth(cap.credential) })).json();
+    assert.ok(Array.isArray(second.items));
+    assert.equal(second.items.length, 1);
+  });
+});

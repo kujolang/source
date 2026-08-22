@@ -143,7 +143,7 @@ test('human login issues a session and gates HTML/API with session cookies', asy
     const login = await fetch(`${base}/login`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ principalId: human.id, orgId: org.id, projectId: project.id, allowed: ['read_source', 'read_context'] }),
+      body: JSON.stringify({ principalId: human.id, password: 'test-password-123', orgId: org.id, projectId: project.id }),
     });
     assert.equal(login.status, 200);
     const session = await login.json();
@@ -160,6 +160,29 @@ test('human login issues a session and gates HTML/API with session cookies', asy
   });
 });
 
+test('human login cannot self-select privileged actions or an unscoped session', async () => {
+  const { src, org, project, human } = freshSource();
+  await withServer(src, async (base) => {
+    const login = await fetch(`${base}/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({
+        principalId: human.id,
+        password: 'test-password-123',
+        orgId: org.id,
+        projectId: project.id,
+        allowed: ['manage_org', 'modify_policy'],
+        ttlMs: 1,
+      }),
+    });
+    assert.equal(login.status, 200);
+    const body = await login.json();
+    assert.deepEqual(body.capability.scope, { org: org.id, project: project.id });
+    assert.deepEqual(body.capability.allowed, ['read_source', 'read_context', 'accept_change']);
+    assert.equal(body.capability.allowed.includes('modify_policy'), false);
+  });
+});
+
 test('human sessions control authorization for human-facing actions', async () => {
   const { src, org, project, human, agent, service } = freshSource();
   const work = src.createWork({ orgId: org.id, projectId: project.id, intent: 'login action test', requester: human.id });
@@ -170,32 +193,17 @@ test('human sessions control authorization for human-facing actions', async () =
   src.addEvidence({ orgId: org.id, projectId: project.id, changeId: change.id, subject: 'e', claim: 'deterministic checks pass', type: 'eval', producer: service.id, result: { status: 'pass' } });
 
   await withServer(src, async (base) => {
-    const readOnly = await fetch(`${base}/login`, {
+    const invalid = await fetch(`${base}/login`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ principalId: human.id, orgId: org.id, projectId: project.id, allowed: ['read_source'] }),
+      body: JSON.stringify({ principalId: human.id, password: 'wrong-password', orgId: org.id, projectId: project.id }),
     });
-    const cookie = parseCookieHeader(readOnly.headers);
-    assert.ok(cookie);
+    assert.equal(invalid.status, 401);
 
-    const denied = await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/changes/${change.id}/decision`, {
-      method: 'POST',
-      headers: { Cookie: cookie, 'content-type': 'application/json' },
-      body: JSON.stringify({ decision: 'accepted', decider: human.id }),
-    });
-    assert.equal(denied.status, 403);
-
-    const empowered = await fetch(`${base}/login`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ principalId: human.id, orgId: org.id, projectId: project.id, allowed: ['read_source', 'accept_change'] }),
-    });
-    const empoweredCookie = parseCookieHeader(empowered.headers);
-    assert.ok(empoweredCookie);
-
+    const maintainer = src.capabilities.issue({ principalId: human.id, scope: { org: org.id, project: project.id }, allowed: ['accept_change'] });
     const accepted = await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/changes/${change.id}/decision`, {
       method: 'POST',
-      headers: { Cookie: empoweredCookie, 'content-type': 'application/json' },
+      headers: { Authorization: `Bearer ${maintainer.credential}`, 'content-type': 'application/json' },
       body: JSON.stringify({ decision: 'accepted', decider: human.id, reasoning: 'ready' }),
     });
     assert.equal(accepted.status, 201);

@@ -147,3 +147,11 @@ public contribution path.
 - `21-multi-tenant-orgs.md` — the org-scoped URL scheme and tenant boundary.
 - `12-threat-model.md` — stolen capability, replay, escalation.
 - `16-mvp-results.md` — item 4 of the next-phase list.
+
+Human web login is intentionally narrower than operator capability issuance. Human
+principals must have a password-backed record, and `/login` requires the password,
+an explicit organization, and an explicit project. The request cannot choose its
+allowed actions or TTL; it receives the bounded default human session grant. High-
+authority actions such as policy modification and release publication remain
+operator-issued capabilities. Passwords are stored as salted `scrypt` hashes and
+are never returned in principal responses.

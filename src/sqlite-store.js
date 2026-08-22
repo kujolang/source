@@ -55,17 +55,28 @@ export class SqliteStore {
 
   // List the direct children (record ids, without ".json") of a logical
   // directory. Mirrors the JSON store's readdir of a directory.
-  listJson(dirRel) {
+  listJson(dirRel, { cursor, limit, includeDirs = false } = {}) {
     const prefix = dirRel.endsWith('/') ? dirRel : `${dirRel}/`;
     const rows = this.db.prepare('SELECT path FROM records WHERE path LIKE ?').all(`${prefix}%`);
-    return rows
+    const names = rows
       .map((r) => {
         const rest = r.path.slice(prefix.length);
-        if (rest.includes('/')) return null; // not a direct child
+        if (rest.includes('/')) {
+          if (!includeDirs) return null;
+          return rest.split('/')[0];
+        }
         return rest.endsWith('.json') ? rest.slice(0, -'.json'.length) : null;
       })
-      .filter(Boolean)
-      .sort();
+      .filter(Boolean);
+    let out = [...new Set(names)].sort();
+    if (cursor) {
+      const start = out.indexOf(cursor);
+      out = start >= 0 ? out.slice(start + 1) : out;
+    }
+    if (Number.isInteger(limit) && limit > 0) {
+      out = out.slice(0, Math.min(limit, 1001));
+    }
+    return out;
   }
 
   // --- metadata counters --------------------------------------------------

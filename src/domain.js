@@ -175,9 +175,9 @@ export function createDecision({ id, changeId, decision, decider, authority, pol
   };
 }
 
-export function createPrincipal({ id, type, name }) {
+export function createPrincipal({ id, type, name, passwordHash = null }) {
   if (!PRINCIPAL_TYPES.includes(type)) throw new Error(`invalid principal type: ${type}`);
-  return { id, type, name, createdAt: new Date().toISOString() };
+  return { id, type, name, ...(passwordHash ? { passwordHash } : {}), createdAt: new Date().toISOString() };
 }
 
 export function createCapability({ id, principalId, scope, allowed = [], denied = [], expiresAt, credential }) {

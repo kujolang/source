@@ -117,9 +117,9 @@ export function renderLogin(opts = {}) {
 ${error}
 <form method="POST" action="/login">
   <label>Principal ID <input name="principalId" placeholder="human principal id" /></label><br/><br/>
-  <label>Org ID (optional for organization-wide session)<input name="orgId" /></label><br/><br/>
-  <label>Project ID (optional)<input name="projectId" /></label><br/><br/>
-  <label>Allowed actions (comma-separated)<input name="allowed" placeholder="read_source,read_context,accept_change" /></label><br/><br/>
+  <label>Password <input type="password" name="password" autocomplete="current-password" /></label><br/><br/>
+  <label>Org ID <input name="orgId" required /></label><br/><br/>
+  <label>Project ID <input name="projectId" required /></label><br/><br/>
   <button type="submit">Sign in</button>
 </form>`,
   );

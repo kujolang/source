@@ -32,6 +32,13 @@ export class CapabilityService {
 
   // Look up a grant by credential. Returns null if unknown.
   lookup(credential) {
+    if (!credential) return null;
+    const storeLookup = typeof this.store.getCapabilityByCredential === 'function' ? this.store.getCapabilityByCredential(credential) : null;
+    if (storeLookup) {
+      this._cache.set(credential, storeLookup);
+      return storeLookup;
+    }
+
     this._refreshCache();
     const cached = this._cache.get(credential);
     if (cached) return cached;

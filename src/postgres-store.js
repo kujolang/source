@@ -578,21 +578,54 @@ class PostgresStore {
     this._syncPolicy(classified.projectId, obj, classified.projectId, classified.orgId);
   }
 
-  listJson(dirRel) {
+  listJson(dirRel, { cursor, limit, includeDirs = false } = {}) {
     const normalized = dirRel.endsWith('/') ? dirRel.slice(0, -1) : dirRel;
-    const rows = this._fetchJsonRows(`SELECT path FROM ${this._qualified('records')} WHERE path LIKE ${escapeSqlLiteral(`${normalized}/%`)}`);
-    return rows
+    const prefix = `${normalized}/`;
+    const where = `WHERE path LIKE ${escapeSqlLiteral(`${prefix}%`)}`;
+    const limitClause = Number.isInteger(limit) && limit > 0 ? ` LIMIT ${Math.min(limit, 1000)}` : '';
+
+    const rows = this._fetchJsonRows(`
+      SELECT path
+      FROM ${this._qualified('records')}
+      ${where}
+      ORDER BY path
+      ${limitClause}
+    `);
+
+    const names = rows
       .map((r) => r.path)
       .map((p) => {
         if (typeof p !== 'string' || !p.startsWith(`${normalized}/`)) return null;
         const rest = p.slice(normalized.length + 1);
+        if (!rest) return null;
+        if (rest.includes('/')) {
+          if (!includeDirs) return null;
+          return rest.split('/')[0];
+        }
         if (!rest.endsWith('.json')) return null;
-        const name = rest.slice(0, -'.json'.length);
-        if (name.includes('/')) return null;
-        return name;
+        return rest.slice(0, -'.json'.length);
       })
       .filter(Boolean)
       .sort();
+    let out = [...new Set(names)];
+    if (cursor) {
+      const start = out.indexOf(cursor);
+      out = start >= 0 ? out.slice(start + 1) : out;
+    }
+    if (Number.isInteger(limit) && limit > 0) {
+      out = out.slice(0, Math.min(limit, 1001));
+    }
+    return out;
+  }
+
+  getCapabilityByCredential(credential) {
+    const row = this._fetchJsonRows(`
+      SELECT json
+      FROM ${this._qualified('capabilities')}
+      WHERE credential = ${escapeSqlLiteral(credential)}
+      LIMIT 1
+    `);
+    return row[0]?.json || null;
   }
 
   getMeta(key) {

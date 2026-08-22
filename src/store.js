@@ -46,14 +46,21 @@ export class Store {
     fs.renameSync(tmp, p);
   }
 
-  listJson(dirRel) {
+  listJson(dirRel, { cursor, limit, includeDirs = false } = {}) {
     const dir = this._p(dirRel);
     try {
-      return fs
-        .readdirSync(dir, { withFileTypes: true })
-        .filter((e) => e.isFile() && e.name.endsWith('.json'))
-        .map((e) => e.name.slice(0, -'.json'.length))
-        .sort();
+      const out = [];
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (e.isFile() && e.name.endsWith('.json')) out.push(e.name.slice(0, -'.json'.length));
+        else if (includeDirs && e.isDirectory()) out.push(e.name);
+      }
+      const unique = [...new Set(out)].sort();
+      if (cursor) {
+        const start = unique.indexOf(cursor);
+        unique.splice(0, start >= 0 ? start + 1 : 0);
+      }
+      if (Number.isInteger(limit) && limit > 0) unique.splice(Math.min(limit, 1001));
+      return unique;
     } catch (e) {
       if (e.code === 'ENOENT') return [];
       throw e;

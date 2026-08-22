@@ -146,6 +146,32 @@ function selectFields(obj, fields) {
   return out;
 }
 
+function parseListParams(url) {
+  const limitRaw = url.searchParams.get('limit');
+  const rawLimit = Number(limitRaw);
+  return {
+    cursor: url.searchParams.get('cursor') || null,
+    limit: Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 1000) : null,
+  };
+}
+
+function paginate(items, { cursor, limit }) {
+  if (!limit) return { items, nextCursor: null };
+  const start = cursor ? items.findIndex((item) => item?.id === cursor) + 1 : 0;
+  const safeStart = start > 0 ? start : 0;
+  const window = items.slice(safeStart, safeStart + limit + 1);
+  const page = window.slice(0, limit);
+  const nextCursor = window.length > limit ? page[page.length - 1]?.id : null;
+  return { items: page, nextCursor };
+}
+
+function paginatedResponse(items, pagination, fields) {
+  const { items: page, nextCursor } = paginate(items, pagination);
+  const payload = selectFields(page, fields);
+  if (!pagination.limit) return payload;
+  return { items: payload, nextCursor };
+}
+
 // Authorize a request against a capability action and scope. Returns null when
 // authorized, or {status, body} to send as the rejection response.
 function guard(src, req, action, scope) {
@@ -179,6 +205,8 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {} } = {
   const limits = {
     submit: { limit: 10, windowMs: 60_000, ...(rateLimit.submit || {}) },
     gitPush: { limit: 30, windowMs: 60_000, ...(rateLimit.gitPush || {}) },
+    login: { limit: 20, windowMs: 60_000, ...(rateLimit.login || {}) },
+    session: { limit: 30, windowMs: 60_000, ...(rateLimit.session || {}) },
   };
 
   const handler = async (req, res) => {
@@ -193,34 +221,34 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {} } = {
       }
 
       if (req.method === 'POST' && pathname === '/login') {
+        const ip = req.socket.remoteAddress || 'unknown';
+        if (!limiter.allow(`login:${ip}`, limits.login)) {
+          if (wantsJson(req)) return json(res, 429, { error: 'rate limit exceeded' });
+          return loginPage(res, 429, 'rate limit exceeded');
+        }
         const body = await readLoginBody(req);
         const principalId = body.principalId || null;
+        const password = body.password || null;
         const orgId = body.orgId || undefined;
         const projectId = body.projectId || undefined;
         const parsedTtl = body.ttlMs !== undefined && body.ttlMs !== null ? Number(body.ttlMs) : undefined;
         const ttlMs = Number.isFinite(parsedTtl) ? parsedTtl : undefined;
-        const allowed = body.allowed
-          ? typeof body.allowed === 'string'
-            ? body.allowed
-                .split(',')
-                .map((value) => value.trim())
-                .filter(Boolean)
-            : Array.isArray(body.allowed)
-              ? body.allowed
-              : undefined
-          : undefined;
 
         const principal = principalId ? src.getPrincipal(principalId) : null;
-        if (!principal) {
+        if (!principal || !src.verifyPrincipalPassword(principal.id, password)) {
           if (wantsJson(req)) return json(res, 401, { error: 'principal id required' });
-          return loginPage(res, 401, 'principal id required');
+          return loginPage(res, 401, 'invalid credentials');
         }
         if (principal.type !== 'human') {
           if (wantsJson(req)) return json(res, 403, { error: `principal is not human: ${principal.type}` });
           return loginPage(res, 403, `principal is not human: ${principal.type}`);
         }
 
-        const session = src.createHumanSession({ principalId: principal.id, orgId, projectId, ttlMs, allowed });
+        if (!orgId || !projectId) {
+          if (wantsJson(req)) return json(res, 400, { error: 'orgId and projectId are required' });
+          return loginPage(res, 400, 'org and project are required');
+        }
+        const session = src.createHumanSession({ principalId: principal.id, orgId, projectId, ttlMs });
         const headers = { 'Set-Cookie': sessionHeaders(session), 'Content-Type': 'application/json' };
 
         if (wantsHtml(req)) {
@@ -372,8 +400,11 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {} } = {
       // --- organizations (tenant boundary) --------------------------------
       if (pathname === '/api/v1/orgs' && req.method === 'GET') {
         const g = guard(src, req, ACTIONS.read_source, {});
+        const pagination = parseListParams(url);
         if (g) return json(res, g.status, g.body);
-        return json(res, 200, selectFields(src.listOrgs(), fields));
+        const requestLimit = pagination.limit ? pagination.limit + 1 : null;
+        const items = src.listOrgs({ cursor: pagination.cursor, limit: requestLimit });
+        return json(res, 200, paginatedResponse(items, pagination, fields));
       }
 
       if (pathname === '/api/v1/orgs' && req.method === 'POST') {
@@ -417,8 +448,21 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {} } = {
 
         if (rest === '/work' && req.method === 'GET') {
           const g = guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId });
+          const pagination = parseListParams(url);
           if (g) return json(res, g.status, g.body);
-          return json(res, 200, selectFields(src.listWork(orgId, projectId), fields));
+          const requestLimit = pagination.limit ? pagination.limit + 1 : null;
+          return json(
+            res,
+            200,
+            paginatedResponse(
+              src.listWork(orgId, projectId, {
+                cursor: pagination.cursor,
+                limit: requestLimit,
+              }),
+              pagination,
+              fields,
+            ),
+          );
         }
 
         // Contribution flow: a Git-only developer submits a change from a
@@ -457,6 +501,10 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {} } = {
           }
 
           if (wrest === '/sessions' && req.method === 'POST') {
+            const ip = req.socket.remoteAddress || 'unknown';
+            if (!limiter.allow(`session:${ip}`, limits.session)) {
+              return json(res, 429, { error: 'rate limit exceeded' });
+            }
             const g = guard(src, req, ACTIONS.start_session, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
             const body = await readBody(req);

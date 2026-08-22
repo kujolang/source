@@ -6,7 +6,7 @@
 // thin clients over it.
 
 import path from 'node:path';
-import fs from 'node:fs';
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { Store } from './store.js';
 import { GitRepo } from './git.js';
 import { CapabilityService } from './capability.js';
@@ -28,7 +28,7 @@ import { normalizeEvalSummary, normalizeEvalManifest, normalizeEvalRun, readEval
 import { scanSecrets } from './scan.js';
 
 const DEFAULT_HUMAN_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
-const DEFAULT_HUMAN_SESSION_ACTIONS = ['read_source', 'read_context', 'accept_change', 'modify_policy', 'publish_release'];
+const DEFAULT_HUMAN_SESSION_ACTIONS = ['read_source', 'read_context', 'accept_change'];
 
 export class Source {
   // `store` is optional; defaults to the JSON-file store. Pass a SqliteStore
@@ -84,14 +84,9 @@ export class Source {
     return this.store.readJson(`${this._orgRel(orgId)}/org.json`);
   }
 
-  listOrgs() {
-    const dir = path.join(this.dataRoot, 'orgs');
-    if (!fs.existsSync(dir)) return [];
-    return fs
-      .readdirSync(dir, { withFileTypes: true })
-      .filter((e) => e.isDirectory())
-      .map((e) => this.getOrg(e.name))
-      .filter(Boolean);
+  listOrgs({ cursor, limit } = {}) {
+    const ids = this.store.listJson('orgs', { cursor, limit, includeDirs: true });
+    return ids.map((id) => this.getOrg(id)).filter(Boolean);
   }
 
   createProject({ orgId, slug, name, description = '', visibility = 'private' }) {
@@ -110,14 +105,9 @@ export class Source {
     return this.store.readJson(`${this._projectRel(orgId, projectId)}/project.json`);
   }
 
-  listProjects(orgId) {
-    const dir = path.join(this.dataRoot, this._orgRel(orgId), 'projects');
-    if (!fs.existsSync(dir)) return [];
-    return fs
-      .readdirSync(dir, { withFileTypes: true })
-      .filter((e) => e.isDirectory())
-      .map((e) => this.getProject(orgId, e.name))
-      .filter(Boolean);
+  listProjects(orgId, { cursor, limit } = {}) {
+    const ids = this.store.listJson(`${this._orgRel(orgId)}/projects`, { cursor, limit, includeDirs: true });
+    return ids.map((id) => this.getProject(orgId, id)).filter(Boolean);
   }
 
   // --- repository -------------------------------------------------------
@@ -173,12 +163,39 @@ export class Source {
   }
 
   // --- principals -------------------------------------------------------
-  createPrincipal({ type, name }) {
+  createPrincipal({ type, name, password } = {}) {
     const id = nextId(this.store, 'principal');
-    const principal = createPrincipal({ id, type, name });
+    const passwordHash = type === 'human' && password ? this._hashPassword(password) : null;
+    const principal = createPrincipal({ id, type, name, passwordHash });
     this.store.writeJson(`principals/${id}.json`, principal);
     this.store.audit({ event: 'principal.create', principalId: id, type, name });
-    return principal;
+    return this._publicPrincipal(principal);
+  }
+
+  _publicPrincipal(principal) {
+    if (!principal) return principal;
+    const { passwordHash, ...publicPrincipal } = principal;
+    return publicPrincipal;
+  }
+
+  _hashPassword(password) {
+    if (typeof password !== 'string' || password.length < 12) throw new Error('human password must be at least 12 characters');
+    const salt = randomBytes(16);
+    return `scrypt$${salt.toString('hex')}$${scryptSync(password, salt, 32).toString('hex')}`;
+  }
+
+  verifyPrincipalPassword(principalId, password) {
+    const principal = this.store.readJson(`principals/${principalId}.json`);
+    if (!principal?.passwordHash || typeof password !== 'string') return false;
+    const [, saltHex, hashHex] = String(principal.passwordHash).split('$');
+    if (!saltHex || !hashHex) return false;
+    try {
+      const actual = scryptSync(password, Buffer.from(saltHex, 'hex'), 32);
+      const expected = Buffer.from(hashHex, 'hex');
+      return actual.length === expected.length && timingSafeEqual(actual, expected);
+    } catch {
+      return false;
+    }
   }
 
   getPrincipal(id) {
@@ -269,7 +286,7 @@ export class Source {
     }
 
     this.store.audit({ event: 'human.session.create', principalId, sessionId: session.id, capabilityId: capability.id, scope });
-    return { ...session, principal, capability };
+    return { ...session, principal: this._publicPrincipal(principal), capability };
   }
 
   getHumanSession(sessionId) {
@@ -278,6 +295,25 @@ export class Source {
       : this.store.readJson(this._humanSessionRel(sessionId));
 
     if (!session) return null;
+    if (!session.credential) {
+      this.revokeHumanSession(sessionId);
+      return null;
+    }
+
+    const capability = this.capabilities.lookup(session.credential);
+    if (!capability) {
+      this.revokeHumanSession(sessionId);
+      return null;
+    }
+    if (capability.revoked) {
+      this.revokeHumanSession(sessionId);
+      return null;
+    }
+    if (capability.expiresAt && new Date(capability.expiresAt).getTime() < Date.now()) {
+      this.revokeHumanSession(sessionId);
+      return null;
+    }
+
     if (session.revoked) {
       this.revokeHumanSession(sessionId);
       return null;
@@ -314,8 +350,8 @@ export class Source {
     return this.store.readJson(`${this._projectRel(orgId, projectId)}/work/${workId}.json`);
   }
 
-  listWork(orgId, projectId) {
-    const ids = this.store.listJson(`${this._projectRel(orgId, projectId)}/work`);
+  listWork(orgId, projectId, { cursor, limit } = {}) {
+    const ids = this.store.listJson(`${this._projectRel(orgId, projectId)}/work`, { cursor, limit });
     return ids.map((id) => this.getWork(orgId, projectId, id)).filter(Boolean);
   }
 

@@ -305,7 +305,7 @@ export async function run(argv) {
       }
       case 'principal': {
         if (sub === 'create') {
-          print(src.createPrincipal({ type: flag('--type') || 'human', name: flag('--name') || 'human' }));
+          print(src.createPrincipal({ type: flag('--type') || 'human', name: flag('--name') || 'human', password: flag('--password') }));
           return;
         }
         break;

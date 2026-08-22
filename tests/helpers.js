@@ -12,7 +12,7 @@ export function freshSource() {
   src.initInstance({ name: 'test' });
   const org = src.createOrg({ name: 'test-org', slug: 'test-org' });
   const project = src.createProject({ orgId: org.id, slug: 'test', name: 'Test Project' });
-  const human = src.createPrincipal({ type: 'human', name: 'maintainer' });
+  const human = src.createPrincipal({ type: 'human', name: 'maintainer', password: 'test-password-123' });
   const agent = src.createPrincipal({ type: 'agent', name: 'agent-1' });
   const service = src.createPrincipal({ type: 'service', name: 'verifier' });
   return { src, dir, org, project, human, agent, service };

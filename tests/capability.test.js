@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { freshSource } from './helpers.js';
+import { CapabilityService } from '../src/capability.js';
 
 test('a capability authorizes allowed actions and denies others', () => {
   const { src, agent } = freshSource();
@@ -43,6 +44,34 @@ test('an unknown credential is refused', () => {
   const r = src.capabilities.authorize('does-not-exist', 'read_source');
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'unknown credential');
+});
+
+test('lookup uses a store capability index when available', () => {
+  const store = {
+    writeJson() {},
+    readJson() {},
+    listJson() {
+      return [];
+    },
+    getCapabilityByCredential: (credential) => {
+      if (credential === 'indexed') {
+        return {
+          id: 'C1',
+          principalId: 'P1',
+          scope: { org: 'O1' },
+          allowed: ['read_source'],
+          denied: [],
+          expiresAt: new Date(Date.now() + 10_000).toISOString(),
+          credential: 'indexed',
+        };
+      }
+      return null;
+    },
+  };
+  const service = new CapabilityService(store);
+  const found = service.lookup('indexed');
+  assert.equal(found?.credential, 'indexed');
+  assert.equal(found?.principalId, 'P1');
 });
 
 test('tenant isolation: a second org cannot read the first org project', () => {
