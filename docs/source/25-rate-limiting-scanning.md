@@ -16,7 +16,7 @@ unauthenticated paths that could otherwise be abused for denial of service:
 Limits and windows are configurable per route via `createServer(src, { rateLimit })`.
 When the selected store implements durable rate limiting (SQLite or Postgres),
 the counters are shared across server processes. The Postgres request path uses
-an asynchronous `psql` update, while the legacy synchronous store contract
+the native asynchronous pool, while the legacy synchronous store contract
 remains available to CLI and compatibility callers. The JSON store falls back
 to a bounded in-memory limiter and is suitable only for a single process.
 Exceeding the limit returns `429`. The limiter is keyed by client address and
