@@ -43,13 +43,33 @@ function html(res, status, body) {
 
 function readText(req, maxBytes = 1_000_000) {
   return new Promise((resolve, reject) => {
-    let data = '';
+    const chunks = [];
+    let size = 0;
+    let settled = false;
     req.on('data', (c) => {
-      data += c;
-      if (data.length > maxBytes) reject(new Error('body too large'));
+      if (settled) return;
+      size += c.length;
+      if (size > maxBytes) {
+        settled = true;
+        chunks.length = 0;
+        req.resume();
+        reject(new Error('body too large'));
+        return;
+      }
+      chunks.push(c);
     });
-    req.on('end', () => resolve(data));
-    req.on('error', reject);
+    req.on('end', () => {
+      if (!settled) {
+        settled = true;
+        resolve(Buffer.concat(chunks).toString('utf8'));
+      }
+    });
+    req.on('error', (error) => {
+      if (!settled) {
+        settled = true;
+        reject(error);
+      }
+    });
   });
 }
 
@@ -86,13 +106,31 @@ function readRawBody(req, maxBytes = 100_000_000) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
+    let settled = false;
     req.on('data', (c) => {
-      chunks.push(c);
+      if (settled) return;
       size += c.length;
-      if (size > maxBytes) reject(new Error('body too large'));
+      if (size > maxBytes) {
+        settled = true;
+        chunks.length = 0;
+        req.resume();
+        reject(new Error('body too large'));
+        return;
+      }
+      chunks.push(c);
     });
-    req.on('end', () => resolve(Buffer.concat(chunks)));
-    req.on('error', reject);
+    req.on('end', () => {
+      if (!settled) {
+        settled = true;
+        resolve(Buffer.concat(chunks));
+      }
+    });
+    req.on('error', (error) => {
+      if (!settled) {
+        settled = true;
+        reject(error);
+      }
+    });
   });
 }
 
@@ -107,12 +145,14 @@ function parseSessionCookie(header) {
   return match.trim().slice(SESSION_COOKIE.length + 1);
 }
 
-function sessionCredential(src, req) {
+async function sessionCredential(src, req) {
   const bearer = bearerCredential(req);
   if (bearer) return bearer;
   const sessionId = parseSessionCookie(req.headers.cookie);
   if (!sessionId) return null;
-  const session = src.getHumanSession(sessionId);
+  const session = typeof src.getHumanSessionAsync === 'function'
+    ? await src.getHumanSessionAsync(sessionId)
+    : src.getHumanSession(sessionId);
   return session?.credential || null;
 }
 
@@ -176,7 +216,7 @@ function paginatedResponse(items, pagination, fields) {
 // Authorize a request against a capability action and scope. Returns null when
 // authorized, or {status, body} to send as the rejection response.
 async function guard(src, req, action, scope) {
-  const credential = sessionCredential(src, req);
+  const credential = await sessionCredential(src, req);
   const r = typeof src.capabilities.authorizeAsync === 'function'
     ? await authorizeRequestAsync(src.capabilities, req, action, { ...scope, credential })
     : authorizeRequest(src.capabilities, req, action, { ...scope, credential });
@@ -240,8 +280,15 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         const parsedTtl = body.ttlMs !== undefined && body.ttlMs !== null ? Number(body.ttlMs) : undefined;
         const ttlMs = Number.isFinite(parsedTtl) ? parsedTtl : undefined;
 
-        const principal = principalId ? src.getPrincipal(principalId) : null;
-        if (!principal || !src.verifyPrincipalPassword(principal.id, password)) {
+        const principal = principalId
+          ? (typeof src.getPrincipalAsync === 'function' ? await src.getPrincipalAsync(principalId) : src.getPrincipal(principalId))
+          : null;
+        const passwordOk = principal
+          ? (typeof src.verifyPrincipalPasswordAsync === 'function'
+            ? await src.verifyPrincipalPasswordAsync(principal.id, password)
+            : src.verifyPrincipalPassword(principal.id, password))
+          : false;
+        if (!principal || !passwordOk) {
           if (wantsJson(req)) return json(res, 401, { error: 'principal id required' });
           return loginPage(res, 401, 'invalid credentials');
         }
@@ -254,7 +301,9 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           if (wantsJson(req)) return json(res, 400, { error: 'orgId and projectId are required' });
           return loginPage(res, 400, 'org and project are required');
         }
-        const session = src.createHumanSession({ principalId: principal.id, orgId, projectId, ttlMs });
+        const session = typeof src.createHumanSessionAsync === 'function'
+          ? await src.createHumanSessionAsync({ principalId: principal.id, orgId, projectId, ttlMs })
+          : src.createHumanSession({ principalId: principal.id, orgId, projectId, ttlMs });
         const headers = { 'Set-Cookie': sessionHeaders(session), 'Content-Type': 'application/json' };
 
         if (wantsHtml(req)) {
@@ -271,7 +320,10 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
 
       if (req.method === 'POST' && pathname === '/logout') {
         const sessionId = parseSessionCookie(req.headers.cookie);
-        if (sessionId) src.revokeHumanSession(sessionId);
+        if (sessionId) {
+          if (typeof src.revokeHumanSessionAsync === 'function') await src.revokeHumanSessionAsync(sessionId);
+          else src.revokeHumanSession(sessionId);
+        }
         const cookie = clearSessionHeader();
         if (wantsHtml(req)) {
           res.writeHead(303, { Location: '/login', 'Set-Cookie': cookie });
@@ -653,7 +705,9 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
             if (g) return json(res, g.status, g.body);
             const e = await src.getEvidenceAsync(orgId, projectId, evidenceId);
             if (!e || !e.artifactRef) return json(res, 404, { error: 'not found' });
-            const bytes = src.getArtifact(e.artifactRef.hash);
+            const bytes = typeof src.getArtifactAsync === 'function'
+              ? await src.getArtifactAsync(e.artifactRef.hash)
+              : src.getArtifact(e.artifactRef.hash);
             if (!bytes) return json(res, 404, { error: 'artifact not found' });
             res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
             return res.end(bytes);

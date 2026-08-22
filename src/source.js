@@ -6,7 +6,8 @@
 // thin clients over it.
 
 import path from 'node:path';
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { randomBytes, scrypt, scryptSync, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
 import { Store } from './store.js';
 import { GitRepo } from './git.js';
 import { CapabilityService } from './capability.js';
@@ -29,6 +30,7 @@ import { scanSecrets } from './scan.js';
 
 const DEFAULT_HUMAN_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_HUMAN_SESSION_ACTIONS = ['read_source', 'read_context', 'accept_change'];
+const scryptAsync = promisify(scrypt);
 
 export class Source {
   // `store` is optional; defaults to the JSON-file store. Pass a SqliteStore
@@ -194,6 +196,12 @@ export class Source {
     return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.getRepository(orgId, projectId, repoId);
   }
 
+  async getArtifactAsync(hash) {
+    return typeof this.store.getArtifactAsync === 'function'
+      ? this.store.getArtifactAsync(hash)
+      : this.getArtifact(hash);
+  }
+
   gitRepo(orgId, projectId, repoId) {
     const repo = this.getRepository(orgId, projectId, repoId);
     if (!repo) throw new Error(`repository not found: ${repoId}`);
@@ -268,6 +276,20 @@ export class Source {
     if (!saltHex || !hashHex) return false;
     try {
       const actual = scryptSync(password, Buffer.from(saltHex, 'hex'), 32);
+      const expected = Buffer.from(hashHex, 'hex');
+      return actual.length === expected.length && timingSafeEqual(actual, expected);
+    } catch {
+      return false;
+    }
+  }
+
+  async verifyPrincipalPasswordAsync(principalId, password) {
+    const principal = await this.getPrincipalAsync(principalId);
+    if (!principal?.passwordHash || typeof password !== 'string') return false;
+    const [, saltHex, hashHex] = String(principal.passwordHash).split('$');
+    if (!saltHex || !hashHex) return false;
+    try {
+      const actual = await scryptAsync(password, Buffer.from(saltHex, 'hex'), 32);
       const expected = Buffer.from(hashHex, 'hex');
       return actual.length === expected.length && timingSafeEqual(actual, expected);
     } catch {
@@ -382,6 +404,50 @@ export class Source {
     return { ...session, principal: this._publicPrincipal(principal), capability };
   }
 
+  async createHumanSessionAsync({
+    principalId,
+    orgId,
+    projectId,
+    ttlMs = DEFAULT_HUMAN_SESSION_TTL_MS,
+    allowed = DEFAULT_HUMAN_SESSION_ACTIONS,
+  }) {
+    const principal = await this.getPrincipalAsync(principalId);
+    if (!principal) throw new Error(`principal not found: ${principalId}`);
+    if (principal.type !== 'human') throw new Error(`principal is not human: ${principal.type}`);
+
+    const scope = {};
+    if (orgId) scope.org = orgId;
+    if (projectId) scope.project = projectId;
+    let result;
+    await this._asyncTransaction(async () => {
+      const capability = await this.capabilities.issueAsync({ principalId, scope, allowed, ttlMs });
+      const sessionBase = {
+        principalId,
+        scope,
+        credential: capability.credential,
+        capabilityId: capability.id,
+        createdAt: new Date().toISOString(),
+        expiresAt: capability.expiresAt,
+      };
+      let session;
+      if (typeof this.store.createHumanSessionRowAsync === 'function') {
+        session = await this.store.createHumanSessionRowAsync(principalId, capability.credential, ttlMs);
+        session.scope = scope;
+        session.capabilityId = capability.id;
+        session.credential = capability.credential;
+        session.principalId = principalId;
+        session.createdAt = session.createdAt || sessionBase.createdAt;
+        await this._asyncWrite(this._humanSessionRel(session.id), session);
+      } else {
+        session = { id: randomHex(24), ...sessionBase };
+        await this._asyncWrite(this._humanSessionRel(session.id), session);
+      }
+      await this._asyncAudit({ event: 'human.session.create', principalId, sessionId: session.id, capabilityId: capability.id, scope });
+      result = { ...session, principal: this._publicPrincipal(principal), capability };
+    });
+    return result;
+  }
+
   getHumanSession(sessionId) {
     const session = typeof this.store.readHumanSession === 'function'
       ? this.store.readHumanSession(sessionId)
@@ -418,6 +484,25 @@ export class Source {
     return session;
   }
 
+  async getHumanSessionAsync(sessionId) {
+    const session = typeof this.store.readHumanSessionAsync === 'function'
+      ? await this.store.readHumanSessionAsync(sessionId)
+      : (typeof this.store.readJsonAsync === 'function'
+        ? await this.store.readJsonAsync(this._humanSessionRel(sessionId))
+        : this.getHumanSession(sessionId));
+    if (!session) return null;
+    const invalidate = async () => {
+      await this.revokeHumanSessionAsync(sessionId);
+      return null;
+    };
+    if (!session.credential) return invalidate();
+    const capability = await this.capabilities.lookupAsync(session.credential);
+    if (!capability || capability.revoked) return invalidate();
+    if (capability.expiresAt && new Date(capability.expiresAt).getTime() < Date.now()) return invalidate();
+    if (session.revoked || (session.expiresAt && new Date(session.expiresAt).getTime() < Date.now())) return invalidate();
+    return session;
+  }
+
   revokeHumanSession(sessionId) {
     if (typeof this.store.deleteHumanSession === 'function') {
       this.store.deleteHumanSession(sessionId);
@@ -428,6 +513,20 @@ export class Source {
     if (!session) return;
     session.revoked = true;
     this.store.writeJson(rel, session);
+  }
+
+  async revokeHumanSessionAsync(sessionId) {
+    if (typeof this.store.deleteHumanSessionAsync === 'function') {
+      await this.store.deleteHumanSessionAsync(sessionId);
+      return;
+    }
+    const rel = this._humanSessionRel(sessionId);
+    const session = typeof this.store.readJsonAsync === 'function'
+      ? await this.store.readJsonAsync(rel)
+      : this.store.readJson(rel);
+    if (!session) return;
+    session.revoked = true;
+    await this._asyncWrite(rel, session);
   }
 
   // --- work -------------------------------------------------------------

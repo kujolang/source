@@ -60,7 +60,15 @@ class PostgresStore {
     this.psqlPath = psql;
     this.projectPrefix = projectPrefix;
     this.connectionOptions = connectionOptions;
-    this.pool = pool || new pg.Pool({ connectionString: dsn, max: connectionOptions.maxConnections || 32 });
+    const poolOptions = { ...connectionOptions };
+    delete poolOptions.env;
+    delete poolOptions.noPassword;
+    delete poolOptions.maxConnections;
+    this.pool = pool || new pg.Pool({
+      connectionString: dsn,
+      ...poolOptions,
+      max: connectionOptions.maxConnections || poolOptions.max || 32,
+    });
     this._asyncTransaction = new AsyncLocalStorage();
     this._txDepth = 0;
 
@@ -908,6 +916,12 @@ class PostgresStore {
     return Buffer.from(row[0].bytes, 'base64');
   }
 
+  async getArtifactAsync(hash) {
+    const rows = await this._runAsync(`SELECT encode(bytes, 'base64') AS bytes FROM ${this._qualified('artifacts')} WHERE hash = ${escapeSqlLiteral(hash)}`);
+    if (!rows[0]?.bytes) return null;
+    return Buffer.from(rows[0].bytes, 'base64');
+  }
+
   audit(entry) {
     const line = { at: nowIso(), ...entry };
     this._run(`INSERT INTO ${this._qualified('audit')} (line) VALUES (${toJson(line)})`);
@@ -987,13 +1001,33 @@ class PostgresStore {
     return session;
   }
 
+  async createHumanSessionRowAsync(principalId, credential, ttlMs = 24 * 60 * 60 * 1000) {
+    const id = randomBytes(24).toString('hex');
+    const now = nowIso();
+    const expiresAt = new Date(Date.now() + ttlMs).toISOString();
+    const session = { id, principalId, credential, createdAt: now, expiresAt };
+    await this._runAsync(`INSERT INTO ${this._qualified('human_sessions')} (id, principal_id, expires_at, json)
+      VALUES (${escapeSqlLiteral(id)}, ${escapeSqlLiteral(principalId)}, ${escapeSqlLiteral(expiresAt)}, ${toJson(session)})
+      ON CONFLICT (id) DO UPDATE SET principal_id = EXCLUDED.principal_id, expires_at = EXCLUDED.expires_at, json = EXCLUDED.json`);
+    return session;
+  }
+
   readHumanSession(sessionId) {
     const row = this._fetchJsonRows(`SELECT json FROM ${this._qualified('human_sessions')} WHERE id = ${escapeSqlLiteral(sessionId)} LIMIT 1`);
     return row[0]?.json || null;
   }
 
+  async readHumanSessionAsync(sessionId) {
+    const rows = await this._runAsync(`SELECT json FROM ${this._qualified('human_sessions')} WHERE id = ${escapeSqlLiteral(sessionId)} LIMIT 1`);
+    return rows[0]?.json || null;
+  }
+
   deleteHumanSession(sessionId) {
     this._run(`DELETE FROM ${this._qualified('human_sessions')} WHERE id = ${escapeSqlLiteral(sessionId)}`);
+  }
+
+  async deleteHumanSessionAsync(sessionId) {
+    await this._runAsync(`DELETE FROM ${this._qualified('human_sessions')} WHERE id = ${escapeSqlLiteral(sessionId)}`);
   }
 
   // Relationship queries (for reporting and authorization auditing).
