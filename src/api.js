@@ -583,9 +583,18 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           if (!(await limiter.allowAsync(`submit:${ip}`, limits.submit))) {
             return json(res, 429, { error: 'rate limit exceeded' });
           }
-          const body = await readBody(req, maxJsonBodyBytes);
-          const r = await src.submitContributionAsync({ orgId, projectId, ...body });
-          return json(res, 201, r);
+          const release = await gitSlots.acquire();
+          if (!release) {
+            req.resume();
+            return json(res, 503, { error: 'Git service busy; retry later' });
+          }
+          try {
+            const body = await readBody(req, maxJsonBodyBytes);
+            const r = await src.submitContributionAsync({ orgId, projectId, ...body });
+            return json(res, 201, r);
+          } finally {
+            release();
+          }
         }
 
         const workMatch = rest.match(/^\/work\/([^/]+)(\/.*)?$/);
@@ -682,8 +691,14 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           if (crest === '/scan' && req.method === 'GET') {
             const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
-            const findings = await src.scanChangeSecretsAsync({ orgId, projectId, changeId });
-            return json(res, 200, { findings });
+            const release = await gitSlots.acquire();
+            if (!release) return json(res, 503, { error: 'Git service busy; retry later' });
+            try {
+              const findings = await src.scanChangeSecretsAsync({ orgId, projectId, changeId });
+              return json(res, 200, { findings });
+            } finally {
+              release();
+            }
           }
 
           if (crest === '/decision' && req.method === 'GET') {

@@ -167,6 +167,35 @@ test('health and readiness endpoints expose process and storage state', async ()
   }
 });
 
+test('Git-backed scan requests honor the shared concurrency budget', async () => {
+  const { src, org, project } = freshSource();
+  const cap = src.capabilities.issue({
+    principalId: 'U1',
+    scope: { org: org.id, project: project.id, work: 'W1' },
+    allowed: ['read_context'],
+  });
+  src.getChangeAsync = async () => ({ workId: 'W1' });
+  let scanStarted;
+  const scanStartedPromise = new Promise((resolve) => { scanStarted = resolve; });
+  src.scanChangeSecretsAsync = async () => {
+    scanStarted();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    return [];
+  };
+  const server = await startServer(src, { port: 0, gitConcurrency: 1, gitQueue: 0 });
+  const url = `http://127.0.0.1:${server.address().port}/api/v1/orgs/${org.id}/projects/${project.id}/changes/C1/scan`;
+  try {
+    const first = fetch(url, { headers: { Authorization: `Bearer ${cap.credential}` } });
+    await scanStartedPromise;
+    const second = await fetch(url, { headers: { Authorization: `Bearer ${cap.credential}` } });
+    assert.equal(second.status, 503);
+    assert.equal((await first).status, 200);
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});
+
 test('Git CGI output is bounded when a caller configures a response cap', async () => {
   const root = mkdtempSync(path.join(tmpdir(), 'source-git-output-cap-'));
   const repo = path.join(root, 'repo.git');
