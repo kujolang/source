@@ -576,13 +576,14 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         }
 
         if (rest === '/jobs' && req.method === 'GET') {
-          const g = await guard(src, req, ACTIONS.read_jobs, { org: orgId, project: projectId });
+          const jobWorkId = url.searchParams.get('work') || null;
+          const g = await guard(src, req, ACTIONS.read_jobs, { org: orgId, project: projectId, work: jobWorkId });
           if (g) return json(res, g.status, g.body);
           const pagination = parseListParams(url);
           const jobs = await src.jobs.list({
             orgId,
             projectId,
-            workId: url.searchParams.get('work') || null,
+            workId: jobWorkId,
             cursor: pagination.cursor,
             limit: pagination.limit ? pagination.limit + 1 : 100,
           });

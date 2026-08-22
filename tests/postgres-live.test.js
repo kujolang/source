@@ -101,6 +101,27 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     const listedResponse = await fetch(`${jobUrl}?limit=2`, { headers: { Authorization: `Bearer ${jobCapability.credential}` } });
     assert.equal(listedResponse.status, 200);
     assert.ok(Array.isArray((await listedResponse.json()).items));
+    const workCapability = await src.capabilities.issueAsync({
+      principalId: principal.id,
+      scope: { org: org.id, project: project.id, work: 'W1' },
+      allowed: ['enqueue_job', 'read_jobs'],
+    });
+    const scopedJob = await fetch(jobUrl, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${workCapability.credential}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'agent.scoped', workId: 'W1', payload: {} }),
+    });
+    assert.equal(scopedJob.status, 202);
+    const scopedJobs = await fetch(`${jobUrl}?work=W1`, { headers: { Authorization: `Bearer ${workCapability.credential}` } });
+    assert.equal(scopedJobs.status, 200);
+    const outOfScopeJobs = await fetch(`${jobUrl}?work=W2`, { headers: { Authorization: `Bearer ${workCapability.credential}` } });
+    assert.equal(outOfScopeJobs.status, 403);
+    const outOfScopeJob = await fetch(jobUrl, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${workCapability.credential}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'agent.scoped', workId: 'W2', payload: {} }),
+    });
+    assert.equal(outOfScopeJob.status, 403);
     const url = `http://127.0.0.1:${server.address().port}/.well-known/source`;
     const responses = await Promise.all(Array.from({ length: 1_000 }, () => fetch(url)));
     assert.ok(responses.every((response) => response.status === 200));
