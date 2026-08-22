@@ -312,8 +312,12 @@ export async function run(argv) {
             const shutdown = async () => {
               if (shuttingDown) return;
               shuttingDown = true;
-              server.closeAllConnections?.();
-              await new Promise((resolve) => server.close(() => resolve()));
+              server.beginDrain?.();
+              server.closeIdleConnections?.();
+              await new Promise((resolve) => {
+                const timer = setTimeout(() => server.closeAllConnections?.(), 30_000);
+                server.close(() => { clearTimeout(timer); resolve(); });
+              });
               await src.store.closeAsync?.();
             };
             for (const signal of ['SIGTERM', 'SIGINT']) {

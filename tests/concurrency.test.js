@@ -161,6 +161,10 @@ test('health and readiness endpoints expose process and storage state', async ()
   try {
     assert.equal((await fetch(`${base}/healthz`)).status, 200);
     assert.equal((await fetch(`${base}/readyz`)).status, 200);
+    server.beginDrain();
+    assert.equal((await fetch(`${base}/readyz`)).status, 503);
+    assert.equal((await fetch(`${base}/healthz`)).status, 200);
+    assert.equal((await fetch(`${base}/.well-known/source`)).status, 503);
   } finally {
     server.closeAllConnections?.();
     server.close();

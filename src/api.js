@@ -261,6 +261,9 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
     const fields = url.searchParams.get('fields') || undefined;
 
     try {
+      if (server.draining && pathname !== '/healthz' && pathname !== '/readyz') {
+        return json(res, 503, { error: 'server is draining' });
+      }
       // --- login ---------------------------------------------------------
       if (req.method === 'GET' && pathname === '/login') {
         return loginPage(res, 200);
@@ -340,6 +343,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
       }
 
       if (req.method === 'GET' && pathname === '/readyz') {
+        if (server.draining) return json(res, 503, { status: 'not_ready', reason: 'server is draining' });
         try {
           const instance = await src.getInstanceAsync();
           if (!instance) return json(res, 503, { status: 'not_ready', reason: 'instance not initialized' });
@@ -793,6 +797,8 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
   };
 
   const server = tls ? https.createServer(tls, handler) : http.createServer(handler);
+  server.draining = false;
+  server.beginDrain = () => { server.draining = true; };
   server.requestTimeout = 120_000;
   server.headersTimeout = 15_000;
   server.keepAliveTimeout = 5_000;
