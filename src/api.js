@@ -28,6 +28,7 @@ import { renderOrgIndex, renderIndex, renderProject, renderWork, renderChange, r
 import { gitHttpBackend } from './git-http.js';
 import { ACTIONS, authorizeRequest, authorizeGit, bearerCredential } from './auth.js';
 import { RateLimiter } from './ratelimit.js';
+import { Semaphore } from './concurrency.js';
 
 function json(res, status, obj) {
   const body = JSON.stringify(obj);
@@ -52,9 +53,9 @@ function readText(req, maxBytes = 1_000_000) {
   });
 }
 
-function readBody(req) {
+function readBody(req, maxBytes = 1_000_000) {
   return new Promise((resolve, reject) => {
-    readText(req)
+    readText(req, maxBytes)
       .then((data) => {
         try {
           resolve(data ? JSON.parse(data) : {});
@@ -200,8 +201,9 @@ function changeWork(src, orgId, projectId, changeId) {
   return c ? c.workId : undefined;
 }
 
-export function createServer(src, { port = 8787, tls, host, rateLimit = {} } = {}) {
-  const limiter = new RateLimiter();
+export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxGitBodyBytes = 100_000_000, gitConcurrency = 32, gitQueue = 256, maxConnections = 10_000 } = {}) {
+  const limiter = new RateLimiter({ maxKeys: rateLimit.maxKeys || 100_000, store: rateLimit.store || src.store });
+  const gitSlots = new Semaphore({ capacity: gitConcurrency, queue: gitQueue });
   const limits = {
     submit: { limit: 10, windowMs: 60_000, ...(rateLimit.submit || {}) },
     gitPush: { limit: 30, windowMs: 60_000, ...(rateLimit.gitPush || {}) },
@@ -373,11 +375,18 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {} } = {
           isWrite,
         });
         if (!auth.ok) return gitAuthError(res, auth.status, auth.error);
+        const declaredLength = Number(req.headers['content-length']);
+        if (Number.isFinite(declaredLength) && declaredLength > maxGitBodyBytes) {
+          return gitAuthError(res, 413, 'request body too large');
+        }
 
+        const release = await gitSlots.acquire();
+        if (!release) return gitAuthError(res, 503, 'Git service busy; retry later');
         let body = null;
-        if (req.method === 'POST') body = await readRawBody(req);
+        try {
+          if (req.method === 'POST') body = await readRawBody(req, maxGitBodyBytes);
 
-        const result = await gitHttpBackend({
+          const result = await gitHttpBackend({
           projectRoot: src.reposRoot(orgId, projectId),
           pathInfo: `/${repo.id}.git${rest}`,
           queryString: url.search ? url.search.slice(1) : '',
@@ -387,14 +396,17 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {} } = {
           remoteUser: auth.remoteUser,
           remoteAddr: req.socket.remoteAddress || '',
           headers: req.headers,
-        });
+          });
 
-        const headers = { ...result.headers };
-        if (result.body && result.body.length && !headers['content-length']) {
-          headers['Content-Length'] = String(result.body.length);
+          const headers = { ...result.headers };
+          if (result.body && result.body.length && !headers['content-length']) {
+            headers['Content-Length'] = String(result.body.length);
+          }
+          res.writeHead(result.status, headers);
+          return res.end(result.body);
+        } finally {
+          release();
         }
-        res.writeHead(result.status, headers);
-        return res.end(result.body);
       }
 
       // --- organizations (tenant boundary) --------------------------------
@@ -410,7 +422,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {} } = {
       if (pathname === '/api/v1/orgs' && req.method === 'POST') {
         const g = guard(src, req, ACTIONS.manage_org, {});
         if (g) return json(res, g.status, g.body);
-        const body = await readBody(req);
+        const body = await readBody(req, maxJsonBodyBytes);
         const org = src.createOrg({ name: body.name, slug: body.slug });
         return json(res, 201, org);
       }
@@ -474,7 +486,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {} } = {
           if (!limiter.allow(`submit:${ip}`, limits.submit)) {
             return json(res, 429, { error: 'rate limit exceeded' });
           }
-          const body = await readBody(req);
+          const body = await readBody(req, maxJsonBodyBytes);
           const r = src.submitContribution({ orgId, projectId, ...body });
           return json(res, 201, r);
         }
@@ -495,7 +507,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {} } = {
           if (wrest === '/claim' && req.method === 'POST') {
             const g = guard(src, req, ACTIONS.claim_work, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
-            const body = await readBody(req);
+            const body = await readBody(req, maxJsonBodyBytes);
             const w = src.claimWork({ orgId, projectId, workId, principalId: body.principalId });
             return json(res, 200, w);
           }
@@ -507,7 +519,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {} } = {
             }
             const g = guard(src, req, ACTIONS.start_session, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
-            const body = await readBody(req);
+            const body = await readBody(req, maxJsonBodyBytes);
             const s = src.startSession({ orgId, projectId, workId, principalId: body.principalId, environment: body.environment, baseCommit: body.baseCommit });
             // Issue a session-scoped capability (temporary session identity):
             // bounded to this org/project/work, expiring, denied accept/policy.
@@ -535,7 +547,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {} } = {
           if (wrest === '/changes' && req.method === 'POST') {
             const g = guard(src, req, ACTIONS.submit_change, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
-            const body = await readBody(req);
+            const body = await readBody(req, maxJsonBodyBytes);
             const c = src.submitChange({ orgId, projectId, workId, sessionId: body.sessionId, baseCommit: body.baseCommit, headCommit: body.headCommit, repositories: body.repositories, repositoryChanges: body.repositoryChanges });
             return json(res, 201, c);
           }
@@ -558,7 +570,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {} } = {
           if (crest === '/evidence' && req.method === 'POST') {
             const g = guard(src, req, ACTIONS.submit_evidence, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
-            const body = await readBody(req);
+            const body = await readBody(req, maxJsonBodyBytes);
             const e = src.addEvidence({ orgId, projectId, changeId, ...body });
             return json(res, 201, e);
           }
@@ -589,7 +601,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {} } = {
           if (crest === '/decision' && req.method === 'POST') {
             const g = guard(src, req, ACTIONS.accept_change, { org: orgId, project: projectId });
             if (g) return json(res, g.status, g.body);
-            const body = await readBody(req);
+            const body = await readBody(req, maxJsonBodyBytes);
             const d = src.makeDecision({ orgId, projectId, changeId, decision: body.decision, decider: body.decider, reasoning: body.reasoning });
             return json(res, 201, d);
           }
@@ -626,6 +638,10 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {} } = {
   };
 
   const server = tls ? https.createServer(tls, handler) : http.createServer(handler);
+  server.requestTimeout = 120_000;
+  server.headersTimeout = 15_000;
+  server.keepAliveTimeout = 5_000;
+  server.maxConnections = maxConnections;
   return server;
 }
 

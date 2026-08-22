@@ -21,6 +21,7 @@ const PREFIXES = {
 export function nextId(store, kind) {
   const prefix = PREFIXES[kind];
   if (!prefix) throw new Error(`unknown id kind: ${kind}`);
+  if (typeof store.nextId === 'function') return store.nextId(kind, prefix);
   const key = `counter:${kind}`;
   const current = store.getMeta(key) ?? 0;
   const next = current + 1;

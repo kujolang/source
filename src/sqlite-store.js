@@ -38,6 +38,11 @@ export class SqliteStore {
         seq INTEGER PRIMARY KEY AUTOINCREMENT,
         line TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS rate_limits (
+        key TEXT PRIMARY KEY,
+        count INTEGER NOT NULL,
+        reset_at INTEGER NOT NULL
+      );
     `);
   }
 
@@ -89,6 +94,28 @@ export class SqliteStore {
     this.db
       .prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
       .run(key, JSON.stringify(value));
+  }
+
+  // Atomic counter allocation for concurrent API writers.
+  nextId(kind, prefix) {
+    const key = `counter:${kind}`;
+    const row = this.db.prepare(`
+      INSERT INTO meta (key, value) VALUES (?, '1')
+      ON CONFLICT(key) DO UPDATE SET value = CAST(CAST(meta.value AS INTEGER) + 1 AS TEXT)
+      RETURNING value
+    `).get(key);
+    return `${prefix}${Number(row.value)}`;
+  }
+
+  allowRateLimit(key, limit, windowMs, now = Date.now()) {
+    const row = this.db.prepare(`
+      INSERT INTO rate_limits (key, count, reset_at) VALUES (?, 1, ?)
+      ON CONFLICT(key) DO UPDATE SET
+        count = CASE WHEN ? >= rate_limits.reset_at THEN 1 ELSE rate_limits.count + 1 END,
+        reset_at = CASE WHEN ? >= rate_limits.reset_at THEN ? ELSE rate_limits.reset_at END
+      RETURNING count
+    `).get(key, now + windowMs, now, now, now + windowMs);
+    return Number(row.count) <= limit;
   }
 
   // --- content-addressed artifacts ----------------------------------------

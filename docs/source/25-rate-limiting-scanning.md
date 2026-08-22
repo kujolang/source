@@ -14,6 +14,9 @@ unauthenticated paths that could otherwise be abused for denial of service:
   address.
 
 Limits and windows are configurable per route via `createServer(src, { rateLimit })`.
+When the selected store implements durable rate limiting (SQLite or Postgres),
+the counters are shared across server processes. The JSON store falls back to a
+bounded in-memory limiter and is suitable only for a single process.
 Exceeding the limit returns `429`. The limiter is keyed by client address and
 is per-process (in-memory); a shared/Redis-backed limiter is a later concern
 for horizontally-scaled deployments.

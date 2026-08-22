@@ -75,6 +75,13 @@ git clone http://source:<credential>@localhost:8787/git/O1/P1/R1.git
 node bin/source.js submit --url http://localhost:8787 --credential <credential>
 ```
 
+The server applies bounded resource controls by default: JSON requests are
+limited to 1 MiB, Git request bodies to 100 MiB, Git CGI subprocesses to 32
+active requests with a 256-request queue, and connections to 10,000. Override
+these through `startServer`/`createServer` options for a deployment sized to its
+CPU, memory, and Git workload. For multi-process deployments use SQLite or
+Postgres for durable coordination; the JSON backend is single-process only.
+
 The machine interface (`/api/v1/…`) is capability-gated: send
 `Authorization: Bearer <credential>` on every request. The Git transport
 (`/git/…`) is capability-gated via HTTP Basic auth: public repos allow anonymous

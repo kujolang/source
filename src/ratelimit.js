@@ -7,14 +7,26 @@
 // and windows are configurable per route.
 
 export class RateLimiter {
-  constructor() {
+  constructor({ maxKeys = 100_000, store = null } = {}) {
     this.buckets = new Map(); // key -> { count, resetAt }
+    this.maxKeys = maxKeys;
+    this.store = store;
   }
 
   // Fixed-window counter. Returns true if the request is allowed, false if the
   // key has exceeded `limit` within the current `windowMs` window.
   allow(key, { limit, windowMs }) {
     const now = Date.now();
+    if (this.store && typeof this.store.allowRateLimit === 'function') {
+      return this.store.allowRateLimit(key, limit, windowMs, now);
+    }
+    if (this.buckets.size >= this.maxKeys && !this.buckets.has(key)) {
+      for (const [candidate, bucket] of this.buckets) {
+        if (now >= bucket.resetAt) this.buckets.delete(candidate);
+        if (this.buckets.size < this.maxKeys) break;
+      }
+      if (this.buckets.size >= this.maxKeys) return false;
+    }
     let b = this.buckets.get(key);
     if (!b || now >= b.resetAt) {
       b = { count: 0, resetAt: now + windowMs };

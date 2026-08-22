@@ -279,8 +279,21 @@ export async function run(argv) {
           tls = { key: readFileSync(tlsKey), cert: readFileSync(tlsCert) };
         }
         const host = flag('--host');
+        const numberFlag = (name, fallback) => {
+          const value = Number(flag(name));
+          return Number.isFinite(value) && value > 0 ? value : fallback;
+        };
         import('./api.js')
-          .then(({ startServer }) => startServer(src, { port: Number(flag('--port') || 8787), tls, host }))
+          .then(({ startServer }) => startServer(src, {
+            port: Number(flag('--port') || 8787),
+            tls,
+            host,
+            gitConcurrency: numberFlag('--git-concurrency', 32),
+            gitQueue: numberFlag('--git-queue', 256),
+            maxConnections: numberFlag('--max-connections', 10_000),
+            maxGitBodyBytes: numberFlag('--max-git-body', 100_000_000),
+            maxJsonBodyBytes: numberFlag('--max-json-body', 1_000_000),
+          }))
           .then((server) => {
             const scheme = tls ? 'https' : 'http';
             const addr = server.address();
@@ -334,7 +347,7 @@ export async function run(argv) {
           '  decision accept|reject|request-revision --org <o> --project <p>',
           '  policy show --org <o> --project <p>',
           '  audit',
-          '  serve --port <n> [--host <addr>] [--tls-key <pem> --tls-cert <pem>]',
+          '  serve --port <n> [--host <addr>] [--git-concurrency <n>] [--git-queue <n>] [--max-connections <n>]',
           '  submit [--intent <s>] [--url <base>] [--credential <c>] [--cwd <dir>]',
           '',
           'Env: SOURCE_DATA (default .source), SOURCE_STORE (json|sqlite|postgres)',

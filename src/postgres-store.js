@@ -292,6 +292,14 @@ class PostgresStore {
       )
     `);
 
+    this._run(`
+      CREATE TABLE IF NOT EXISTS ${this._qualified('rate_limits')} (
+        key TEXT PRIMARY KEY,
+        count BIGINT NOT NULL,
+        reset_at BIGINT NOT NULL
+      )
+    `);
+
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_records_path`)} ON ${this._qualified('records')} (path)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_evidence_project`)} ON ${this._qualified('evidence')} (org_id, project_id)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_changes_work`)} ON ${this._qualified('changes')} (org_id, project_id, work_id)`);
@@ -637,6 +645,30 @@ class PostgresStore {
     this._run(`INSERT INTO ${this._qualified('meta')} (key, value)
       VALUES (${escapeSqlLiteral(key)}, ${toJson(value)})
       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`);
+  }
+
+  // Atomic counter allocation for concurrent API writers.
+  nextId(kind, prefix) {
+    const key = `counter:${kind}`;
+    const value = this._run(`
+      INSERT INTO ${this._qualified('meta')} (key, value)
+      VALUES (${escapeSqlLiteral(key)}, '1'::jsonb)
+      ON CONFLICT (key) DO UPDATE SET value = to_jsonb(((value)::text)::bigint + 1)
+      RETURNING value
+    `);
+    return `${prefix}${Number(JSON.parse(value))}`;
+  }
+
+  allowRateLimit(key, limit, windowMs, now = Date.now()) {
+    const out = this._run(`
+      INSERT INTO ${this._qualified('rate_limits')} (key, count, reset_at)
+      VALUES (${escapeSqlLiteral(key)}, 1, ${escapeSqlLiteral(now + windowMs)})
+      ON CONFLICT (key) DO UPDATE SET
+        count = CASE WHEN ${escapeSqlLiteral(now)} >= ${this._qualified('rate_limits')}.reset_at THEN 1 ELSE ${this._qualified('rate_limits')}.count + 1 END,
+        reset_at = CASE WHEN ${escapeSqlLiteral(now)} >= ${this._qualified('rate_limits')}.reset_at THEN ${escapeSqlLiteral(now + windowMs)} ELSE ${this._qualified('rate_limits')}.reset_at END
+      RETURNING count
+    `);
+    return Number(out) <= limit;
   }
 
   putArtifact(bytes) {

@@ -44,29 +44,29 @@ boundaries required for later scaling.
 | Concern | Choice | Classification | Rationale |
 |---|---|---|---|
 | Language | **Node.js (JavaScript, ESM)** | Evidence-backed | Runnable and testable in this environment (`npm`/`node` v23 available); mature `child_process` git integration; zero-dependency possible; portable and self-hostable. Alternatives: Kujo (ecosystem language, but runtime not executable in the build environment and Source is a standalone product, not a Kujo feature); Go/Rust (not runnable here). |
-| Database | **JSON files on disk (MVP)** | Implementation hypothesis | Matches the Kujo ecosystem's "plain JSON, inspectable" philosophy; zero deps; atomic writes. Swappable for SQLite/Postgres behind the `storage` boundary. |
+| Database | **SQLite or Postgres for production; JSON for local single-process use** | Evidence-backed boundary | SQLite WAL and Postgres provide durable transactions and atomic ID allocation. JSON remains inspectable but is explicitly not a multi-process production backend. |
 | Git server | **`git` CLI via `child_process`, bare repos** | Evidence-backed | Git remains authoritative; no packfile/network reimplementation. Smart-HTTP and `file://`/local transport for MVP. |
 | Artifact storage | **Filesystem, content-addressed by SHA-256** | Evidence-backed | Immutable artifacts keyed by hash; provenance links to source revision. |
 | API | **HTTP + JSON (REST-shaped), discovery endpoint** | Evidence-backed | Compact, cacheable, content-negotiable; `/.well-known/source` for agent discovery. |
 | Frontend | **Static HTML + vanilla JS** | Implementation hypothesis | MVP needs enough UI to understand a Change; no framework. |
-| Events | **In-process synchronous dispatch** | Implementation hypothesis | No queue in MVP; event log is append-only and replayable. |
+| Events | **Bounded in-process request work; external queue is the production scale-out seam** | Implementation hypothesis | Git subprocesses and request bodies are bounded in-process. Durable workflows and fan-out still require a queue/worker deployment for thousands of agents. |
 | Identity | **Principal records + opaque capability tokens (HMAC-signed)** | Evidence-backed | No custom cryptography; Node `crypto` HMAC-SHA256 for capability tokens. |
 | Crypto | **Node built-in `crypto`** | Evidence-backed | SHA-256 hashing, HMAC signing, `randomBytes` for tokens. No custom primitives. |
 
 ## Explicitly deferred (not over-engineered in MVP)
 
-- Message queue / async job execution (in-process now).
-- SQL/Postgres (JSON store now, behind a boundary).
+- Durable message queue / async job execution (bounded in-process now; required for large deployments).
+- Multi-region replication and object storage for Git/artifacts.
 - Distributed replication / geographic scaling.
 - Full SaaS control plane / billing.
 - Plugin marketplace.
 
 ## Why a modular monolith
 
-The MEGA_PROMPT prefers a modular monolith over distributed complexity "unless
-evidence demonstrates otherwise." No evidence here demands distribution: the
-MVP is single-tenant-scale, and every boundary above is a clean seam that can
-be split later (storage → DB, events → queue, git → separate service).
+The bounded monolith is suitable for a single deployment unit, but thousands of
+agents require SQLite/Postgres, a queue-backed worker plane, shared artifact
+storage, and horizontally sharded Git hosting. The storage, events, and Git
+boundaries above are the explicit split seams.
 
 ## Cross-references
 
