@@ -3,7 +3,7 @@
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class SourceWorker {
-  constructor({ queue, handlers = {}, workerId, concurrency = 8, leaseMs = 30_000, pollMs = 1_000, maxAttempts = 5 } = {}) {
+  constructor({ queue, handlers = {}, workerId, concurrency = 8, leaseMs = 30_000, pollMs = 1_000, retryDelayMs = 1_000, maxAttempts = 5 } = {}) {
     if (!queue) throw new Error('queue is required');
     if (!workerId) throw new Error('workerId is required');
     this.queue = queue;
@@ -12,6 +12,7 @@ export class SourceWorker {
     this.concurrency = Math.min(1000, Math.max(1, Math.trunc(concurrency)));
     this.leaseMs = Math.max(1, Math.trunc(leaseMs));
     this.pollMs = Math.max(1, Math.trunc(pollMs));
+    this.retryDelayMs = Math.max(0, Math.trunc(retryDelayMs));
     this.maxAttempts = Math.max(1, Math.trunc(maxAttempts));
     this.stopping = false;
     this.running = null;
@@ -56,6 +57,7 @@ export class SourceWorker {
         id: job.id,
         workerId: this.workerId,
         error: error instanceof Error ? error.message : String(error),
+        retryDelayMs: this.retryDelayMs,
         maxAttempts: this.maxAttempts,
       });
     } finally {

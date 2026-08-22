@@ -7,6 +7,7 @@ import path from 'node:path';
 import { PostgresStore } from '../src/postgres-store.js';
 import { Source } from '../src/source.js';
 import { startServer } from '../src/api.js';
+import { SourceWorker } from '../src/worker.js';
 
 const dsn = process.env.SOURCE_TEST_DATABASE_URL;
 
@@ -41,6 +42,35 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     const recovered = (await src.jobs.claim({ workerId: 'recovery-worker', limit: 1, leaseMs: 5_000 }))[0];
     assert.equal(recovered.id, leaseJob.id);
     await src.jobs.complete({ id: recovered.id, workerId: 'recovery-worker', result: { recovered: true } });
+
+    let handled = 0;
+    let retryAttempts = 0;
+    await Promise.all(Array.from({ length: 100 }, (_, i) => src.jobs.enqueue({ kind: 'agent.worker', payload: { index: i } })));
+    await src.jobs.enqueue({ kind: 'agent.retry', payload: {} });
+    const worker = new SourceWorker({
+      queue: src.jobs,
+      workerId: 'live-worker',
+      concurrency: 8,
+      pollMs: 2,
+      leaseMs: 5_000,
+      retryDelayMs: 5,
+      handlers: {
+        'agent.worker': async () => { handled += 1; },
+        'agent.retry': async () => {
+          retryAttempts += 1;
+          if (retryAttempts === 1) throw new Error('transient');
+          return { retried: true };
+        },
+      },
+    });
+    worker.start();
+    const deadline = Date.now() + 5_000;
+    while ((handled < 100 || retryAttempts < 2) && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    await worker.stop();
+    assert.equal(handled, 100);
+    assert.equal(retryAttempts, 2);
 
     server = await startServer(src, { port: 0, maxConnections: 2_000 });
     const url = `http://127.0.0.1:${server.address().port}/.well-known/source`;
