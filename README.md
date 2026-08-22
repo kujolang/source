@@ -116,6 +116,9 @@ Postgres-backed workers can claim deferred jobs through `src/job-queue.js`.
 Claims use row locking with `SKIP LOCKED`; expired leases are reclaimable and
 failed jobs can be retried with bounded attempts. This is the worker-plane seam
 for batch workflows that should not run inside request handlers.
+Workers back off and report transient queue/database failures instead of
+terminating, while leases allow abandoned jobs to be recovered by another
+worker.
 
 Workers register handlers by job kind and can run as separate processes:
 

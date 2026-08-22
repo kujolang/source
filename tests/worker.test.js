@@ -61,3 +61,34 @@ test('worker routes handler failures to retry/failure state', async () => {
   assert.match(failure.error, /no handler registered/);
   assert.equal(failure.workerId, 'worker-2');
 });
+
+test('worker survives transient queue outages and reports errors', async () => {
+  let claimAttempts = 0;
+  let completed = false;
+  const errors = [];
+  const queue = {
+    async claim() {
+      claimAttempts += 1;
+      if (claimAttempts < 3) throw new Error('database unavailable');
+      if (completed) return [];
+      return [{ id: 'J-recovered', kind: 'recover', payload: {} }];
+    },
+    async complete() { completed = true; },
+    async fail() { assert.fail('unexpected failure'); },
+    async extend() { return true; },
+  };
+  const worker = new SourceWorker({
+    queue,
+    workerId: 'worker-recovery',
+    pollMs: 1,
+    errorBackoffMs: 1,
+    onError: (error) => errors.push(error.message),
+    handlers: { recover: async () => {} },
+  });
+  worker.start();
+  await waitFor(() => completed);
+  await worker.stop();
+  assert.equal(claimAttempts >= 3, true);
+  assert.deepEqual(errors, ['database unavailable', 'database unavailable']);
+  assert.equal(worker.lastError.message, 'database unavailable');
+});
