@@ -243,8 +243,9 @@ never a control.
 - **Preventive:** size limits, rate limits (submit + git push), timeouts.
 - **Detective:** observability.
 - **Recovery:** restart; scale.
-- **Remaining risk:** the rate limiter is per-process (in-memory); a shared
-  limiter is needed for horizontally-scaled deployments.
+- **Remaining risk:** the JSON development backend is per-process; production
+  deployments must use Postgres for shared rate-limit state. Distributed
+  edge-level throttling and reputation controls remain deployment concerns.
 
 ### T24 — Destructive Git operations
 - **Asset:** source. **Attacker:** principal with write.

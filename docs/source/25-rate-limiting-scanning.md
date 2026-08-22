@@ -20,8 +20,10 @@ an asynchronous `psql` update, while the legacy synchronous store contract
 remains available to CLI and compatibility callers. The JSON store falls back
 to a bounded in-memory limiter and is suitable only for a single process.
 Exceeding the limit returns `429`. The limiter is keyed by client address and
-is per-process (in-memory); a shared/Redis-backed limiter is a later concern
-for horizontally-scaled deployments.
+is shared across serving processes when Postgres is selected. Expired Postgres
+buckets are periodically pruned through an indexed expiry path so unique
+clients cannot grow the table without bound. The JSON fallback remains
+single-process only.
 
 ## Credential scanning
 
