@@ -164,6 +164,11 @@ test('health and readiness endpoints expose process and storage state', async ()
     const metricResponse = await fetch(`${base}/metrics`);
     assert.equal(metricResponse.status, 200);
     assert.match(await metricResponse.text(), /source_requests_total/);
+    src.store.poolStats = () => ({ total: 8, idle: 3, waiting: 2, fallbackActive: 1 });
+    const poolMetricResponse = await fetch(`${base}/metrics`);
+    const poolMetrics = await poolMetricResponse.text();
+    assert.match(poolMetrics, /source_postgres_pool_connections 8/);
+    assert.match(poolMetrics, /source_postgres_pool_waiting 2/);
     src.store.checkHealthAsync = async () => { throw new Error('database unavailable'); };
     assert.equal((await fetch(`${base}/readyz`)).status, 503);
     delete src.store.checkHealthAsync;

@@ -36,7 +36,7 @@ function json(res, status, obj) {
   res.end(body);
 }
 
-function metrics(res, state) {
+function metrics(res, state, src) {
   const lines = [
     '# HELP source_requests_total Total HTTP requests received.',
     '# TYPE source_requests_total counter',
@@ -51,6 +51,23 @@ function metrics(res, state) {
     '# TYPE source_aborted_requests_total counter',
     `source_aborted_requests_total ${state.abortedRequests}`,
   ];
+  const pool = typeof src?.store?.poolStats === 'function' ? src.store.poolStats() : null;
+  if (pool) {
+    lines.push(
+      '# HELP source_postgres_pool_connections Current total Postgres pool connections.',
+      '# TYPE source_postgres_pool_connections gauge',
+      `source_postgres_pool_connections ${pool.total}`,
+      '# HELP source_postgres_pool_idle Current idle Postgres pool connections.',
+      '# TYPE source_postgres_pool_idle gauge',
+      `source_postgres_pool_idle ${pool.idle}`,
+      '# HELP source_postgres_pool_waiting Current requests waiting for a Postgres connection.',
+      '# TYPE source_postgres_pool_waiting gauge',
+      `source_postgres_pool_waiting ${pool.waiting}`,
+      '# HELP source_postgres_fallback_active Current legacy psql fallback processes.',
+      '# TYPE source_postgres_fallback_active gauge',
+      `source_postgres_fallback_active ${pool.fallbackActive}`,
+    );
+  }
   for (const [status, count] of state.statuses) lines.push(`source_responses_by_status_total{status="${status}"} ${count}`);
   const body = `${lines.join('\n')}\n`;
   res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4', 'Content-Length': Buffer.byteLength(body) });
@@ -302,7 +319,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
     const fields = url.searchParams.get('fields') || undefined;
 
     try {
-      if (req.method === 'GET' && pathname === '/metrics') return metrics(res, state);
+      if (req.method === 'GET' && pathname === '/metrics') return metrics(res, state, src);
       if (server.draining && pathname !== '/healthz' && pathname !== '/readyz') {
         return json(res, 503, { error: 'server is draining' });
       }

@@ -1211,6 +1211,15 @@ class PostgresStore {
     return true;
   }
 
+  poolStats() {
+    return {
+      total: Number(this.pool.totalCount || 0),
+      idle: Number(this.pool.idleCount || 0),
+      waiting: Number(this.pool.waitingCount || 0),
+      fallbackActive: this._fallbackActive,
+    };
+  }
+
   createHumanSessionRow(principalId, credential, ttlMs = 24 * 60 * 60 * 1000) {
     const id = randomBytes(24).toString('hex');
     const now = nowIso();
