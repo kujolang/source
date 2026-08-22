@@ -224,7 +224,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
 
       if (req.method === 'POST' && pathname === '/login') {
         const ip = req.socket.remoteAddress || 'unknown';
-        if (!limiter.allow(`login:${ip}`, limits.login)) {
+        if (!(await limiter.allowAsync(`login:${ip}`, limits.login))) {
           if (wantsJson(req)) return json(res, 429, { error: 'rate limit exceeded' });
           return loginPage(res, 429, 'rate limit exceeded');
         }
@@ -363,7 +363,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         // Rate-limit the write path (push) by client address.
         if (isWrite) {
           const ip = req.socket.remoteAddress || 'unknown';
-          if (!limiter.allow(`gitpush:${ip}`, limits.gitPush)) {
+          if (!(await limiter.allowAsync(`gitpush:${ip}`, limits.gitPush))) {
             return gitAuthError(res, 429, 'rate limit exceeded');
           }
         }
@@ -502,7 +502,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         // rate-limited by client address.
         if (rest === '/submit' && req.method === 'POST') {
           const ip = req.socket.remoteAddress || 'unknown';
-          if (!limiter.allow(`submit:${ip}`, limits.submit)) {
+          if (!(await limiter.allowAsync(`submit:${ip}`, limits.submit))) {
             return json(res, 429, { error: 'rate limit exceeded' });
           }
           const body = await readBody(req, maxJsonBodyBytes);
@@ -533,7 +533,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
 
           if (wrest === '/sessions' && req.method === 'POST') {
             const ip = req.socket.remoteAddress || 'unknown';
-            if (!limiter.allow(`session:${ip}`, limits.session)) {
+            if (!(await limiter.allowAsync(`session:${ip}`, limits.session))) {
               return json(res, 429, { error: 'rate limit exceeded' });
             }
             const g = guard(src, req, ACTIONS.start_session, { org: orgId, project: projectId, work: workId });

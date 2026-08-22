@@ -20,6 +20,21 @@ export class RateLimiter {
     if (this.store && typeof this.store.allowRateLimit === 'function') {
       return this.store.allowRateLimit(key, limit, windowMs, now);
     }
+    return this._allowInMemory(key, limit, windowMs, now);
+  }
+
+  async allowAsync(key, { limit, windowMs }) {
+    const now = Date.now();
+    if (this.store && typeof this.store.allowRateLimitAsync === 'function') {
+      return this.store.allowRateLimitAsync(key, limit, windowMs, now);
+    }
+    if (this.store && typeof this.store.allowRateLimit === 'function') {
+      return this.store.allowRateLimit(key, limit, windowMs, now);
+    }
+    return this._allowInMemory(key, limit, windowMs, now);
+  }
+
+  _allowInMemory(key, limit, windowMs, now) {
     if (this.buckets.size >= this.maxKeys && !this.buckets.has(key)) {
       for (const [candidate, bucket] of this.buckets) {
         if (now >= bucket.resetAt) this.buckets.delete(candidate);

@@ -5,7 +5,7 @@ rate-limited, and submitted Changes are scanned for credentials.
 
 ## Rate limiting
 
-A fixed-window, in-memory rate limiter (`src/ratelimit.js`) throttles the two
+A fixed-window rate limiter (`src/ratelimit.js`) throttles the two
 unauthenticated paths that could otherwise be abused for denial of service:
 
 - **`source submit`** (`POST /api/v1/orgs/{org}/projects/{project}/submit`) —
@@ -15,8 +15,10 @@ unauthenticated paths that could otherwise be abused for denial of service:
 
 Limits and windows are configurable per route via `createServer(src, { rateLimit })`.
 When the selected store implements durable rate limiting (SQLite or Postgres),
-the counters are shared across server processes. The JSON store falls back to a
-bounded in-memory limiter and is suitable only for a single process.
+the counters are shared across server processes. The Postgres request path uses
+an asynchronous `psql` update, while the legacy synchronous store contract
+remains available to CLI and compatibility callers. The JSON store falls back
+to a bounded in-memory limiter and is suitable only for a single process.
 Exceeding the limit returns `429`. The limiter is keyed by client address and
 is per-process (in-memory); a shared/Redis-backed limiter is a later concern
 for horizontally-scaled deployments.

@@ -35,6 +35,24 @@ test('RateLimiter evicts expired keys and caps memory growth', () => {
   assert.equal(limiter.allow('c', { limit: 1, windowMs: 60_000 }), false);
 });
 
+test('RateLimiter async path delegates to an async durable store', async () => {
+  let syncCalls = 0;
+  const limiter = new RateLimiter({
+    store: {
+      allowRateLimit() {
+        syncCalls += 1;
+        throw new Error('sync store path used');
+      },
+      async allowRateLimitAsync() {
+        await new Promise((resolve) => setImmediate(resolve));
+        return true;
+      },
+    },
+  });
+  assert.equal(await limiter.allowAsync('agent:async', { limit: 1, windowMs: 1000 }), true);
+  assert.equal(syncCalls, 0);
+});
+
 test('SQLite counter allocation returns unique monotonic IDs', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'source-counter-'));
   const store = new SqliteStore(root);

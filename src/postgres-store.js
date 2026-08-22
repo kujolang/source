@@ -5,11 +5,15 @@
 // `Work`, `Change`, `Evidence`, `Decision`, and `Principal` are also stored in
 // normalized tables with foreign keys and join-ready junctions.
 //
-// Synchronous execution is preserved (legacy with `psql`, aligned with the
-// rest of the codebase). No third-party dependency is added.
+// Synchronous execution is preserved for the legacy store contract. Hot
+// request-path rate-limit updates also expose an async `psql` seam so durable
+// throttling does not block the Node event loop.
 
 import { createHash, randomBytes } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 
 function escapeSqlLiteral(value) {
   if (value === null || value === undefined) return 'NULL';
@@ -63,6 +67,17 @@ class PostgresStore {
   }
 
   _run(sql) {
+    const args = this._psqlArgs(sql);
+
+    const result = execFileSync(this.psqlPath, args, {
+      encoding: 'utf8',
+      env: { ...process.env, ...(this.connectionOptions.env || {}) },
+    });
+
+    return String(result || '').replace(/\r/g, '').trim();
+  }
+
+  _psqlArgs(sql) {
     const args = [
       '-X',
       '-A',
@@ -82,12 +97,16 @@ class PostgresStore {
       args.unshift('--no-password');
     }
 
-    const result = execFileSync(this.psqlPath, args, {
+    return args;
+  }
+
+  async _runAsync(sql) {
+    const { stdout } = await execFileAsync(this.psqlPath, this._psqlArgs(sql), {
       encoding: 'utf8',
+      maxBuffer: 8 * 1024 * 1024,
       env: { ...process.env, ...(this.connectionOptions.env || {}) },
     });
-
-    return String(result || '').replace(/\r/g, '').trim();
+    return String(stdout || '').replace(/\r/g, '').trim();
   }
 
   _fetchJsonRows(sql) {
@@ -661,6 +680,20 @@ class PostgresStore {
 
   allowRateLimit(key, limit, windowMs, now = Date.now()) {
     const out = this._run(`
+      INSERT INTO ${this._qualified('rate_limits')} (key, count, reset_at)
+      VALUES (${escapeSqlLiteral(key)}, 1, ${escapeSqlLiteral(now + windowMs)})
+      ON CONFLICT (key) DO UPDATE SET
+        count = CASE WHEN ${escapeSqlLiteral(now)} >= ${this._qualified('rate_limits')}.reset_at THEN 1 ELSE ${this._qualified('rate_limits')}.count + 1 END,
+        reset_at = CASE WHEN ${escapeSqlLiteral(now)} >= ${this._qualified('rate_limits')}.reset_at THEN ${escapeSqlLiteral(now + windowMs)} ELSE ${this._qualified('rate_limits')}.reset_at END
+      RETURNING count
+    `);
+    return Number(out) <= limit;
+  }
+
+  // Async counterpart for request-path throttles. This keeps psql subprocess
+  // I/O off the Node event loop while preserving the same atomic SQL update.
+  async allowRateLimitAsync(key, limit, windowMs, now = Date.now()) {
+    const out = await this._runAsync(`
       INSERT INTO ${this._qualified('rate_limits')} (key, count, reset_at)
       VALUES (${escapeSqlLiteral(key)}, 1, ${escapeSqlLiteral(now + windowMs)})
       ON CONFLICT (key) DO UPDATE SET
