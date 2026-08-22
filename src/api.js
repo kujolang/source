@@ -245,7 +245,7 @@ async function changeWork(src, orgId, projectId, changeId) {
   return c ? c.workId : undefined;
 }
 
-export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxGitBodyBytes = 100_000_000, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, maxConnections = 10_000 } = {}) {
+export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxGitBodyBytes = 100_000_000, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTimeoutMs = 120_000, maxConnections = 10_000 } = {}) {
   const limiter = new RateLimiter({ maxKeys: rateLimit.maxKeys || 100_000, store: rateLimit.store || src.store });
   const gitSlots = new Semaphore({ capacity: gitConcurrency, queue: gitQueue });
   const limits = {
@@ -495,6 +495,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           contentLength,
           maxInputBytes: maxGitBodyBytes,
           abortSignal: abortController.signal,
+          timeoutMs: gitTimeoutMs,
           remoteUser: auth.remoteUser,
           remoteAddr: req.socket.remoteAddress || '',
           headers: req.headers,

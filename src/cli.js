@@ -301,6 +301,7 @@ export async function run(argv) {
             maxConnections: numberFlag('--max-connections', 10_000),
             maxGitBodyBytes: numberFlag('--max-git-body', 100_000_000),
             maxGitResponseBytes: numberFlag('--max-git-response', 512 * 1024 * 1024),
+            gitTimeoutMs: numberFlag('--git-timeout-ms', 120_000),
             maxJsonBodyBytes: numberFlag('--max-json-body', 1_000_000),
           }))
           .then((server) => {
@@ -409,7 +410,7 @@ export async function run(argv) {
           '  decision accept|reject|request-revision --org <o> --project <p>',
           '  policy show --org <o> --project <p>',
           '  audit',
-          '  serve --port <n> [--host <addr>] [--git-concurrency <n>] [--git-queue <n>] [--max-connections <n>] [--max-git-response <bytes>]',
+          '  serve --port <n> [--host <addr>] [--git-concurrency <n>] [--git-queue <n>] [--git-timeout-ms <n>] [--max-connections <n>] [--max-git-response <bytes>]',
           '  worker --store postgres --handler-module <path> [--worker-id <id> --worker-concurrency <n> --worker-error-backoff-ms <n>]',
           '  submit [--intent <s>] [--url <base>] [--credential <c>] [--cwd <dir>]',
           '',

@@ -90,7 +90,8 @@ node bin/source.js submit --url http://localhost:8787 --credential <credential>
 The server applies bounded resource controls by default: JSON requests are
 limited to 1 MiB, Git request bodies to 100 MiB, Git CGI subprocesses to 32
 active requests with a 256-request queue, Git CGI responses to 512 MiB, and
-connections to 10,000. Git responses are streamed with HTTP backpressure so
+connections to 10,000. Git CGI subprocesses have a 120-second timeout. Git
+responses are streamed with HTTP backpressure so
 large clones, fetches, and known-length pushes do not require a full
 packfile-sized buffer per request. Override these through
 `startServer`/`createServer` options for a
