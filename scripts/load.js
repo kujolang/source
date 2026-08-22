@@ -1,6 +1,9 @@
 // Repeatable deployment load probe for the public agent surface.
 // Example: node scripts/load.js --url https://source.example/.well-known/source --requests 10000 --concurrency 1000
 
+import http from 'node:http';
+import https from 'node:https';
+
 function flag(name, fallback) {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : fallback;
@@ -17,6 +20,18 @@ const concurrency = Math.max(1, Math.min(requests, Number(flag('--concurrency', 
 const timeoutMs = Math.max(100, Number(flag('--timeout-ms', 30_000)) || 30_000);
 const bearer = process.env.SOURCE_LOAD_BEARER;
 const headers = bearer ? { Authorization: `Bearer ${bearer}` } : undefined;
+const transport = url.startsWith('https:') ? https : http;
+const agent = new transport.Agent({ keepAlive: true, maxSockets: Math.max(16, Math.min(concurrency, 256)), maxFreeSockets: 256 });
+function request() {
+  return new Promise((resolve, reject) => {
+    const req = transport.get(url, { headers, agent, timeout: timeoutMs }, (response) => {
+      response.resume();
+      response.once('end', () => resolve({ ok: response.statusCode >= 200 && response.statusCode < 300, status: response.statusCode }));
+    });
+    req.once('timeout', () => req.destroy(new Error('request timed out')));
+    req.once('error', reject);
+  });
+}
 const latencies = [];
 const errors = [];
 let next = 0;
@@ -32,8 +47,7 @@ async function worker() {
     active += 1;
     const started = performance.now();
     try {
-      const response = await fetch(url, { headers, signal: AbortSignal.timeout(timeoutMs) });
-      await response.arrayBuffer();
+      const response = await request();
       latencies.push(performance.now() - started);
       if (!response.ok) errors.push({ index, status: response.status });
     } catch (error) {
@@ -46,6 +60,7 @@ async function worker() {
 
 await Promise.all(Array.from({ length: concurrency }, worker));
 clearInterval(timer);
+agent.destroy();
 latencies.sort((a, b) => a - b);
 const percentile = (p) => latencies[Math.min(latencies.length - 1, Math.floor(latencies.length * p))] ?? null;
 const result = {

@@ -444,8 +444,13 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
 
       // --- discovery (public) ---------------------------------------------
       if (pathname === '/.well-known/source') {
+        if (!server.discoveryInstancePromise) {
+          server.discoveryInstancePromise = Promise.resolve(
+            typeof src.getInstanceAsync === 'function' ? src.getInstanceAsync() : src.getInstance(),
+          );
+        }
         return json(res, 200, {
-          instance: (await src.getInstanceAsync())?.name ?? 'source',
+          instance: (await server.discoveryInstancePromise)?.name ?? 'source',
           api_version: '1',
           protocols: ['http+json', 'git-smart-http'],
           endpoints: {
@@ -926,6 +931,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
     abortedRequests: 0,
     statuses: new Map(),
   };
+  server.discoveryInstancePromise = null;
   server.draining = false;
   server.beginDrain = () => { server.draining = true; };
   server.requestTimeout = 120_000;
@@ -935,9 +941,14 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
   return server;
 }
 
-export function startServer(src, opts) {
+export function startServer(src, opts = {}) {
   const server = createServer(src, opts);
-  return new Promise((resolve) => {
-    server.listen(opts.port ?? 8787, opts.host, () => resolve(server));
+  return new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen({
+      port: opts.port ?? 8787,
+      host: opts.host,
+      backlog: opts.backlog ?? Math.max(511, opts.maxConnections ?? 10_000),
+    }, () => resolve(server));
   });
 }
