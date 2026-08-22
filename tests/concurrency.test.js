@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import { Semaphore } from '../src/concurrency.js';
 import { RateLimiter } from '../src/ratelimit.js';
 import { SqliteStore } from '../src/sqlite-store.js';
+import { GitRepo } from '../src/git.js';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 test('Semaphore bounds active work and rejects beyond the queue budget', async () => {
   const semaphore = new Semaphore({ capacity: 1, queue: 1 });
@@ -41,4 +43,16 @@ test('SQLite rate limits are durable and shared through the store', () => {
   assert.equal(store.allowRateLimit('agent:1', 2, 60_000, 1001), true);
   assert.equal(store.allowRateLimit('agent:1', 2, 60_000, 1002), false);
   assert.equal(store.allowRateLimit('agent:1', 2, 60_000, 61_001), true);
+});
+
+test('async Git operations yield to the event loop under concurrent work', async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'source-async-git-'));
+  const bare = path.join(root, 'repo.git');
+  execFileSync('git', ['init', '--bare', bare], { stdio: 'ignore' });
+  const repo = new GitRepo(bare);
+  let ticks = 0;
+  const timer = setInterval(() => { ticks += 1; }, 1);
+  await Promise.all(Array.from({ length: 24 }, () => repo.hasCommitAsync('deadbeef')));
+  clearInterval(timer);
+  assert.ok(ticks > 0, `event loop did not run while Git work was in flight: ${ticks}`);
 });

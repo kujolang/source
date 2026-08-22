@@ -4,7 +4,8 @@
 // bare-repo storage, clone/fetch/push, ref inspection, and canonical-state
 // updates. No packfile/network behavior is reimplemented.
 
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -14,6 +15,17 @@ function run(args, opts = {}) {
     stdio: ['ignore', 'pipe', 'pipe'],
     ...opts,
   }).trim();
+}
+
+const execFileAsync = promisify(execFile);
+
+async function runAsync(args, opts = {}) {
+  const { stdout } = await execFileAsync('git', args, {
+    encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
+    ...opts,
+  });
+  return String(stdout || '').trim();
 }
 
 export class GitRepo {
@@ -131,6 +143,52 @@ export class GitRepo {
     } catch {
       return [];
     }
+  }
+
+  // Async counterparts are used by HTTP-facing service paths so Git work does
+  // not block the Node event loop. Synchronous methods remain for the CLI and
+  // compatibility with the pure application-service tests.
+  async revParseAsync(ref) {
+    try { return await runAsync(['rev-parse', ref], { cwd: this.barePath }); } catch { return ''; }
+  }
+
+  async defaultBranchAsync() {
+    try { return await runAsync(['symbolic-ref', '--short', 'HEAD'], { cwd: this.barePath }); } catch { return 'main'; }
+  }
+
+  async hasCommitAsync(hash) {
+    try { await runAsync(['cat-file', '-e', `${hash}^{commit}`], { cwd: this.barePath }); return true; } catch { return false; }
+  }
+
+  async isAncestorAsync(ancestor, descendant) {
+    try { await runAsync(['merge-base', '--is-ancestor', ancestor, descendant], { cwd: this.barePath }); return true; } catch { return false; }
+  }
+
+  async fastForwardAsync(base, head, branch) {
+    const tip = await this.revParseAsync(branch);
+    if (!tip) {
+      await runAsync(['update-ref', `refs/heads/${branch}`, head], { cwd: this.barePath });
+      return { ok: true, reason: 'created' };
+    }
+    if (!(await this.isAncestorAsync(base, tip))) return { ok: false, reason: 'non-fast-forward: base is not an ancestor of current tip' };
+    if (!(await this.isAncestorAsync(tip, head))) return { ok: false, reason: 'head does not descend from current tip' };
+    await runAsync(['update-ref', `refs/heads/${branch}`, head], { cwd: this.barePath });
+    return { ok: true, reason: 'fast-forwarded' };
+  }
+
+  async diffAsync(base, head) {
+    const args = ['diff', '--no-renames'];
+    if (base) args.push(base, head); else args.push(head);
+    try { return await runAsync(args, { cwd: this.barePath }); } catch { return ''; }
+  }
+
+  async changedFilesAsync(base, head) {
+    const args = ['diff', '--name-status', '--no-renames'];
+    if (base) args.push(base, head); else args.push(head);
+    try {
+      const out = await runAsync(args, { cwd: this.barePath });
+      return out ? out.split('\n') : [];
+    } catch { return []; }
   }
 }
 

@@ -765,6 +765,82 @@ export class Source {
     };
   }
 
+  async updateCanonicalStateAsync({ orgId, projectId, changeId, repoId = null }) {
+    const change = this.getChange(orgId, projectId, changeId);
+    if (!change) throw new Error(`change not found: ${changeId}`);
+    if (change.decisionState !== 'accepted') throw new Error(`change not accepted (state: ${change.decisionState})`);
+    let targets;
+    if (repoId) {
+      const match = change.repositoryChanges.find((r) => r.repoId === repoId);
+      targets = match ? [match] : (change.repositoryChanges.length === 0 ? [{ repoId, baseCommit: change.baseCommit, headCommit: change.headCommit }] : []);
+    } else targets = change.repositoryChanges;
+    if (targets.length === 0) throw new Error('no repository changes to update');
+
+    const results = [];
+    for (const target of targets) {
+      const git = this.gitRepo(orgId, projectId, target.repoId);
+      if (!(await git.hasCommitAsync(target.headCommit))) {
+        results.push({ repoId: target.repoId, ok: false, reason: 'head commit not present in repository' });
+        continue;
+      }
+      const branch = await git.defaultBranchAsync();
+      const result = await git.fastForwardAsync(target.baseCommit, target.headCommit, branch);
+      this.store.audit({ event: 'canonical.update', orgId, projectId, changeId, repoId: target.repoId, branch, ...result });
+      results.push({ repoId: target.repoId, ...result });
+    }
+    const ok = results.every((result) => result.ok);
+    if (ok) {
+      const work = this.getWork(orgId, projectId, change.workId);
+      if (work && work.status === 'accepted') {
+        transitionWork(work, 'closed');
+        this._saveWork(orgId, projectId, work);
+      }
+    }
+    return repoId ? results[0] : { ok, results };
+  }
+
+  async scanChangeSecretsAsync({ orgId, projectId, changeId }) {
+    const change = this.getChange(orgId, projectId, changeId);
+    if (!change) throw new Error(`change not found: ${changeId}`);
+    const findings = [];
+    for (const repositoryChange of change.repositoryChanges) {
+      const git = this.gitRepo(orgId, projectId, repositoryChange.repoId);
+      findings.push(...scanSecrets(await git.diffAsync(repositoryChange.baseCommit, repositoryChange.headCommit)));
+    }
+    return findings;
+  }
+
+  async submitContributionAsync({ orgId, projectId, repoRef, baseCommit, headCommit, intent = '', contributorName = 'contributor' }) {
+    const repo = this.resolveRepository(orgId, projectId, repoRef);
+    if (!repo) throw new Error(`repository not found: ${repoRef}`);
+    const git = this.gitRepo(orgId, projectId, repo.id);
+    if (!(await git.hasCommitAsync(headCommit))) throw new Error('head commit not present in repository');
+    if (baseCommit && !(await git.hasCommitAsync(baseCommit))) throw new Error('base commit not present in repository');
+    if (baseCommit === headCommit) throw new Error('no changes to submit (base == head)');
+
+    const principal = this.createPrincipal({ type: 'human', name: contributorName });
+    const work = this.createWork({ orgId, projectId, intent: intent || `Contribution to ${repo.name}`, type: 'contribution', requester: principal.id });
+    this.claimWork({ orgId, projectId, workId: work.id, principalId: principal.id });
+    const session = this.startSession({ orgId, projectId, workId: work.id, principalId: principal.id, baseCommit });
+    const change = this.submitChange({ orgId, projectId, workId: work.id, sessionId: session.id, baseCommit, headCommit, repositories: [repo.id] });
+    const changed = await git.changedFilesAsync(baseCommit, headCommit);
+    const nonEmpty = changed.length > 0;
+    const footprint = this.addEvidence({
+      orgId, projectId, changeId: change.id, subject: 'change footprint', claim: 'change is non-empty', type: 'test', producer: principal.id,
+      artifact: JSON.stringify({ changedFiles: changed, nonEmpty }), result: { status: nonEmpty ? 'pass' : 'fail' }, validity: nonEmpty ? 'valid' : 'invalid',
+    });
+    const findings = await this.scanChangeSecretsAsync({ orgId, projectId, changeId: change.id });
+    let securityEvidence = null;
+    if (findings.length > 0) {
+      securityEvidence = this.addEvidence({
+        orgId, projectId, changeId: change.id, subject: 'credential scan', claim: 'no credentials in change', type: 'security', producer: principal.id,
+        artifact: JSON.stringify({ findings }), result: { status: 'fail', findings }, validity: 'invalid',
+      });
+    }
+    const evaluation = this.evaluateChange({ orgId, projectId, changeId: change.id });
+    return { work, session, change, evidence: footprint, securityEvidence, findings, evaluation: evaluation.evaluation, interpretation: evaluation.interpretation };
+  }
+
   // --- audit ------------------------------------------------------------
   queryWorkGraph(orgId, projectId, workId) {
     if (typeof this.store.queryWorkGraph === 'function') {
