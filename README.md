@@ -73,6 +73,10 @@ node bin/source.js serve --host 0.0.0.0 --port 443 \
 SOURCE_DATABASE_URL='postgres://source:password@db/source' \
   node bin/source.js --store postgres serve --host 0.0.0.0 --port 8787
 
+# Liveness/readiness probes
+curl http://localhost:8787/healthz
+curl http://localhost:8787/readyz
+
 # Contribute as a Git-only developer (no Source concepts required)
 #   public repos clone anonymously; private repos and all pushes need a credential
 git clone http://source:<credential>@localhost:8787/git/O1/P1/R1.git
@@ -89,6 +93,21 @@ request. Override these through `startServer`/`createServer` options for a
 deployment sized to its CPU, memory, and Git workload. For multi-process
 deployments use SQLite or Postgres for durable coordination; the JSON backend
 is single-process only.
+
+`/healthz` reports process liveness. `/readyz` verifies that the Source
+instance is initialized and the selected store can be read; remove an instance
+from service when readiness returns `503`.
+
+For a real deployment burst test, use the dependency-free load harness:
+
+```bash
+npm run load -- --url https://source.example/.well-known/source \
+  --requests 10000 --concurrency 1000
+```
+
+It reports success rate, event-loop progress, and p50/p95/p99/max latency.
+Run it against the Postgres-backed deployment from a separate host; local
+tests do not prove database, network, or multi-node capacity.
 
 The machine interface (`/api/v1/…`) is capability-gated: send
 `Authorization: Bearer <credential>` on every request. The Git transport
