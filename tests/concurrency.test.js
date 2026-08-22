@@ -8,6 +8,10 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { promisify } from 'node:util';
+import { execFile } from 'node:child_process';
+
+const execFileAsync = promisify(execFile);
 
 test('Semaphore bounds active work and rejects beyond the queue budget', async () => {
   const semaphore = new Semaphore({ capacity: 1, queue: 1 });
@@ -55,4 +59,21 @@ test('async Git operations yield to the event loop under concurrent work', async
   await Promise.all(Array.from({ length: 24 }, () => repo.hasCommitAsync('deadbeef')));
   clearInterval(timer);
   assert.ok(ticks > 0, `event loop did not run while Git work was in flight: ${ticks}`);
+});
+
+test('SQLite counters and rate limits survive concurrent processes', async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'source-multiprocess-'));
+  const storeModule = path.resolve('src/sqlite-store.js');
+  const worker = `
+    import { SqliteStore } from ${JSON.stringify(storeModule)};
+    const store = new SqliteStore(process.argv[1]);
+    const ids = Array.from({ length: 40 }, () => store.nextId('process', 'X'));
+    const allowed = Array.from({ length: 40 }, () => store.allowRateLimit('shared', 1000, 60000));
+    process.stdout.write(JSON.stringify({ ids, allowed }));
+  `;
+  const results = await Promise.all(Array.from({ length: 4 }, () => execFileAsync(process.execPath, ['--input-type=module', '-e', worker, root], { maxBuffer: 2 * 1024 * 1024 })));
+  const ids = results.flatMap(({ stdout }) => JSON.parse(stdout).ids);
+  assert.equal(ids.length, 160);
+  assert.equal(new Set(ids).size, 160);
+  assert.equal(Math.max(...ids.map((id) => Number(id.slice(1)))), 160);
 });

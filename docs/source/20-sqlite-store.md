@@ -28,6 +28,11 @@ node bin/source.js --store sqlite init --name source.kujolang.ai
 
 The JSON store remains the default (and the only option on Node < 22.5).
 
+SQLite enables WAL mode with `synchronous=FULL` and a five-second busy timeout.
+The counter and rate-limit tables use atomic upserts so multiple Source
+processes can share the database without duplicating IDs or resetting limits.
+Run `npm run test:scale` to exercise concurrent-process coordination.
+
 ## Why this matters
 
 The JSON store writes each record independently. A `submitChange` writes the

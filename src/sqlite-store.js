@@ -21,7 +21,8 @@ export class SqliteStore {
     this.db = new DatabaseSync(path.join(root, 'source.sqlite'));
     this.db.exec(`
       PRAGMA journal_mode = WAL;
-      PRAGMA synchronous = NORMAL;
+      PRAGMA synchronous = FULL;
+      PRAGMA busy_timeout = 5000;
       CREATE TABLE IF NOT EXISTS records (
         path TEXT PRIMARY KEY,
         json TEXT NOT NULL
