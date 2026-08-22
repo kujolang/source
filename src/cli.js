@@ -8,6 +8,8 @@
 // (see `submit.js`). All other commands operate on the local data root.
 
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { Source } from './source.js';
 
 function dataRoot() {
@@ -28,11 +30,17 @@ function printText(lines) {
 }
 
 export async function run(argv) {
-  const [cmd, sub, ...rest] = argv;
+  const args = [...argv];
+  const leadingFlags = [];
+  const globalValueFlags = new Set(['--store', '--database-url', '--schema']);
+  while (globalValueFlags.has(args[0])) {
+    leadingFlags.push(args.shift(), args.shift());
+  }
+  const [cmd, sub, ...rest] = args;
 
   // Flags may appear after the command (with or without a subcommand), so
   // search everything after `cmd`.
-  const all = [sub, ...rest];
+  const all = [...leadingFlags, sub, ...rest];
   const flag = (name) => {
     const i = all.indexOf(name);
     return i >= 0 ? all[i + 1] : undefined;
@@ -315,6 +323,42 @@ export async function run(argv) {
           .catch((e) => fail(e.message));
         return;
       }
+      case 'worker': {
+        const handlerModule = flag('--handler-module');
+        if (!handlerModule) fail('worker requires --handler-module <path>');
+        if (backend !== 'postgres') fail('worker requires --store postgres for durable leases');
+        const loaded = await import(pathToFileURL(path.resolve(handlerModule)).href);
+        const handlers = loaded.handlers || loaded.default;
+        if (!handlers || typeof handlers !== 'object') fail('handler module must export { handlers } or a default handler map');
+        const { SourceWorker } = await import('./worker.js');
+        const numberFlag = (name, fallback) => {
+          const value = Number(flag(name));
+          return Number.isFinite(value) && value > 0 ? value : fallback;
+        };
+        const worker = new SourceWorker({
+          queue: src.jobs,
+          handlers,
+          workerId: flag('--worker-id') || `${process.pid}`,
+          concurrency: numberFlag('--worker-concurrency', 8),
+          leaseMs: numberFlag('--worker-lease-ms', 30_000),
+          pollMs: numberFlag('--worker-poll-ms', 1_000),
+          retryDelayMs: numberFlag('--worker-retry-ms', 1_000),
+          maxAttempts: numberFlag('--worker-max-attempts', 5),
+        });
+        worker.start();
+        process.stdout.write(`worker ${worker.workerId} started\n`);
+        let shuttingDown = false;
+        const shutdown = async () => {
+          if (shuttingDown) return;
+          shuttingDown = true;
+          await worker.stop();
+          await src.store.closeAsync?.();
+        };
+        for (const signal of ['SIGTERM', 'SIGINT']) {
+          process.once(signal, () => shutdown().finally(() => process.exit(0)));
+        }
+        return;
+      }
       case 'submit': {
         // Client command: run inside a working clone, talk to the remote Source
         // instance over HTTP. See src/submit.js.
@@ -360,6 +404,7 @@ export async function run(argv) {
           '  policy show --org <o> --project <p>',
           '  audit',
           '  serve --port <n> [--host <addr>] [--git-concurrency <n>] [--git-queue <n>] [--max-connections <n>] [--max-git-response <bytes>]',
+          '  worker --store postgres --handler-module <path> [--worker-id <id> --worker-concurrency <n>]',
           '  submit [--intent <s>] [--url <base>] [--credential <c>] [--cwd <dir>]',
           '',
           'Env: SOURCE_DATA (default .source), SOURCE_STORE (json|sqlite|postgres)',

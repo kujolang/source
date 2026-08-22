@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **117/117 default tests pass**, including a dogfood test against the real `spec` Kujo
+- **118/118 default tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
@@ -129,6 +129,14 @@ const worker = new SourceWorker({
   handlers: { 'agent.batch': async (payload) => runBatch(payload) },
 });
 worker.start();
+```
+
+The built-in process entrypoint accepts a handler module exporting `handlers`:
+
+```bash
+SOURCE_DATABASE_URL='postgresql://source:password@db/source' \
+  node bin/source.js --store postgres worker \
+  --handler-module ./worker-handlers.js --worker-concurrency 32
 ```
 
 The machine interface (`/api/v1/…`) is capability-gated: send

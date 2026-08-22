@@ -1,7 +1,7 @@
 # 16 — MVP Results
 
-Status: **Complete.** The vertical slice is implemented, tested (118 tests;
-117 pass plus one opt-in Postgres test when no DSN is supplied),
+Status: **Complete.** The vertical slice is implemented, tested (119 tests;
+118 pass plus one opt-in Postgres test when no DSN is supplied),
 and dogfooded against a real Kujo repository.
 
 ## What Was Built
@@ -226,7 +226,7 @@ All six items of the original "Recommended Next Phase" are now complete:
   org-scoped capabilities are enforced server-side, and org list/get/create is
   exposed via API, CLI, and web.
 
-The default test suite is now **117/117 passing**, with the live Postgres gate
+The default test suite is now **118/118 passing**, with the live Postgres gate
 available through `SOURCE_TEST_DATABASE_URL=... npm run test:postgres`.
 
 ## Next phase (fresh prioritization)
