@@ -137,6 +137,23 @@ test('smart-HTTP Git remains responsive under concurrent requests', async () => 
   }
 });
 
+test('HTTP discovery withstands a thousand concurrent agent connections', async () => {
+  const { src } = freshSource();
+  const server = await startServer(src, { port: 0, maxConnections: 2_000 });
+  const url = `http://127.0.0.1:${server.address().port}/.well-known/source`;
+  let ticks = 0;
+  const timer = setInterval(() => { ticks += 1; }, 1);
+  try {
+    const responses = await Promise.all(Array.from({ length: 1_000 }, () => fetch(url)));
+    assert.ok(responses.every((response) => response.status === 200));
+    assert.ok(ticks > 0, 'event loop did not progress during the thousand-agent burst');
+  } finally {
+    clearInterval(timer);
+    server.closeAllConnections?.();
+    server.close();
+  }
+});
+
 test('Git CGI output is bounded when a caller configures a response cap', async () => {
   const root = mkdtempSync(path.join(tmpdir(), 'source-git-output-cap-'));
   const repo = path.join(root, 'repo.git');

@@ -93,8 +93,29 @@ a silent claim.
 - A normalized relational schema with foreign keys and queryable relationships.
   The path-keyed `records` table does not preclude this; the `storage` boundary
   is where a relational redesign would land.
-- Postgres. The interface is the seam; a Postgres adapter would implement the
-  same methods.
+- High-concurrency pooled request-path I/O. SQLite's synchronous
+  `node:sqlite` API is appropriate for local or small multi-process installs;
+  large agent fleets should use the Postgres backend.
+
+## Postgres backend
+
+`src/postgres-store.js` provides the production backend. It keeps the
+path-keyed compatibility records while also synchronizing normalized tables
+for lifecycle entities, capabilities, and relationship junctions. The async
+API path uses a native `pg.Pool`, async transactions, and one pooled client per
+transaction; the legacy synchronous methods remain available for CLI and
+compatibility callers.
+
+Select it with:
+
+```bash
+SOURCE_DATABASE_URL='postgres://source:password@db/source' \
+  node bin/source.js --store postgres serve --host 0.0.0.0 --port 8787
+```
+
+The JSON and SQLite backends remain useful for local development and
+single-node deployments. They are not evidence of Postgres production load
+capacity.
 
 ## Node version
 

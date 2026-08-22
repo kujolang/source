@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **93/93 tests pass**, including a dogfood test against the real `spec` Kujo
+- **113/113 tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
@@ -28,8 +28,9 @@ scanning).
   multi-tenant org-management/tenant-isolation tests, TLS/deployment tests
   (HTTPS + `git clone` over HTTPS), multi-repository Change tests, rate-limiting
   tests, and credential-scanning tests.
-- Zero runtime dependencies (Node.js ≥ 18, `git` on PATH). The SQLite backend
-  requires Node ≥ 22.5 (`node:sqlite`); the JSON store works on Node ≥ 18.
+- Runtime dependency: `pg` for pooled Postgres production storage. Node.js ≥ 18
+  and `git` on PATH are also required. The SQLite backend requires Node ≥ 22.5
+  (`node:sqlite`); the JSON store works on Node ≥ 18.
 - Deterministic-first: no LLM is required for any operation in the slice.
 
 ## Quick start
@@ -68,6 +69,10 @@ node bin/source.js serve --port 8787
 node bin/source.js serve --host 0.0.0.0 --port 443 \
   --tls-key /path/to/privkey.pem --tls-cert /path/to/fullchain.pem
 
+# Production storage: use a pooled Postgres backend for multi-process serving
+SOURCE_DATABASE_URL='postgres://source:password@db/source' \
+  node bin/source.js --store postgres serve --host 0.0.0.0 --port 8787
+
 # Contribute as a Git-only developer (no Source concepts required)
 #   public repos clone anonymously; private repos and all pushes need a credential
 git clone http://source:<credential>@localhost:8787/git/O1/P1/R1.git
@@ -96,14 +101,26 @@ The Organization is the tenant boundary and is explicit in every route
 
 ### Storage backend
 
-The default store is JSON files on disk. Select the SQLite backend (ACID
-transactions across records) with `--store sqlite` or `SOURCE_STORE=sqlite`:
+The default store is JSON files on disk for local development only. Select the
+SQLite backend (ACID transactions across records) with `--store sqlite` or
+`SOURCE_STORE=sqlite`:
 
 ```bash
 node bin/source.js --store sqlite init --name source.kujolang.ai
 ```
 
 See `docs/source/20-sqlite-store.md`.
+
+For production multi-process deployments, select the pooled Postgres backend:
+
+```bash
+SOURCE_DATABASE_URL='postgres://source:password@db/source' \
+  node bin/source.js --store postgres serve --host 0.0.0.0 --port 8787
+```
+
+Postgres is the recommended backend for large agent fleets; configure pool
+options through the store integration and place Git repositories on shared,
+durable storage.
 
 ### Deployment
 
