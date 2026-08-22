@@ -471,6 +471,9 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         try {
           const abortController = new AbortController();
           req.once('aborted', () => abortController.abort());
+          res.once('close', () => {
+            if (!res.writableFinished) abortController.abort();
+          });
           let input = null;
           let contentLength = null;
           if (req.method === 'POST') {
