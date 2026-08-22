@@ -659,6 +659,32 @@ class PostgresStore {
     return out;
   }
 
+  async listJsonAsync(dirRel, { cursor, limit, includeDirs = false } = {}) {
+    const normalized = dirRel.endsWith('/') ? dirRel.slice(0, -1) : dirRel;
+    const prefix = `${normalized}/`;
+    const limitClause = Number.isInteger(limit) && limit > 0 ? ` LIMIT ${Math.min(limit, 1000)}` : '';
+    const rows = await this._fetchJsonRowsAsync(`
+      SELECT path
+      FROM ${this._qualified('records')}
+      WHERE path LIKE ${escapeSqlLiteral(`${prefix}%`)}
+      ORDER BY path
+      ${limitClause}
+    `);
+    const names = rows.map((r) => r.path).map((p) => {
+      if (typeof p !== 'string' || !p.startsWith(`${normalized}/`)) return null;
+      const rest = p.slice(normalized.length + 1);
+      if (!rest) return null;
+      if (rest.includes('/')) return includeDirs ? rest.split('/')[0] : null;
+      return rest.endsWith('.json') ? rest.slice(0, -'.json'.length) : null;
+    }).filter(Boolean).sort();
+    let out = [...new Set(names)];
+    if (cursor) {
+      const start = out.indexOf(cursor);
+      out = start >= 0 ? out.slice(start + 1) : out;
+    }
+    return Number.isInteger(limit) && limit > 0 ? out.slice(0, Math.min(limit, 1001)) : out;
+  }
+
   getCapabilityByCredential(credential) {
     const row = this._fetchJsonRows(`
       SELECT json

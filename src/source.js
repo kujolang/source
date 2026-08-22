@@ -72,6 +72,10 @@ export class Source {
     return this.store.readJson('instance.json');
   }
 
+  async getInstanceAsync() {
+    return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync('instance.json') : this.getInstance();
+  }
+
   createOrg({ name, slug }) {
     const orgId = nextId(this.store, 'org');
     const org = { id: orgId, name, slug, visibility: 'private', createdAt: new Date().toISOString() };
@@ -84,9 +88,21 @@ export class Source {
     return this.store.readJson(`${this._orgRel(orgId)}/org.json`);
   }
 
+  async getOrgAsync(orgId) {
+    const rel = `${this._orgRel(orgId)}/org.json`;
+    return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.getOrg(orgId);
+  }
+
   listOrgs({ cursor, limit } = {}) {
     const ids = this.store.listJson('orgs', { cursor, limit, includeDirs: true });
     return ids.map((id) => this.getOrg(id)).filter(Boolean);
+  }
+
+  async listOrgsAsync({ cursor, limit } = {}) {
+    const ids = typeof this.store.listJsonAsync === 'function'
+      ? await this.store.listJsonAsync('orgs', { cursor, limit, includeDirs: true })
+      : this.store.listJson('orgs', { cursor, limit, includeDirs: true });
+    return Promise.all(ids.map((id) => this.getOrgAsync(id))).then((items) => items.filter(Boolean));
   }
 
   createProject({ orgId, slug, name, description = '', visibility = 'private' }) {
@@ -103,6 +119,11 @@ export class Source {
 
   getProject(orgId, projectId) {
     return this.store.readJson(`${this._projectRel(orgId, projectId)}/project.json`);
+  }
+
+  async getProjectAsync(orgId, projectId) {
+    const rel = `${this._projectRel(orgId, projectId)}/project.json`;
+    return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.getProject(orgId, projectId);
   }
 
   listProjects(orgId, { cursor, limit } = {}) {
@@ -137,6 +158,11 @@ export class Source {
 
   getRepository(orgId, projectId, repoId) {
     return this.store.readJson(`${this._projectRel(orgId, projectId)}/repos/${repoId}.json`);
+  }
+
+  async getRepositoryAsync(orgId, projectId, repoId) {
+    const rel = `${this._projectRel(orgId, projectId)}/repos/${repoId}.json`;
+    return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.getRepository(orgId, projectId, repoId);
   }
 
   gitRepo(orgId, projectId, repoId) {
@@ -363,9 +389,22 @@ export class Source {
     return this.store.readJson(`${this._projectRel(orgId, projectId)}/work/${workId}.json`);
   }
 
+  async getWorkAsync(orgId, projectId, workId) {
+    const rel = `${this._projectRel(orgId, projectId)}/work/${workId}.json`;
+    return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.getWork(orgId, projectId, workId);
+  }
+
   listWork(orgId, projectId, { cursor, limit } = {}) {
     const ids = this.store.listJson(`${this._projectRel(orgId, projectId)}/work`, { cursor, limit });
     return ids.map((id) => this.getWork(orgId, projectId, id)).filter(Boolean);
+  }
+
+  async listWorkAsync(orgId, projectId, { cursor, limit } = {}) {
+    const rel = `${this._projectRel(orgId, projectId)}/work`;
+    const ids = typeof this.store.listJsonAsync === 'function'
+      ? await this.store.listJsonAsync(rel, { cursor, limit })
+      : this.store.listJson(rel, { cursor, limit });
+    return Promise.all(ids.map((id) => this.getWorkAsync(orgId, projectId, id))).then((items) => items.filter(Boolean));
   }
 
   _saveWork(orgId, projectId, work) {
@@ -444,6 +483,11 @@ export class Source {
     return this.store.readJson(`${this._projectRel(orgId, projectId)}/changes/${changeId}.json`);
   }
 
+  async getChangeAsync(orgId, projectId, changeId) {
+    const rel = `${this._projectRel(orgId, projectId)}/changes/${changeId}.json`;
+    return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.getChange(orgId, projectId, changeId);
+  }
+
   listChanges(orgId, projectId) {
     const ids = this.store.listJson(`${this._projectRel(orgId, projectId)}/changes`);
     return ids.map((id) => this.getChange(orgId, projectId, id)).filter(Boolean);
@@ -475,6 +519,11 @@ export class Source {
 
   getEvidence(orgId, projectId, evidenceId) {
     return this.store.readJson(`${this._projectRel(orgId, projectId)}/evidence/${evidenceId}.json`);
+  }
+
+  async getEvidenceAsync(orgId, projectId, evidenceId) {
+    const rel = `${this._projectRel(orgId, projectId)}/evidence/${evidenceId}.json`;
+    return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.getEvidence(orgId, projectId, evidenceId);
   }
 
   listEvidence(orgId, projectId) {
@@ -529,6 +578,12 @@ export class Source {
   // --- policy -----------------------------------------------------------
   getPolicy(orgId, projectId) {
     return this.store.readJson(`${this._projectRel(orgId, projectId)}/policy.json`) ?? defaultPolicy();
+  }
+
+  async getPolicyAsync(orgId, projectId) {
+    const rel = `${this._projectRel(orgId, projectId)}/policy.json`;
+    const policy = typeof this.store.readJsonAsync === 'function' ? await this.store.readJsonAsync(rel) : this.getPolicy(orgId, projectId);
+    return policy ?? defaultPolicy();
   }
 
   // Evaluate a Change's evidence against policy. Transitions submitted -> in_review.
@@ -624,6 +679,11 @@ export class Source {
 
   getDecision(orgId, projectId, decisionId) {
     return this.store.readJson(`${this._projectRel(orgId, projectId)}/decisions/${decisionId}.json`);
+  }
+
+  async getDecisionAsync(orgId, projectId, decisionId) {
+    const rel = `${this._projectRel(orgId, projectId)}/decisions/${decisionId}.json`;
+    return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.getDecision(orgId, projectId, decisionId);
   }
 
   // --- canonical state update (on accept) -------------------------------

@@ -198,8 +198,10 @@ function gitAuthError(res, status, error) {
 }
 
 // Resolve the Work id a Change belongs to (for work-scoped capability checks).
-function changeWork(src, orgId, projectId, changeId) {
-  const c = src.getChange(orgId, projectId, changeId);
+async function changeWork(src, orgId, projectId, changeId) {
+  const c = typeof src.getChangeAsync === 'function'
+    ? await src.getChangeAsync(orgId, projectId, changeId)
+    : src.getChange(orgId, projectId, changeId);
   return c ? c.workId : undefined;
 }
 
@@ -302,7 +304,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         if (g) return loginPage(res, g.status, g.body.error);
 
         if (changeId) {
-          const c = src.getChange(orgId, projectId, changeId);
+          const c = await src.getChangeAsync(orgId, projectId, changeId);
           if (!c) return html(res, 404, '<!doctype html><html><body><h1>Not found</h1></body></html>');
           return html(res, 200, renderChange(src, orgId, projectId, changeId));
         }
@@ -318,7 +320,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
       // --- discovery (public) ---------------------------------------------
       if (pathname === '/.well-known/source') {
         return json(res, 200, {
-          instance: src.getInstance()?.name ?? 'source',
+          instance: (await src.getInstanceAsync())?.name ?? 'source',
           api_version: '1',
           protocols: ['http+json', 'git-smart-http'],
           endpoints: {
@@ -443,7 +445,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         const pagination = parseListParams(url);
         if (g) return json(res, g.status, g.body);
         const requestLimit = pagination.limit ? pagination.limit + 1 : null;
-        const items = src.listOrgs({ cursor: pagination.cursor, limit: requestLimit });
+        const items = await src.listOrgsAsync({ cursor: pagination.cursor, limit: requestLimit });
         return json(res, 200, paginatedResponse(items, pagination, fields));
       }
 
@@ -460,7 +462,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         const orgId = orgMatch[1];
         const g = await guard(src, req, ACTIONS.read_source, { org: orgId });
         if (g) return json(res, g.status, g.body);
-        const org = src.getOrg(orgId);
+        const org = await src.getOrgAsync(orgId);
         if (!org) return json(res, 404, { error: 'not found' });
         return json(res, 200, selectFields(org, fields));
       }
@@ -475,7 +477,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         if (rest === '' && req.method === 'GET') {
           const g = await guard(src, req, ACTIONS.read_source, { org: orgId, project: projectId });
           if (g) return json(res, g.status, g.body);
-          const p = src.getProject(orgId, projectId);
+          const p = await src.getProjectAsync(orgId, projectId);
           if (!p) return json(res, 404, { error: 'not found' });
           return json(res, 200, selectFields(p, fields));
         }
@@ -483,7 +485,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         if (rest === '/policy' && req.method === 'GET') {
           const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId });
           if (g) return json(res, g.status, g.body);
-          return json(res, 200, src.getPolicy(orgId, projectId));
+          return json(res, 200, await src.getPolicyAsync(orgId, projectId));
         }
 
         if (rest === '/work' && req.method === 'GET') {
@@ -495,7 +497,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
             res,
             200,
             paginatedResponse(
-              src.listWork(orgId, projectId, {
+              await src.listWorkAsync(orgId, projectId, {
                 cursor: pagination.cursor,
                 limit: requestLimit,
               }),
@@ -527,7 +529,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           if (wrest === '' && req.method === 'GET') {
             const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
-            const w = src.getWork(orgId, projectId, workId);
+            const w = await src.getWorkAsync(orgId, projectId, workId);
             if (!w) return json(res, 404, { error: 'not found' });
             return json(res, 200, selectFields(w, fields));
           }
@@ -558,7 +560,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           if (wrest === '/context' && req.method === 'GET') {
             const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
-            const w = src.getWork(orgId, projectId, workId);
+            const w = await src.getWorkAsync(orgId, projectId, workId);
             if (!w) return json(res, 404, { error: 'not found' });
             // Scoped, token-bounded context: intent, requirements, acceptance,
             // policy, and current status — not the whole repository.
@@ -568,7 +570,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
               requirements: w.requirements,
               acceptanceConditions: w.acceptanceConditions,
               status: w.status,
-              policy: src.getPolicy(orgId, projectId),
+              policy: await src.getPolicyAsync(orgId, projectId),
             });
           }
 
@@ -585,12 +587,12 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         if (changeMatch) {
           const changeId = changeMatch[1];
           const crest = changeMatch[2] || '';
-          const workId = changeWork(src, orgId, projectId, changeId);
+          const workId = await changeWork(src, orgId, projectId, changeId);
 
           if (crest === '' && req.method === 'GET') {
             const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
-            const c = src.getChange(orgId, projectId, changeId);
+            const c = await src.getChangeAsync(orgId, projectId, changeId);
             if (!c) return json(res, 404, { error: 'not found' });
             return json(res, 200, selectFields(c, fields));
           }
@@ -620,9 +622,9 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           if (crest === '/decision' && req.method === 'GET') {
             const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
-            const c = src.getChange(orgId, projectId, changeId);
+            const c = await src.getChangeAsync(orgId, projectId, changeId);
             if (!c) return json(res, 404, { error: 'not found' });
-            const decisions = (c.decisions || []).map((id) => src.getDecision(orgId, projectId, id)).filter(Boolean);
+            const decisions = (await Promise.all((c.decisions || []).map((id) => src.getDecisionAsync(orgId, projectId, id)))).filter(Boolean);
             return json(res, 200, decisions);
           }
 
@@ -642,14 +644,14 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           if (erest === '' && req.method === 'GET') {
             const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId });
             if (g) return json(res, g.status, g.body);
-            const e = src.getEvidence(orgId, projectId, evidenceId);
+            const e = await src.getEvidenceAsync(orgId, projectId, evidenceId);
             if (!e) return json(res, 404, { error: 'not found' });
             return json(res, 200, e);
           }
           if (erest === '/artifact' && req.method === 'GET') {
             const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId });
             if (g) return json(res, g.status, g.body);
-            const e = src.getEvidence(orgId, projectId, evidenceId);
+            const e = await src.getEvidenceAsync(orgId, projectId, evidenceId);
             if (!e || !e.artifactRef) return json(res, 404, { error: 'not found' });
             const bytes = src.getArtifact(e.artifactRef.hash);
             if (!bytes) return json(res, 404, { error: 'artifact not found' });
