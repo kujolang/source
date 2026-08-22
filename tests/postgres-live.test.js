@@ -14,10 +14,12 @@ const dsn = process.env.SOURCE_TEST_DATABASE_URL;
 test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents', { skip: !dsn }, async () => {
   const schema = `source_test_${Date.now()}_${process.pid}`;
   let store;
+  let src;
   let server;
   try {
     store = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 16 } });
-    const src = new Source(mkdtempSync(path.join(tmpdir(), 'source-pg-live-')), { store });
+    const dataRoot = mkdtempSync(path.join(tmpdir(), 'source-pg-live-'));
+    src = new Source(dataRoot, { store });
     await store.writeJsonAsync('instance.json', { id: 'instance', name: 'postgres-live', apiVersion: '1' });
     const org = await src.createOrgAsync({ name: 'load-org', slug: 'load-org' });
     const project = await src.createProjectAsync({ orgId: org.id, name: 'load-project', slug: 'load-project' });
@@ -42,6 +44,17 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     const recovered = (await src.jobs.claim({ workerId: 'recovery-worker', limit: 1, leaseMs: 5_000 }))[0];
     assert.equal(recovered.id, leaseJob.id);
     await src.jobs.complete({ id: recovered.id, workerId: 'recovery-worker', result: { recovered: true } });
+
+    const restartJob = await src.jobs.enqueue({ kind: 'agent.restart', payload: {} });
+    const restartLease = (await src.jobs.claim({ workerId: 'terminated-worker', limit: 1, leaseMs: 1 }))[0];
+    assert.equal(restartLease.id, restartJob.id);
+    await store.closeAsync();
+    store = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 16 } });
+    src = new Source(dataRoot, { store });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const afterRestart = (await src.jobs.claim({ workerId: 'restarted-worker', limit: 1, leaseMs: 5_000 }))[0];
+    assert.equal(afterRestart.id, restartJob.id);
+    await src.jobs.complete({ id: afterRestart.id, workerId: 'restarted-worker', result: { restarted: true } });
 
     let handled = 0;
     let retryAttempts = 0;
