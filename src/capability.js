@@ -45,6 +45,19 @@ export class CapabilityService {
     return null;
   }
 
+  async lookupAsync(credential) {
+    if (!credential) return null;
+    if (typeof this.store.getCapabilityByCredentialAsync === 'function') {
+      const storeLookup = await this.store.getCapabilityByCredentialAsync(credential);
+      if (storeLookup) {
+        this._cache.set(credential, storeLookup);
+        return storeLookup;
+      }
+      return null;
+    }
+    return this.lookup(credential);
+  }
+
   _refreshCache() {
     const now = Date.now();
     if (this._cache.size > 0 && now - this._cacheAt < this._cacheTtlMs) return;
@@ -71,6 +84,19 @@ export class CapabilityService {
     if (cap.denied && cap.denied.includes(action)) {
       return { ok: false, reason: `denied: ${action}` };
     }
+    if (cap.allowed && cap.allowed.length > 0 && !cap.allowed.includes(action)) {
+      return { ok: false, reason: `not allowed: ${action}` };
+    }
+    return { ok: true, reason: 'authorized', cap };
+  }
+
+  async authorizeAsync(credential, action) {
+    if (!credential) return { ok: false, reason: 'missing credential' };
+    const cap = await this.lookupAsync(credential);
+    if (!cap) return { ok: false, reason: 'unknown credential' };
+    if (cap.revoked) return { ok: false, reason: 'revoked' };
+    if (new Date(cap.expiresAt).getTime() < Date.now()) return { ok: false, reason: 'expired' };
+    if (cap.denied && cap.denied.includes(action)) return { ok: false, reason: `denied: ${action}` };
     if (cap.allowed && cap.allowed.length > 0 && !cap.allowed.includes(action)) {
       return { ok: false, reason: `not allowed: ${action}` };
     }

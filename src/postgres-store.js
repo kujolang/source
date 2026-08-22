@@ -115,6 +115,12 @@ class PostgresStore {
     return JSON.parse(out);
   }
 
+  async _fetchJsonRowsAsync(sql) {
+    const out = await this._runAsync(`SELECT COALESCE(json_agg(row_to_json(r)), '[]'::json)::text AS rows FROM (${sql}) AS r`);
+    if (!out) return [];
+    return JSON.parse(out);
+  }
+
   _fetchJsonRow(sql) {
     const out = this._run(`SELECT row_to_json(r)::text AS row FROM (${sql}) AS r LIMIT 1`);
     if (!out) return null;
@@ -329,6 +335,10 @@ class PostgresStore {
     return this._fetchJsonRow(`SELECT json FROM ${this._qualified('records')} WHERE path = ${escapeSqlLiteral(relPath)}`)?.json ?? null;
   }
 
+  async _queryPathRowAsync(relPath) {
+    return (await this._fetchJsonRowsAsync(`SELECT json FROM ${this._qualified('records')} WHERE path = ${escapeSqlLiteral(relPath)}`))[0]?.json ?? null;
+  }
+
   _deletePath(relPath) {
     this._run(`DELETE FROM ${this._qualified('records')} WHERE path = ${escapeSqlLiteral(relPath)}`);
   }
@@ -536,6 +546,10 @@ class PostgresStore {
     return this._queryPathRow(relPath);
   }
 
+  readJsonAsync(relPath) {
+    return this._queryPathRowAsync(relPath);
+  }
+
   writeJson(relPath, obj) {
     const classified = this._classifyRelPath(relPath);
 
@@ -653,6 +667,16 @@ class PostgresStore {
       LIMIT 1
     `);
     return row[0]?.json || null;
+  }
+
+  async getCapabilityByCredentialAsync(credential) {
+    const rows = await this._fetchJsonRowsAsync(`
+      SELECT json
+      FROM ${this._qualified('capabilities')}
+      WHERE credential = ${escapeSqlLiteral(credential)}
+      LIMIT 1
+    `);
+    return rows[0]?.json || null;
   }
 
   getMeta(key) {

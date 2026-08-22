@@ -162,6 +162,19 @@ export class Source {
     return null;
   }
 
+  async resolveRepositoryAsync(orgId, projectId, repoRef) {
+    const readJson = typeof this.store.readJsonAsync === 'function'
+      ? (rel) => this.store.readJsonAsync(rel)
+      : (rel) => this.store.readJson(rel);
+    const project = await readJson(`${this._projectRel(orgId, projectId)}/project.json`);
+    if (!project) return null;
+    for (const id of project.repositories) {
+      const repo = await readJson(`${this._projectRel(orgId, projectId)}/repos/${id}.json`);
+      if (repo && (repo.id === repoRef || repo.name === repoRef)) return repo;
+    }
+    return null;
+  }
+
   // --- principals -------------------------------------------------------
   createPrincipal({ type, name, password } = {}) {
     const id = nextId(this.store, 'principal');

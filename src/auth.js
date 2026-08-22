@@ -84,6 +84,16 @@ export function authorizeRequest(capabilities, req, action, { org, project, work
   return { ok: true, cap: auth.cap };
 }
 
+export async function authorizeRequestAsync(capabilities, req, action, { org, project, work, credential } = {}) {
+  const effectiveCredential = credential ?? bearerCredential(req);
+  const auth = typeof capabilities.authorizeAsync === 'function'
+    ? await capabilities.authorizeAsync(effectiveCredential, action)
+    : capabilities.authorize(effectiveCredential, action);
+  if (!auth.ok) return { ok: false, status: statusFor(auth.reason), error: auth.reason };
+  if (!scopeCovers(auth.cap, { org, project, work })) return { ok: false, status: 403, error: 'scope violation' };
+  return { ok: true, cap: auth.cap };
+}
+
 // Authorize a Git smart-HTTP request. Git clients use Basic auth; the password
 // field is the capability credential.
 //
@@ -106,6 +116,26 @@ export function authorizeGit(capabilities, req, { org, project, visibility, isWr
   if (visibility === 'public') return { ok: true, remoteUser: '' };
   const credential = basicCredential(req);
   const auth = capabilities.authorize(credential, ACTIONS.read_source);
+  if (!auth.ok) return { ok: false, status: statusFor(auth.reason), error: auth.reason };
+  if (!scopeCovers(auth.cap, { org, project })) return { ok: false, status: 403, error: 'scope violation' };
+  return { ok: true, remoteUser: auth.cap.principalId };
+}
+
+export async function authorizeGitAsync(capabilities, req, { org, project, visibility, isWrite }) {
+  if (isWrite) {
+    const credential = basicCredential(req);
+    const auth = typeof capabilities.authorizeAsync === 'function'
+      ? await capabilities.authorizeAsync(credential, ACTIONS.git_push)
+      : capabilities.authorize(credential, ACTIONS.git_push);
+    if (!auth.ok) return { ok: false, status: statusFor(auth.reason), error: auth.reason };
+    if (!scopeCovers(auth.cap, { org, project })) return { ok: false, status: 403, error: 'scope violation' };
+    return { ok: true, remoteUser: auth.cap.principalId };
+  }
+  if (visibility === 'public') return { ok: true, remoteUser: '' };
+  const credential = basicCredential(req);
+  const auth = typeof capabilities.authorizeAsync === 'function'
+    ? await capabilities.authorizeAsync(credential, ACTIONS.read_source)
+    : capabilities.authorize(credential, ACTIONS.read_source);
   if (!auth.ok) return { ok: false, status: statusFor(auth.reason), error: auth.reason };
   if (!scopeCovers(auth.cap, { org, project })) return { ok: false, status: 403, error: 'scope violation' };
   return { ok: true, remoteUser: auth.cap.principalId };

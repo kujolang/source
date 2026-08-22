@@ -26,7 +26,7 @@ import https from 'node:https';
 import { Source } from './source.js';
 import { renderOrgIndex, renderIndex, renderProject, renderWork, renderChange, renderLogin } from './web.js';
 import { gitHttpBackend } from './git-http.js';
-import { ACTIONS, authorizeRequest, authorizeGit, bearerCredential } from './auth.js';
+import { ACTIONS, authorizeRequest, authorizeRequestAsync, authorizeGit, authorizeGitAsync, bearerCredential } from './auth.js';
 import { RateLimiter } from './ratelimit.js';
 import { Semaphore } from './concurrency.js';
 
@@ -175,9 +175,11 @@ function paginatedResponse(items, pagination, fields) {
 
 // Authorize a request against a capability action and scope. Returns null when
 // authorized, or {status, body} to send as the rejection response.
-function guard(src, req, action, scope) {
+async function guard(src, req, action, scope) {
   const credential = sessionCredential(src, req);
-  const r = authorizeRequest(src.capabilities, req, action, { ...scope, credential });
+  const r = typeof src.capabilities.authorizeAsync === 'function'
+    ? await authorizeRequestAsync(src.capabilities, req, action, { ...scope, credential })
+    : authorizeRequest(src.capabilities, req, action, { ...scope, credential });
   if (r.ok) return null;
   return { status: r.status, body: { error: r.error } };
 }
@@ -280,7 +282,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
 
       // --- human-facing HTML views ---------------------------------------
       if (req.method === 'GET' && pathname === '/') {
-        const g = guard(src, req, ACTIONS.read_source, {});
+        const g = await guard(src, req, ACTIONS.read_source, {});
         if (g) return loginPage(res, g.status, g.body.error);
         return html(res, 200, renderOrgIndex(src));
       }
@@ -288,7 +290,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
       const orgPageMatch = pathname.match(/^\/o\/([^/]+)$/);
       if (req.method === 'GET' && orgPageMatch) {
         const [, orgId] = orgPageMatch;
-        const g = guard(src, req, ACTIONS.read_source, { org: orgId });
+        const g = await guard(src, req, ACTIONS.read_source, { org: orgId });
         if (g) return loginPage(res, g.status, g.body.error);
         return html(res, 200, renderIndex(src, orgId));
       }
@@ -296,7 +298,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
       const pMatch = pathname.match(/^\/o\/([^/]+)\/p\/([^/]+)(?:\/w\/([^/]+))?(?:\/c\/([^/]+))?$/);
       if (req.method === 'GET' && pMatch) {
         const [, orgId, projectId, workId, changeId] = pMatch;
-        const g = guard(src, req, ACTIONS.read_source, { org: orgId, project: projectId });
+        const g = await guard(src, req, ACTIONS.read_source, { org: orgId, project: projectId });
         if (g) return loginPage(res, g.status, g.body.error);
 
         if (changeId) {
@@ -306,7 +308,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         }
 
         if (workId) {
-          const wc = guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
+          const wc = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
           if (wc) return loginPage(res, wc.status, wc.body.error);
           return html(res, 200, renderWork(src, orgId, projectId, workId));
         }
@@ -351,7 +353,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
       if (gitMatch && (req.method === 'GET' || req.method === 'POST')) {
         const [, orgId, projectId, repoFile, rest = ''] = gitMatch;
         const repoRef = repoFile.slice(0, -'.git'.length);
-        const repo = src.resolveRepository(orgId, projectId, repoRef);
+        const repo = await src.resolveRepositoryAsync(orgId, projectId, repoRef);
         if (!repo) return json(res, 404, { error: 'repository not found' });
 
         // Auth: read (upload-pack) vs write (receive-pack). Public repos allow
@@ -368,12 +370,19 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           }
         }
 
-        const auth = authorizeGit(src.capabilities, req, {
+        const auth = typeof src.capabilities.authorizeAsync === 'function'
+          ? await authorizeGitAsync(src.capabilities, req, {
+            org: orgId,
+            project: projectId,
+            visibility: repo.visibility,
+            isWrite,
+          })
+          : authorizeGit(src.capabilities, req, {
           org: orgId,
           project: projectId,
           visibility: repo.visibility,
           isWrite,
-        });
+          });
         if (!auth.ok) return gitAuthError(res, auth.status, auth.error);
         const declaredLength = Number(req.headers['content-length']);
         if (Number.isFinite(declaredLength) && declaredLength > maxGitBodyBytes) {
@@ -430,7 +439,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
 
       // --- organizations (tenant boundary) --------------------------------
       if (pathname === '/api/v1/orgs' && req.method === 'GET') {
-        const g = guard(src, req, ACTIONS.read_source, {});
+        const g = await guard(src, req, ACTIONS.read_source, {});
         const pagination = parseListParams(url);
         if (g) return json(res, g.status, g.body);
         const requestLimit = pagination.limit ? pagination.limit + 1 : null;
@@ -439,7 +448,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
       }
 
       if (pathname === '/api/v1/orgs' && req.method === 'POST') {
-        const g = guard(src, req, ACTIONS.manage_org, {});
+        const g = await guard(src, req, ACTIONS.manage_org, {});
         if (g) return json(res, g.status, g.body);
         const body = await readBody(req, maxJsonBodyBytes);
         const org = src.createOrg({ name: body.name, slug: body.slug });
@@ -449,7 +458,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
       const orgMatch = pathname.match(/^\/api\/v1\/orgs\/([^/]+)$/);
       if (orgMatch && req.method === 'GET') {
         const orgId = orgMatch[1];
-        const g = guard(src, req, ACTIONS.read_source, { org: orgId });
+        const g = await guard(src, req, ACTIONS.read_source, { org: orgId });
         if (g) return json(res, g.status, g.body);
         const org = src.getOrg(orgId);
         if (!org) return json(res, 404, { error: 'not found' });
@@ -464,7 +473,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         const rest = projectMatch[3] || '';
 
         if (rest === '' && req.method === 'GET') {
-          const g = guard(src, req, ACTIONS.read_source, { org: orgId, project: projectId });
+          const g = await guard(src, req, ACTIONS.read_source, { org: orgId, project: projectId });
           if (g) return json(res, g.status, g.body);
           const p = src.getProject(orgId, projectId);
           if (!p) return json(res, 404, { error: 'not found' });
@@ -472,13 +481,13 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         }
 
         if (rest === '/policy' && req.method === 'GET') {
-          const g = guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId });
+          const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId });
           if (g) return json(res, g.status, g.body);
           return json(res, 200, src.getPolicy(orgId, projectId));
         }
 
         if (rest === '/work' && req.method === 'GET') {
-          const g = guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId });
+          const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId });
           const pagination = parseListParams(url);
           if (g) return json(res, g.status, g.body);
           const requestLimit = pagination.limit ? pagination.limit + 1 : null;
@@ -516,7 +525,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           const wrest = workMatch[2] || '';
 
           if (wrest === '' && req.method === 'GET') {
-            const g = guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
+            const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
             const w = src.getWork(orgId, projectId, workId);
             if (!w) return json(res, 404, { error: 'not found' });
@@ -524,7 +533,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           }
 
           if (wrest === '/claim' && req.method === 'POST') {
-            const g = guard(src, req, ACTIONS.claim_work, { org: orgId, project: projectId, work: workId });
+            const g = await guard(src, req, ACTIONS.claim_work, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
             const body = await readBody(req, maxJsonBodyBytes);
             const w = src.claimWork({ orgId, projectId, workId, principalId: body.principalId });
@@ -536,7 +545,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
             if (!(await limiter.allowAsync(`session:${ip}`, limits.session))) {
               return json(res, 429, { error: 'rate limit exceeded' });
             }
-            const g = guard(src, req, ACTIONS.start_session, { org: orgId, project: projectId, work: workId });
+            const g = await guard(src, req, ACTIONS.start_session, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
             const body = await readBody(req, maxJsonBodyBytes);
             const s = src.startSession({ orgId, projectId, workId, principalId: body.principalId, environment: body.environment, baseCommit: body.baseCommit });
@@ -547,7 +556,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           }
 
           if (wrest === '/context' && req.method === 'GET') {
-            const g = guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
+            const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
             const w = src.getWork(orgId, projectId, workId);
             if (!w) return json(res, 404, { error: 'not found' });
@@ -564,7 +573,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           }
 
           if (wrest === '/changes' && req.method === 'POST') {
-            const g = guard(src, req, ACTIONS.submit_change, { org: orgId, project: projectId, work: workId });
+            const g = await guard(src, req, ACTIONS.submit_change, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
             const body = await readBody(req, maxJsonBodyBytes);
             const c = src.submitChange({ orgId, projectId, workId, sessionId: body.sessionId, baseCommit: body.baseCommit, headCommit: body.headCommit, repositories: body.repositories, repositoryChanges: body.repositoryChanges });
@@ -579,7 +588,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           const workId = changeWork(src, orgId, projectId, changeId);
 
           if (crest === '' && req.method === 'GET') {
-            const g = guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
+            const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
             const c = src.getChange(orgId, projectId, changeId);
             if (!c) return json(res, 404, { error: 'not found' });
@@ -587,7 +596,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           }
 
           if (crest === '/evidence' && req.method === 'POST') {
-            const g = guard(src, req, ACTIONS.submit_evidence, { org: orgId, project: projectId, work: workId });
+            const g = await guard(src, req, ACTIONS.submit_evidence, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
             const body = await readBody(req, maxJsonBodyBytes);
             const e = src.addEvidence({ orgId, projectId, changeId, ...body });
@@ -595,21 +604,21 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           }
 
           if (crest === '/evaluate' && req.method === 'POST') {
-            const g = guard(src, req, ACTIONS.submit_evidence, { org: orgId, project: projectId, work: workId });
+            const g = await guard(src, req, ACTIONS.submit_evidence, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
             const r = src.evaluateChange({ orgId, projectId, changeId });
             return json(res, 200, { evaluation: r.evaluation, interpretation: r.interpretation });
           }
 
           if (crest === '/scan' && req.method === 'GET') {
-            const g = guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
+            const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
             const findings = await src.scanChangeSecretsAsync({ orgId, projectId, changeId });
             return json(res, 200, { findings });
           }
 
           if (crest === '/decision' && req.method === 'GET') {
-            const g = guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
+            const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
             const c = src.getChange(orgId, projectId, changeId);
             if (!c) return json(res, 404, { error: 'not found' });
@@ -618,7 +627,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           }
 
           if (crest === '/decision' && req.method === 'POST') {
-            const g = guard(src, req, ACTIONS.accept_change, { org: orgId, project: projectId });
+            const g = await guard(src, req, ACTIONS.accept_change, { org: orgId, project: projectId });
             if (g) return json(res, g.status, g.body);
             const body = await readBody(req, maxJsonBodyBytes);
             const d = src.makeDecision({ orgId, projectId, changeId, decision: body.decision, decider: body.decider, reasoning: body.reasoning });
@@ -631,14 +640,14 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           const evidenceId = evidenceMatch[1];
           const erest = evidenceMatch[2] || '';
           if (erest === '' && req.method === 'GET') {
-            const g = guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId });
+            const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId });
             if (g) return json(res, g.status, g.body);
             const e = src.getEvidence(orgId, projectId, evidenceId);
             if (!e) return json(res, 404, { error: 'not found' });
             return json(res, 200, e);
           }
           if (erest === '/artifact' && req.method === 'GET') {
-            const g = guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId });
+            const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId });
             if (g) return json(res, g.status, g.body);
             const e = src.getEvidence(orgId, projectId, evidenceId);
             if (!e || !e.artifactRef) return json(res, 404, { error: 'not found' });
