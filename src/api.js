@@ -272,6 +272,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
   const limits = {
     submit: { limit: 10, windowMs: 60_000, ...(rateLimit.submit || {}) },
     gitPush: { limit: 30, windowMs: 60_000, ...(rateLimit.gitPush || {}) },
+    gitRead: { limit: 120, windowMs: 60_000, ...(rateLimit.gitRead || {}) },
     login: { limit: 20, windowMs: 60_000, ...(rateLimit.login || {}) },
     session: { limit: 30, windowMs: 60_000, ...(rateLimit.session || {}) },
   };
@@ -319,8 +320,6 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         const password = body.password || null;
         const orgId = body.orgId || undefined;
         const projectId = body.projectId || undefined;
-        const parsedTtl = body.ttlMs !== undefined && body.ttlMs !== null ? Number(body.ttlMs) : undefined;
-        const ttlMs = Number.isFinite(parsedTtl) ? parsedTtl : undefined;
 
         const principal = principalId
           ? (typeof src.getPrincipalAsync === 'function' ? await src.getPrincipalAsync(principalId) : src.getPrincipal(principalId))
@@ -344,8 +343,8 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           return loginPage(res, 400, 'org and project are required');
         }
         const session = typeof src.createHumanSessionAsync === 'function'
-          ? await src.createHumanSessionAsync({ principalId: principal.id, orgId, projectId, ttlMs })
-          : src.createHumanSession({ principalId: principal.id, orgId, projectId, ttlMs });
+          ? await src.createHumanSessionAsync({ principalId: principal.id, orgId, projectId })
+          : src.createHumanSession({ principalId: principal.id, orgId, projectId });
         const headers = { 'Set-Cookie': sessionHeaders(session), 'Content-Type': 'application/json' };
 
         if (wantsHtml(req)) {
@@ -477,12 +476,28 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         const service = url.searchParams.get('service') || '';
         const isWrite = service === 'git-receive-pack' || rest.includes('git-receive-pack');
 
+        // Git only has three documented smart-HTTP path forms.  Passing an
+        // arbitrary suffix to PATH_INFO would let Git normalize dot segments
+        // after Source authorized a different repository.
+        let decodedRest = rest;
+        try {
+          for (let i = 0; i < 2 && decodedRest.includes('%'); i += 1) decodedRest = decodeURIComponent(decodedRest);
+        } catch {
+          return gitAuthError(res, 400, 'invalid Git path');
+        }
+        if (!/^\/(?:info\/refs|git-upload-pack|git-receive-pack)\/?$/.test(decodedRest)
+          || decodedRest.includes('..') || decodedRest.includes('\\')) {
+          return gitAuthError(res, 400, 'invalid Git path');
+        }
+
         // Rate-limit the write path (push) by client address.
+        const ip = req.socket.remoteAddress || 'unknown';
         if (isWrite) {
-          const ip = req.socket.remoteAddress || 'unknown';
           if (!(await limiter.allowAsync(`gitpush:${ip}`, limits.gitPush))) {
             return gitAuthError(res, 429, 'rate limit exceeded');
           }
+        } else if (repo.visibility === 'public' && !(await limiter.allowAsync(`gitread:${ip}`, limits.gitRead))) {
+          return gitAuthError(res, 429, 'rate limit exceeded');
         }
 
         const auth = typeof src.capabilities.authorizeAsync === 'function'
@@ -528,7 +543,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           let streamed = false;
           const result = await gitHttpBackend({
           projectRoot: src.reposRoot(orgId, projectId),
-          pathInfo: `/${repo.id}.git${rest}`,
+          pathInfo: `/${repo.id}.git${decodedRest}`,
           queryString: url.search ? url.search.slice(1) : '',
           method: req.method,
           contentType: req.headers['content-type'] || '',
@@ -725,13 +740,17 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
             if (!(await limiter.allowAsync(`session:${ip}`, limits.session))) {
               return json(res, 429, { error: 'rate limit exceeded' });
             }
-            const g = await guard(src, req, ACTIONS.start_session, { org: orgId, project: projectId, work: workId });
-            if (g) return json(res, g.status, g.body);
+            const credential = await sessionCredential(src, req);
+            const auth = typeof src.capabilities.authorizeAsync === 'function'
+              ? await authorizeRequestAsync(src.capabilities, req, ACTIONS.start_session, { org: orgId, project: projectId, work: workId, credential })
+              : authorizeRequest(src.capabilities, req, ACTIONS.start_session, { org: orgId, project: projectId, work: workId, credential });
+            if (!auth.ok) return json(res, auth.status, { error: auth.error });
             const body = await readBody(req, maxJsonBodyBytes);
-            const s = await src.startSessionAsync({ orgId, projectId, workId, principalId: body.principalId, environment: body.environment, baseCommit: body.baseCommit });
+            const principalId = auth.cap.principalId;
+            const s = await src.startSessionAsync({ orgId, projectId, workId, principalId, environment: body.environment, baseCommit: body.baseCommit });
             // Issue a session-scoped capability (temporary session identity):
             // bounded to this org/project/work, expiring, denied accept/policy.
-            const cap = await src.issueSessionCapabilityAsync({ orgId, projectId, workId, principalId: body.principalId });
+            const cap = await src.issueSessionCapabilityAsync({ orgId, projectId, workId, principalId });
             return json(res, 201, { ...s, capability: cap });
           }
 

@@ -137,6 +137,28 @@ test('a session-scoped capability can submit but cannot accept (denied)', async 
   });
 });
 
+test('session bootstrap binds the issued capability to the authenticated principal', async () => {
+  const { src, org, project, agent, human } = freshSource();
+  const work = src.createWork({ orgId: org.id, projectId: project.id, intent: 'bind session identity', requester: human.id });
+  src.claimWork({ orgId: org.id, projectId: project.id, workId: work.id, principalId: agent.id });
+  const bootstrap = src.capabilities.issue({
+    principalId: agent.id,
+    scope: { org: org.id, project: project.id },
+    allowed: ['start_session'],
+  });
+  await withServer(src, async (base) => {
+    const response = await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/work/${work.id}/sessions`, {
+      method: 'POST',
+      headers: { ...auth(bootstrap.credential), 'content-type': 'application/json' },
+      body: JSON.stringify({ principalId: human.id }),
+    });
+    assert.equal(response.status, 201);
+    const body = await response.json();
+    assert.equal(body.principal, agent.id);
+    assert.equal(body.capability.principalId, agent.id);
+  });
+});
+
 test('human login issues a session and gates HTML/API with session cookies', async () => {
   const { src, org, project, human } = freshSource();
   await withServer(src, async (base) => {

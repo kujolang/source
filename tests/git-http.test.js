@@ -216,3 +216,16 @@ test('path traversal is rejected (no repo escape)', async () => {
     assert.equal(res.status, 404);
   });
 });
+
+test('path traversal in the Git service suffix is rejected', async () => {
+  const { src, org, project, human } = freshSource();
+  const { repo } = seedRepo(src, org.id, project.id);
+  const cap = gitCap(src, org.id, project.id, human.id);
+  await withServer(src, async (base) => {
+    const res = await fetch(
+      `${base}/git/${org.id}/${project.id}/${repo.id}.git/%2e%2e/%2e%2e/other.git/info/refs?service=git-upload-pack`,
+      { headers: { authorization: basicAuthHeader(cap.credential) } },
+    );
+    assert.equal(res.status, 400);
+  });
+});
