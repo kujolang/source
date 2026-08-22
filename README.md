@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **115/115 default tests pass**, including a dogfood test against the real `spec` Kujo
+- **117/117 default tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
@@ -117,6 +117,20 @@ Claims use row locking with `SKIP LOCKED`; expired leases are reclaimable and
 failed jobs can be retried with bounded attempts. This is the worker-plane seam
 for batch workflows that should not run inside request handlers.
 
+Workers register handlers by job kind and can run as separate processes:
+
+```js
+import { SourceWorker } from './src/worker.js';
+
+const worker = new SourceWorker({
+  queue: src.jobs,
+  workerId: process.env.WORKER_ID,
+  concurrency: 32,
+  handlers: { 'agent.batch': async (payload) => runBatch(payload) },
+});
+worker.start();
+```
+
 The machine interface (`/api/v1/…`) is capability-gated: send
 `Authorization: Bearer <credential>` on every request. The Git transport
 (`/git/…`) is capability-gated via HTTP Basic auth: public repos allow anonymous
@@ -182,6 +196,7 @@ src/
   integrations/
     kujo.js      — Eval/Spec/ShipCheck artifact normalizers + KujoRunner
   job-queue.js   — durable Postgres lease/retry queue for worker fleets
+  worker.js      — bounded worker loop with heartbeats and retry routing
 bin/source.js    — CLI entry
 ```
 

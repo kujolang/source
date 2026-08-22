@@ -979,6 +979,19 @@ class PostgresStore {
     return rows[0] || null;
   }
 
+  async extendJobAsync({ id, workerId, leaseMs = 30_000 }) {
+    const safeLease = Math.min(86_400_000, Math.max(1, Math.trunc(leaseMs)));
+    const rows = await this._runJsonCommandAsync(`
+      WITH updated AS (
+        UPDATE ${this._qualified('jobs')}
+        SET leased_until = NOW() + (${safeLease} * INTERVAL '1 millisecond'), updated_at = NOW()
+        WHERE id = ${escapeSqlLiteral(id)} AND status = 'leased' AND worker_id = ${escapeSqlLiteral(workerId)}
+        RETURNING id, leased_until
+      ) SELECT COALESCE(json_agg(row_to_json(updated)), '[]'::json)::text AS rows FROM updated
+    `);
+    return rows[0] || null;
+  }
+
   putArtifact(bytes) {
     const buffer = Buffer.isBuffer(bytes) ? bytes : Buffer.from(String(bytes), 'utf8');
     const hash = createHash('sha256').update(buffer).digest('hex');

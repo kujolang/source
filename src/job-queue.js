@@ -27,4 +27,8 @@ export class JobQueue {
   async fail({ id, workerId, error, retryDelayMs = 1_000, maxAttempts = 5 }) {
     return this.store.failJobAsync({ id, workerId, error, retryDelayMs, maxAttempts });
   }
+
+  async extend({ id, workerId, leaseMs = 30_000 }) {
+    return this.store.extendJobAsync({ id, workerId, leaseMs });
+  }
 }

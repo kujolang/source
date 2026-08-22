@@ -1,0 +1,63 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { SourceWorker } from '../src/worker.js';
+
+const waitFor = async (predicate, timeoutMs = 2_000) => {
+  const started = Date.now();
+  while (!predicate()) {
+    if (Date.now() - started > timeoutMs) throw new Error('worker test timed out');
+    await new Promise((resolve) => setTimeout(resolve, 2));
+  }
+};
+
+test('worker bounds handler concurrency and stops gracefully', async () => {
+  const jobs = Array.from({ length: 20 }, (_, index) => ({ id: `J${index}`, kind: 'batch', payload: { index } }));
+  let active = 0;
+  let maxActive = 0;
+  let completed = 0;
+  const queue = {
+    async claim({ limit }) { return jobs.splice(0, limit); },
+    async complete() { completed += 1; },
+    async fail() { assert.fail('unexpected failure'); },
+    async extend() { return true; },
+  };
+  const worker = new SourceWorker({
+    queue,
+    workerId: 'worker-1',
+    concurrency: 4,
+    pollMs: 1,
+    handlers: {
+      batch: async () => {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        active -= 1;
+      },
+    },
+  });
+  worker.start();
+  await waitFor(() => completed === 20);
+  await worker.stop();
+  assert.equal(maxActive, 4);
+});
+
+test('worker routes handler failures to retry/failure state', async () => {
+  let claimed = true;
+  let failure;
+  const queue = {
+    async claim() {
+      if (!claimed) return [];
+      claimed = false;
+      return [{ id: 'J1', kind: 'missing', payload: {} }];
+    },
+    async complete() { assert.fail('unexpected completion'); },
+    async fail(args) { failure = args; },
+    async extend() { return true; },
+  };
+  const worker = new SourceWorker({ queue, workerId: 'worker-2', pollMs: 1, handlers: {} });
+  worker.start();
+  await waitFor(() => Boolean(failure));
+  await worker.stop();
+  assert.match(failure.error, /no handler registered/);
+  assert.equal(failure.workerId, 'worker-2');
+});
