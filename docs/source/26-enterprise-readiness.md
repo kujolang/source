@@ -14,7 +14,9 @@ approval authority without a matching organization membership and existing
 project.
 
 Durable job enqueueing is bounded by a configurable per-project record depth,
-per-request payload size, and shared rate limit. Completed and failed jobs are
+per-request payload size, and shared rate limit. The Postgres depth quota is
+enforced atomically under the project row lock, so concurrent agents cannot
+oversubscribe it with a count-then-insert race. Completed and failed jobs are
 retained for seven days by default and pruned in bounded batches. Postgres
 fallback `psql` processes have a four-process budget and a ten-second timeout
 by default.

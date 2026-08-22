@@ -710,15 +710,20 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           }
           const payloadBytes = Buffer.byteLength(JSON.stringify(body.payload ?? {}));
           if (payloadBytes > maxJobPayloadBytes) return json(res, 413, { error: 'job payload too large' });
-          const jobCount = typeof src.jobs.count === 'function' ? await src.jobs.count({ orgId, projectId }) : 0;
-          if (jobCount >= maxJobQueueDepth) return json(res, 429, { error: 'job queue depth exceeded' });
-          const job = await src.jobs.enqueue({
-            kind: body.kind,
-            payload: body.payload ?? {},
-            orgId,
-            projectId,
-            workId: body.workId || null,
-          });
+          let job;
+          try {
+            job = await src.jobs.enqueue({
+              kind: body.kind,
+              payload: body.payload ?? {},
+              orgId,
+              projectId,
+              workId: body.workId || null,
+              maxQueueDepth: maxJobQueueDepth,
+            });
+          } catch (error) {
+            if (error?.message === 'job queue depth exceeded') return json(res, 429, { error: error.message });
+            throw error;
+          }
           return json(res, 202, job);
         }
 

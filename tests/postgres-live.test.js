@@ -26,6 +26,7 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     await store.writeJsonAsync('instance.json', { id: 'instance', name: 'postgres-live', apiVersion: '1' });
     const org = await src.createOrgAsync({ name: 'load-org', slug: 'load-org' });
     const project = await src.createProjectAsync({ orgId: org.id, name: 'load-project', slug: 'load-project' });
+    const quotaProject = await src.createProjectAsync({ orgId: org.id, name: 'quota-project', slug: 'quota-project' });
     const principal = await src.createPrincipalAsync({ type: 'agent', name: 'load-agent' });
     peerStore = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 16 } });
     const peerSrc = new Source(dataRoot, { store: peerStore, gitRoot });
@@ -50,6 +51,14 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     const claims = (await Promise.all(Array.from({ length: 8 }, (_, i) => src.jobs.claim({ workerId: `worker-${i}`, limit: 20 })))).flat();
     assert.equal(new Set(claims.map((job) => job.id)).size, queued.length);
   await Promise.all(claims.map((job) => src.jobs.complete({ id: job.id, workerId: job.workerId, leaseToken: job.leaseToken, result: { ok: true } })));
+    const quotaResults = await Promise.allSettled(Array.from({ length: 20 }, (_, i) => src.jobs.enqueue({
+      kind: 'agent.quota', payload: { index: i }, orgId: org.id, projectId: quotaProject.id, maxQueueDepth: 1,
+    })));
+    assert.equal(quotaResults.filter((result) => result.status === 'fulfilled').length, 1);
+    assert.equal(quotaResults.filter((result) => result.reason?.message === 'job queue depth exceeded').length, 19);
+    const quotaJob = (await src.jobs.claim({ workerId: 'quota-worker', limit: 1 }))[0];
+    assert.equal(quotaJob.id, quotaResults.find((result) => result.status === 'fulfilled').value.id);
+    await src.jobs.complete({ id: quotaJob.id, workerId: 'quota-worker', leaseToken: quotaJob.leaseToken, result: { ok: true } });
     const peerJob = await src.jobs.enqueue({ kind: 'agent.peer', payload: { node: 'primary' } });
     const peerClaim = (await peerSrc.jobs.claim({ workerId: 'peer-worker', limit: 1 }))[0];
     assert.equal(peerClaim.id, peerJob.id);
@@ -133,7 +142,7 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
       headers: { Authorization: `Bearer ${jobCapability.credential}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ kind: 'agent.api', payload: { source: 'live-test' } }),
     });
-    assert.equal(enqueuedResponse.status, 202);
+    assert.equal(enqueuedResponse.status, 202, await enqueuedResponse.clone().text());
     const listedResponse = await fetch(`${jobUrl}?limit=2`, { headers: { Authorization: `Bearer ${jobCapability.credential}` } });
     assert.equal(listedResponse.status, 200);
     assert.ok(Array.isArray((await listedResponse.json()).items));

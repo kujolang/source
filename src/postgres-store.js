@@ -966,13 +966,33 @@ class PostgresStore {
     )`);
   }
 
-  async enqueueJobAsync({ kind, payload = {}, availableAt = new Date(), orgId = null, projectId = null, workId = null, maxAttempts = 5 }) {
+  async enqueueJobAsync({ kind, payload = {}, availableAt = new Date(), orgId = null, projectId = null, workId = null, maxAttempts = 5, maxQueueDepth = null }) {
     if (!kind || typeof kind !== 'string') throw new Error('job kind is required');
     const safeAttempts = Math.min(100, Math.max(1, Math.trunc(maxAttempts)));
     const id = await this.nextIdAsync('job', 'J');
     const at = new Date(availableAt).toISOString();
-    await this._runAsync(`INSERT INTO ${this._qualified('jobs')} (id, kind, payload, org_id, project_id, work_id, status, available_at, max_attempts)
-      VALUES (${escapeSqlLiteral(id)}, ${escapeSqlLiteral(kind)}, ${toJson(payload)}, ${escapeSqlLiteral(orgId)}, ${escapeSqlLiteral(projectId)}, ${escapeSqlLiteral(workId)}, 'queued', ${escapeSqlLiteral(at)}, ${safeAttempts})`);
+    const safeDepth = maxQueueDepth == null ? null : Math.min(10_000_000, Math.max(1, Math.trunc(maxQueueDepth)));
+    const insert = () => this._runAsync(`INSERT INTO ${this._qualified('jobs')} (id, kind, payload, org_id, project_id, work_id, status, available_at, max_attempts)
+      VALUES (${escapeSqlLiteral(id)}, ${escapeSqlLiteral(kind)}, ${toJson(payload)}, ${escapeSqlLiteral(orgId)}, ${escapeSqlLiteral(projectId)}, ${escapeSqlLiteral(workId)}, 'queued', ${escapeSqlLiteral(at)}, ${safeAttempts})
+      RETURNING id`);
+    let inserted;
+    if (safeDepth != null && orgId && projectId) {
+      // Lock the project in an explicit transaction. A single SQL statement
+      // can retain a pre-wait snapshot while another request holds the row
+      // lock, which would make a count-then-insert quota race under burst load.
+      inserted = await this.transactionAsync(async () => {
+        await this._runAsync(`SELECT id FROM ${this._qualified('projects')} WHERE id = ${escapeSqlLiteral(projectId)} FOR UPDATE`);
+        const current = await this._runAsync(`SELECT COUNT(*) FROM ${this._qualified('jobs')}
+          WHERE org_id = ${escapeSqlLiteral(orgId)} AND project_id = ${escapeSqlLiteral(projectId)}`);
+        if (Number(current || 0) >= safeDepth) return '';
+        return insert();
+      });
+    } else {
+      inserted = await insert();
+    }
+    if (safeDepth != null && orgId && projectId && !inserted) {
+      throw new Error('job queue depth exceeded');
+    }
     this._jobMaintenanceOps += 1;
     if (this._jobMaintenanceOps % 1_000 === 0) await this.pruneJobsAsync({ limit: 1_000 });
     return { id, kind, payload, orgId, projectId, workId, status: 'queued', attempts: 0, maxAttempts: safeAttempts, availableAt: at };
