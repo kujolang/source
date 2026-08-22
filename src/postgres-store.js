@@ -819,26 +819,24 @@ class PostgresStore {
     const normalized = dirRel.endsWith('/') ? dirRel.slice(0, -1) : dirRel;
     const prefix = `${normalized}/`;
     const limitClause = Number.isInteger(limit) && limit > 0 ? ` LIMIT ${Math.min(limit, 1000)}` : '';
+    const restExpr = `substring(path from ${prefix.length + 1})`;
+    const nameExpr = includeDirs
+      ? `CASE WHEN position('/' in ${restExpr}) > 0 THEN split_part(${restExpr}, '/', 1)
+             WHEN ${restExpr} LIKE '%.json' THEN left(${restExpr}, length(${restExpr}) - 5)
+             ELSE NULL END`
+      : `CASE WHEN position('/' in ${restExpr}) = 0 AND ${restExpr} LIKE '%.json'
+             THEN left(${restExpr}, length(${restExpr}) - 5) ELSE NULL END`;
+    const cursorClause = cursor ? `AND (${nameExpr}) > ${escapeSqlLiteral(cursor)}` : '';
     const rows = await this._fetchJsonRowsAsync(`
-      SELECT path
+      SELECT DISTINCT ${nameExpr} AS name
       FROM ${this._qualified('records')}
       WHERE path LIKE ${escapeSqlLiteral(`${prefix}%`)}
-      ORDER BY path
+        ${cursorClause}
+        AND (${nameExpr}) IS NOT NULL
+      ORDER BY name
       ${limitClause}
     `);
-    const names = rows.map((r) => r.path).map((p) => {
-      if (typeof p !== 'string' || !p.startsWith(`${normalized}/`)) return null;
-      const rest = p.slice(normalized.length + 1);
-      if (!rest) return null;
-      if (rest.includes('/')) return includeDirs ? rest.split('/')[0] : null;
-      return rest.endsWith('.json') ? rest.slice(0, -'.json'.length) : null;
-    }).filter(Boolean).sort();
-    let out = [...new Set(names)];
-    if (cursor) {
-      const start = out.indexOf(cursor);
-      out = start >= 0 ? out.slice(start + 1) : out;
-    }
-    return Number.isInteger(limit) && limit > 0 ? out.slice(0, Math.min(limit, 1001)) : out;
+    return rows.map((row) => row.name).filter(Boolean);
   }
 
   getCapabilityByCredential(credential) {

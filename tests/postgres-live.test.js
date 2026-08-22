@@ -32,6 +32,11 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     })));
     assert.equal(works.length, 1_000);
     assert.equal((await src.listWorkAsync(org.id, project.id, { limit: 1_001 })).length, 1_000);
+    const firstWorkPage = await src.listWorkAsync(org.id, project.id, { limit: 100 });
+    const secondWorkPage = await src.listWorkAsync(org.id, project.id, { cursor: firstWorkPage.at(-1).id, limit: 100 });
+    assert.equal(firstWorkPage.length, 100);
+    assert.equal(secondWorkPage.length, 100);
+    assert.equal(new Set([...firstWorkPage, ...secondWorkPage].map((work) => work.id)).size, 200);
 
     const queued = await Promise.all(Array.from({ length: 100 }, (_, i) => src.jobs.enqueue({ kind: 'agent.batch', payload: { index: i } })));
     const claims = (await Promise.all(Array.from({ length: 8 }, (_, i) => src.jobs.claim({ workerId: `worker-${i}`, limit: 20 })))).flat();
