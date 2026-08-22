@@ -487,7 +487,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
             return json(res, 429, { error: 'rate limit exceeded' });
           }
           const body = await readBody(req, maxJsonBodyBytes);
-          const r = src.submitContribution({ orgId, projectId, ...body });
+          const r = await src.submitContributionAsync({ orgId, projectId, ...body });
           return json(res, 201, r);
         }
 
@@ -585,7 +585,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           if (crest === '/scan' && req.method === 'GET') {
             const g = guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
-            const findings = src.scanChangeSecrets({ orgId, projectId, changeId });
+            const findings = await src.scanChangeSecretsAsync({ orgId, projectId, changeId });
             return json(res, 200, { findings });
           }
 
