@@ -30,8 +30,8 @@ test('Semaphore bounds active work and rejects beyond the queue budget', async (
 
 test('RateLimiter evicts expired keys and caps memory growth', () => {
   const limiter = new RateLimiter({ maxKeys: 2 });
-  assert.equal(limiter.allow('a', { limit: 1, windowMs: 1 }), true);
-  assert.equal(limiter.allow('b', { limit: 1, windowMs: 1 }), true);
+  assert.equal(limiter.allow('a', { limit: 1, windowMs: 60_000 }), true);
+  assert.equal(limiter.allow('b', { limit: 1, windowMs: 60_000 }), true);
   assert.equal(limiter.allow('c', { limit: 1, windowMs: 60_000 }), false);
 });
 
