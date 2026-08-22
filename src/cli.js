@@ -71,6 +71,15 @@ export async function run(argv) {
         return;
       }
       case 'org': {
+        if (sub === 'member' && rest[0] === 'add') {
+          const membership = src.addOrgMember({
+            orgId: flag('--org') || 'O1',
+            principalId: flag('--principal'),
+            role: flag('--role') || 'member',
+          });
+          print(membership);
+          return;
+        }
         if (sub === 'create') {
           const org = src.createOrg({ name: flag('--name') || 'default', slug: flag('--slug') || 'default' });
           print(org);
@@ -300,6 +309,7 @@ export async function run(argv) {
             gitQueue: numberFlag('--git-queue', 256),
             maxConnections: numberFlag('--max-connections', 10_000),
             maxGitBodyBytes: numberFlag('--max-git-body', 100_000_000),
+            maxChunkedGitBodyBytes: numberFlag('--max-chunked-git-body', 16 * 1024 * 1024),
             maxGitResponseBytes: numberFlag('--max-git-response', 512 * 1024 * 1024),
             gitTimeoutMs: numberFlag('--git-timeout-ms', 120_000),
             maxJsonBodyBytes: numberFlag('--max-json-body', 1_000_000),
@@ -397,6 +407,7 @@ export async function run(argv) {
           'Commands:',
           '  init --name <n> [--hosted]',
           '  org create|list|show [--name <n> --slug <s>]',
+          '  org member add --org <o> --principal <id> [--role member|maintainer|admin]',
           '  project create|list|show --org <o> [--name --slug]',
           '  repo create --org <o> --project <p> --name <n>',
           '  principal create --type human|agent|service --name <n>',

@@ -48,18 +48,37 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     const queued = await Promise.all(Array.from({ length: 100 }, (_, i) => src.jobs.enqueue({ kind: 'agent.batch', payload: { index: i } })));
     const claims = (await Promise.all(Array.from({ length: 8 }, (_, i) => src.jobs.claim({ workerId: `worker-${i}`, limit: 20 })))).flat();
     assert.equal(new Set(claims.map((job) => job.id)).size, queued.length);
-    await Promise.all(claims.map((job) => src.jobs.complete({ id: job.id, workerId: job.workerId, result: { ok: true } })));
+  await Promise.all(claims.map((job) => src.jobs.complete({ id: job.id, workerId: job.workerId, leaseToken: job.leaseToken, result: { ok: true } })));
     const peerJob = await src.jobs.enqueue({ kind: 'agent.peer', payload: { node: 'primary' } });
     const peerClaim = (await peerSrc.jobs.claim({ workerId: 'peer-worker', limit: 1 }))[0];
     assert.equal(peerClaim.id, peerJob.id);
-    await peerSrc.jobs.complete({ id: peerClaim.id, workerId: 'peer-worker', result: { node: 'peer' } });
+  await peerSrc.jobs.complete({ id: peerClaim.id, workerId: 'peer-worker', leaseToken: peerClaim.leaseToken, result: { node: 'peer' } });
     const leaseJob = await src.jobs.enqueue({ kind: 'agent.recover', payload: {} });
     const leased = (await src.jobs.claim({ workerId: 'crashed-worker', limit: 1, leaseMs: 1 }))[0];
     assert.equal(leased.id, leaseJob.id);
     await new Promise((resolve) => setTimeout(resolve, 20));
     const recovered = (await src.jobs.claim({ workerId: 'recovery-worker', limit: 1, leaseMs: 5_000 }))[0];
     assert.equal(recovered.id, leaseJob.id);
-    await src.jobs.complete({ id: recovered.id, workerId: 'recovery-worker', result: { recovered: true } });
+    await src.jobs.complete({ id: recovered.id, workerId: 'recovery-worker', leaseToken: recovered.leaseToken, result: { recovered: true } });
+
+    const fencedJob = await src.jobs.enqueue({ kind: 'agent.fenced', payload: {}, orgId: org.id, projectId: project.id });
+    const firstLease = (await src.jobs.claim({ workerId: 'fence-a', limit: 1, leaseMs: 1 }))[0];
+    assert.equal(firstLease.id, fencedJob.id);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const secondLease = (await src.jobs.claim({ workerId: 'fence-b', limit: 1, leaseMs: 5_000 }))[0];
+    assert.equal(secondLease.id, fencedJob.id);
+    assert.equal(await src.jobs.complete({ id: fencedJob.id, workerId: 'fence-a', leaseToken: firstLease.leaseToken, result: { stale: true } }), false);
+    assert.equal(await src.jobs.complete({ id: fencedJob.id, workerId: 'fence-b', leaseToken: secondLease.leaseToken, result: { stale: false } }), true);
+
+    const cappedJob = await src.jobs.enqueue({ kind: 'agent.capped', payload: {}, orgId: org.id, projectId: project.id, maxAttempts: 1 });
+    const cappedLease = (await src.jobs.claim({ workerId: 'cap-a', limit: 1, leaseMs: 1 }))[0];
+    assert.equal(cappedLease.id, cappedJob.id);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const capReclaim = (await src.jobs.claim({ workerId: 'cap-b', limit: 1 }))[0];
+    assert.notEqual(capReclaim?.id, cappedJob.id);
+    if (capReclaim) await src.jobs.complete({ id: capReclaim.id, workerId: 'cap-b', leaseToken: capReclaim.leaseToken, result: { unrelated: true } });
+    const cappedRows = await src.jobs.list({ orgId: org.id, projectId: project.id, limit: 100 });
+    assert.equal(cappedRows.find((job) => job.id === cappedJob.id)?.status, 'failed');
 
     const restartJob = await src.jobs.enqueue({ kind: 'agent.restart', payload: {} });
     const restartLease = (await src.jobs.claim({ workerId: 'terminated-worker', limit: 1, leaseMs: 1 }))[0];
@@ -70,7 +89,7 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     await new Promise((resolve) => setTimeout(resolve, 20));
     const afterRestart = (await src.jobs.claim({ workerId: 'restarted-worker', limit: 1, leaseMs: 5_000 }))[0];
     assert.equal(afterRestart.id, restartJob.id);
-    await src.jobs.complete({ id: afterRestart.id, workerId: 'restarted-worker', result: { restarted: true } });
+  await src.jobs.complete({ id: afterRestart.id, workerId: 'restarted-worker', leaseToken: afterRestart.leaseToken, result: { restarted: true } });
 
     let handled = 0;
     let retryAttempts = 0;

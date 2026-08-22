@@ -205,6 +205,31 @@ test('human login cannot self-select privileged actions or an unscoped session',
   });
 });
 
+test('human login requires organization membership and role-scopes approval', async () => {
+  const { src, org, project, human } = freshSource();
+  const other = src.createPrincipal({ type: 'human', name: 'reader', password: 'reader-password-123' });
+  await withServer(src, async (base) => {
+    const denied = await fetch(`${base}/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ principalId: other.id, password: 'reader-password-123', orgId: org.id, projectId: project.id }),
+    });
+    assert.equal(denied.status, 403);
+
+    src.addOrgMember({ orgId: org.id, principalId: other.id, role: 'member' });
+    const login = await fetch(`${base}/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ principalId: other.id, password: 'reader-password-123', orgId: org.id, projectId: project.id }),
+    });
+    assert.equal(login.status, 200);
+    const body = await login.json();
+    assert.deepEqual(body.capability.allowed, ['read_source', 'read_context']);
+    assert.equal(body.capability.allowed.includes('accept_change'), false);
+    assert.equal(human.type, 'human');
+  });
+});
+
 test('human sessions control authorization for human-facing actions', async () => {
   const { src, org, project, human, agent, service } = freshSource();
   const work = src.createWork({ orgId: org.id, projectId: project.id, intent: 'login action test', requester: human.id });
@@ -232,13 +257,13 @@ test('human sessions control authorization for human-facing actions', async () =
   });
 });
 
-test('the contribution submit endpoint remains public (low-friction onboarding)', async () => {
+test('private contribution submit requires authorization', async () => {
   const { src, org, project } = freshSource();
   const repo = src.createRepository({ orgId: org.id, projectId: project.id, name: 'main' });
   await withServer(src, async (base) => {
     // No credential: the submit endpoint is the anonymous contribution path.
     const res = await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/submit`, { method: 'POST', body: JSON.stringify({ repoRef: repo.name, baseCommit: 'a', headCommit: 'b' }) });
-    // base/head commits are not present, so it fails with 400 — but not 401/403.
-    assert.equal(res.status, 400);
+    // The default project is private, so anonymous lifecycle mutation is denied.
+    assert.equal(res.status, 401);
   });
 });

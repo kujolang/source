@@ -135,6 +135,39 @@ export class Source {
     return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.getOrg(orgId);
   }
 
+  _orgMemberRel(orgId, principalId) {
+    return `${this._orgRel(orgId)}/members/${principalId}.json`;
+  }
+
+  addOrgMember({ orgId, principalId, role = 'member' }) {
+    if (!['member', 'maintainer', 'admin'].includes(role)) throw new Error(`invalid organization role: ${role}`);
+    if (!this.getOrg(orgId)) throw new Error(`org not found: ${orgId}`);
+    if (!this.getPrincipal(principalId)) throw new Error(`principal not found: ${principalId}`);
+    const membership = { orgId, principalId, role, createdAt: new Date().toISOString() };
+    this.store.writeJson(this._orgMemberRel(orgId, principalId), membership);
+    this.store.audit({ event: 'org.member.add', orgId, principalId, role });
+    return membership;
+  }
+
+  async addOrgMemberAsync({ orgId, principalId, role = 'member' }) {
+    if (!['member', 'maintainer', 'admin'].includes(role)) throw new Error(`invalid organization role: ${role}`);
+    if (!(await this.getOrgAsync(orgId))) throw new Error(`org not found: ${orgId}`);
+    if (!(await this.getPrincipalAsync(principalId))) throw new Error(`principal not found: ${principalId}`);
+    const membership = { orgId, principalId, role, createdAt: new Date().toISOString() };
+    await this._asyncWrite(this._orgMemberRel(orgId, principalId), membership);
+    await this._asyncAudit({ event: 'org.member.add', orgId, principalId, role });
+    return membership;
+  }
+
+  getOrgMembership(orgId, principalId) {
+    return this.store.readJson(this._orgMemberRel(orgId, principalId));
+  }
+
+  async getOrgMembershipAsync(orgId, principalId) {
+    const rel = this._orgMemberRel(orgId, principalId);
+    return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.getOrgMembership(orgId, principalId);
+  }
+
   listOrgs({ cursor, limit } = {}) {
     const ids = this.store.listJson('orgs', { cursor, limit, includeDirs: true });
     return ids.map((id) => this.getOrg(id)).filter(Boolean);
@@ -1066,7 +1099,7 @@ export class Source {
   // Change against the exact base state, deterministic footprint evidence, a
   // deterministic credential scan, and evaluates policy. Returns the full
   // lifecycle for inspection.
-  submitContribution({ orgId, projectId, repoRef, baseCommit, headCommit, intent = '', contributorName = 'contributor' }) {
+  submitContribution({ orgId, projectId, repoRef, baseCommit, headCommit, intent = '', contributorName = 'contributor', principalId = null }) {
     const repo = this.resolveRepository(orgId, projectId, repoRef);
     if (!repo) throw new Error(`repository not found: ${repoRef}`);
     const git = this.gitRepo(orgId, projectId, repo.id);
@@ -1075,7 +1108,8 @@ export class Source {
     if (baseCommit === headCommit) throw new Error('no changes to submit (base == head)');
 
     // Contributor identity: a human principal (no auth in the MVP).
-    const principal = this.createPrincipal({ type: 'human', name: contributorName });
+    const principal = principalId ? this.getPrincipal(principalId) : this.createPrincipal({ type: 'human', name: contributorName });
+    if (!principal) throw new Error(`principal not found: ${principalId}`);
 
     // Contribution Work → claim → Session → Change.
     const work = this.createWork({
@@ -1186,7 +1220,7 @@ export class Source {
     return findings;
   }
 
-  async submitContributionAsync({ orgId, projectId, repoRef, baseCommit, headCommit, intent = '', contributorName = 'contributor' }) {
+  async submitContributionAsync({ orgId, projectId, repoRef, baseCommit, headCommit, intent = '', contributorName = 'contributor', principalId = null }) {
     const repo = this.resolveRepository(orgId, projectId, repoRef);
     if (!repo) throw new Error(`repository not found: ${repoRef}`);
     const git = this.gitRepo(orgId, projectId, repo.id);
@@ -1194,7 +1228,10 @@ export class Source {
     if (baseCommit && !(await git.hasCommitAsync(baseCommit))) throw new Error('base commit not present in repository');
     if (baseCommit === headCommit) throw new Error('no changes to submit (base == head)');
 
-    const principal = await this.createPrincipalAsync({ type: 'human', name: contributorName });
+    const principal = principalId
+      ? await this.getPrincipalAsync(principalId)
+      : await this.createPrincipalAsync({ type: 'human', name: contributorName });
+    if (!principal) throw new Error(`principal not found: ${principalId}`);
     const work = await this.createWorkAsync({ orgId, projectId, intent: intent || `Contribution to ${repo.name}`, type: 'contribution', requester: principal.id });
     await this.claimWorkAsync({ orgId, projectId, workId: work.id, principalId: principal.id });
     const session = await this.startSessionAsync({ orgId, projectId, workId: work.id, principalId: principal.id, baseCommit });

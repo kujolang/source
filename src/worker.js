@@ -61,19 +61,20 @@ export class SourceWorker {
       if (typeof handler !== 'function') throw new Error(`no handler registered for job kind: ${job.kind}`);
       const heartbeatMs = Math.max(1, Math.floor(this.leaseMs / 3));
       heartbeat = setInterval(() => {
-        this.queue.extend({ id: job.id, workerId: this.workerId, leaseMs: this.leaseMs }).catch(() => {});
+        this.queue.extend({ id: job.id, workerId: this.workerId, leaseToken: job.leaseToken, leaseMs: this.leaseMs }).catch(() => {});
       }, heartbeatMs);
       const result = await handler(job.payload, job);
-      await this.queue.complete({ id: job.id, workerId: this.workerId, result });
+      await this.queue.complete({ id: job.id, workerId: this.workerId, leaseToken: job.leaseToken, result });
     } catch (error) {
       this._reportError(error);
       try {
         await this.queue.fail({
           id: job.id,
           workerId: this.workerId,
+          leaseToken: job.leaseToken,
           error: error instanceof Error ? error.message : String(error),
           retryDelayMs: this.retryDelayMs,
-          maxAttempts: this.maxAttempts,
+          maxAttempts: job.maxAttempts ?? this.maxAttempts,
         });
       } catch (failureError) {
         // A transient database failure must not terminate the worker. The

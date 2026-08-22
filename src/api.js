@@ -266,13 +266,15 @@ async function changeWork(src, orgId, projectId, changeId) {
   return c ? c.workId : undefined;
 }
 
-export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxGitBodyBytes = 100_000_000, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTimeoutMs = 120_000, maxConnections = 10_000 } = {}) {
+export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxJobPayloadBytes = 64 * 1024, maxJobQueueDepth = 100_000, maxGitBodyBytes = 100_000_000, maxChunkedGitBodyBytes = 16 * 1024 * 1024, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTimeoutMs = 120_000, maxConnections = 10_000 } = {}) {
   const limiter = new RateLimiter({ maxKeys: rateLimit.maxKeys || 100_000, store: rateLimit.store || src.store });
   const gitSlots = new Semaphore({ capacity: gitConcurrency, queue: gitQueue });
+  const chunkedGitSlots = new Semaphore({ capacity: Math.max(1, Math.min(4, gitConcurrency)), queue: Math.max(0, Math.min(32, gitQueue)) });
   const limits = {
     submit: { limit: 10, windowMs: 60_000, ...(rateLimit.submit || {}) },
     gitPush: { limit: 30, windowMs: 60_000, ...(rateLimit.gitPush || {}) },
     gitRead: { limit: 120, windowMs: 60_000, ...(rateLimit.gitRead || {}) },
+    jobEnqueue: { limit: 120, windowMs: 60_000, ...(rateLimit.jobEnqueue || {}) },
     login: { limit: 20, windowMs: 60_000, ...(rateLimit.login || {}) },
     session: { limit: 30, windowMs: 60_000, ...(rateLimit.session || {}) },
   };
@@ -342,9 +344,21 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           if (wantsJson(req)) return json(res, 400, { error: 'orgId and projectId are required' });
           return loginPage(res, 400, 'org and project are required');
         }
+        const membership = typeof src.getOrgMembershipAsync === 'function'
+          ? await src.getOrgMembershipAsync(orgId, principal.id)
+          : src.getOrgMembership(orgId, principal.id);
+        const project = typeof src.getProjectAsync === 'function'
+          ? await src.getProjectAsync(orgId, projectId)
+          : src.getProject(orgId, projectId);
+        if (!membership || !project) {
+          if (wantsJson(req)) return json(res, 403, { error: 'principal is not a member of this project' });
+          return loginPage(res, 403, 'principal is not a member of this project');
+        }
+        const allowed = ['read_source', 'read_context'];
+        if (membership.role === 'maintainer' || membership.role === 'admin') allowed.push('accept_change');
         const session = typeof src.createHumanSessionAsync === 'function'
-          ? await src.createHumanSessionAsync({ principalId: principal.id, orgId, projectId })
-          : src.createHumanSession({ principalId: principal.id, orgId, projectId });
+          ? await src.createHumanSessionAsync({ principalId: principal.id, orgId, projectId, allowed })
+          : src.createHumanSession({ principalId: principal.id, orgId, projectId, allowed });
         const headers = { 'Set-Cookie': sessionHeaders(session), 'Content-Type': 'application/json' };
 
         if (wantsHtml(req)) {
@@ -522,6 +536,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         const release = await gitSlots.acquire();
         if (!release) return gitAuthError(res, 503, 'Git service busy; retry later');
         let body = null;
+        let releaseChunked = null;
         try {
           const abortController = new AbortController();
           req.once('aborted', () => abortController.abort());
@@ -536,7 +551,9 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
               input = req;
               contentLength = length;
             } else {
-              body = await readRawBody(req, maxGitBodyBytes);
+              releaseChunked = await chunkedGitSlots.acquire();
+              if (!releaseChunked) return gitAuthError(res, 503, 'chunked Git uploads busy; retry later');
+              body = await readRawBody(req, Math.min(maxGitBodyBytes, maxChunkedGitBodyBytes));
             }
           }
 
@@ -583,6 +600,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           res.writeHead(result.status, headers);
           return res.end(result.body);
         } finally {
+          releaseChunked?.();
           release();
         }
       }
@@ -672,6 +690,10 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
 
         if (rest === '/jobs' && req.method === 'POST') {
           const body = await readBody(req, maxJsonBodyBytes);
+          const ip = req.socket.remoteAddress || 'unknown';
+          if (!(await limiter.allowAsync(`job:${ip}:${orgId}:${projectId}`, limits.jobEnqueue))) {
+            return json(res, 429, { error: 'rate limit exceeded' });
+          }
           const g = await guard(src, req, ACTIONS.enqueue_job, {
             org: orgId,
             project: projectId,
@@ -681,6 +703,10 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           if (typeof body.kind !== 'string' || !/^[A-Za-z0-9_.:-]{1,120}$/.test(body.kind)) {
             return json(res, 400, { error: 'kind must be 1-120 safe characters' });
           }
+          const payloadBytes = Buffer.byteLength(JSON.stringify(body.payload ?? {}));
+          if (payloadBytes > maxJobPayloadBytes) return json(res, 413, { error: 'job payload too large' });
+          const jobCount = typeof src.jobs.count === 'function' ? await src.jobs.count({ orgId, projectId }) : 0;
+          if (jobCount >= maxJobQueueDepth) return json(res, 429, { error: 'job queue depth exceeded' });
           const job = await src.jobs.enqueue({
             kind: body.kind,
             payload: body.payload ?? {},
@@ -693,12 +719,26 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
 
         // Contribution flow: a Git-only developer submits a change from a
         // working clone. Source creates the Work → Session → Change → Evidence
-        // lifecycle server-side. Public by design (low-friction onboarding);
-        // rate-limited by client address.
+        // lifecycle server-side. Public projects support low-friction
+        // onboarding; private projects require a project-scoped capability.
         if (rest === '/submit' && req.method === 'POST') {
           const ip = req.socket.remoteAddress || 'unknown';
           if (!(await limiter.allowAsync(`submit:${ip}`, limits.submit))) {
             return json(res, 429, { error: 'rate limit exceeded' });
+          }
+          const body = await readBody(req, maxJsonBodyBytes);
+          const project = typeof src.getProjectAsync === 'function'
+            ? await src.getProjectAsync(orgId, projectId)
+            : src.getProject(orgId, projectId);
+          if (!project) return json(res, 404, { error: 'project not found' });
+          let submitPrincipalId = null;
+          if (project.visibility !== 'public') {
+            const credential = await sessionCredential(src, req);
+            const auth = typeof src.capabilities.authorizeAsync === 'function'
+              ? await authorizeRequestAsync(src.capabilities, req, ACTIONS.submit_change, { org: orgId, project: projectId, credential })
+              : authorizeRequest(src.capabilities, req, ACTIONS.submit_change, { org: orgId, project: projectId, credential });
+            if (!auth.ok) return json(res, auth.status, { error: auth.error });
+            submitPrincipalId = auth.cap.principalId;
           }
           const release = await gitSlots.acquire();
           if (!release) {
@@ -706,8 +746,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
             return json(res, 503, { error: 'Git service busy; retry later' });
           }
           try {
-            const body = await readBody(req, maxJsonBodyBytes);
-            const r = await src.submitContributionAsync({ orgId, projectId, ...body });
+            const r = await src.submitContributionAsync({ ...body, orgId, projectId, principalId: submitPrincipalId });
             return json(res, 201, r);
           } finally {
             release();
@@ -728,10 +767,13 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
           }
 
           if (wrest === '/claim' && req.method === 'POST') {
-            const g = await guard(src, req, ACTIONS.claim_work, { org: orgId, project: projectId, work: workId });
-            if (g) return json(res, g.status, g.body);
+            const credential = await sessionCredential(src, req);
+            const auth = typeof src.capabilities.authorizeAsync === 'function'
+              ? await authorizeRequestAsync(src.capabilities, req, ACTIONS.claim_work, { org: orgId, project: projectId, work: workId, credential })
+              : authorizeRequest(src.capabilities, req, ACTIONS.claim_work, { org: orgId, project: projectId, work: workId, credential });
+            if (!auth.ok) return json(res, auth.status, { error: auth.error });
             const body = await readBody(req, maxJsonBodyBytes);
-            const w = await src.claimWorkAsync({ orgId, projectId, workId, principalId: body.principalId });
+            const w = await src.claimWorkAsync({ orgId, projectId, workId, principalId: auth.cap.principalId });
             return json(res, 200, w);
           }
 

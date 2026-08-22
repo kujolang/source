@@ -61,8 +61,9 @@ test('an agent can complete the workflow without HTML (capability-gated)', async
     assert.ok(workList.some((x) => x.id === w.id));
 
     // claim work
-    const claim = await (await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/work/${w.id}/claim`, { method: 'POST', headers: auth(agentCap.credential), body: JSON.stringify({ principalId: agent.id }) })).json();
+    const claim = await (await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/work/${w.id}/claim`, { method: 'POST', headers: auth(agentCap.credential), body: JSON.stringify({ principalId: human.id }) })).json();
     assert.equal(claim.status, 'claimed');
+    assert.equal(claim.assignee, agent.id);
 
     // start session (returns a session-scoped capability)
     const session = await (await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/work/${w.id}/sessions`, { method: 'POST', headers: auth(agentCap.credential), body: JSON.stringify({ principalId: agent.id, baseCommit: 'base' }) })).json();
