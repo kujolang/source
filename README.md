@@ -102,7 +102,9 @@ default), a 10-second connection timeout, a 30-second idle timeout, and a
 30-second query timeout; tune these through the store's `connectionOptions` for
 the deployment's database capacity.
 
-`/healthz` reports process liveness. `/readyz` verifies that the Source
+`/healthz` reports process liveness. `/metrics` exposes low-cardinality
+Prometheus-compatible request, response, active-request, and abort counters.
+`/readyz` verifies that the Source
 instance, metadata store, and Git root are available; remove an instance
 from service when readiness returns `503`. On shutdown the CLI marks the
 instance draining, rejects new work with `503`, allows active requests to

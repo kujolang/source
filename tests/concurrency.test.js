@@ -161,6 +161,9 @@ test('health and readiness endpoints expose process and storage state', async ()
   try {
     assert.equal((await fetch(`${base}/healthz`)).status, 200);
     assert.equal((await fetch(`${base}/readyz`)).status, 200);
+    const metricResponse = await fetch(`${base}/metrics`);
+    assert.equal(metricResponse.status, 200);
+    assert.match(await metricResponse.text(), /source_requests_total/);
     src.store.checkHealthAsync = async () => { throw new Error('database unavailable'); };
     assert.equal((await fetch(`${base}/readyz`)).status, 503);
     delete src.store.checkHealthAsync;

@@ -36,6 +36,27 @@ function json(res, status, obj) {
   res.end(body);
 }
 
+function metrics(res, state) {
+  const lines = [
+    '# HELP source_requests_total Total HTTP requests received.',
+    '# TYPE source_requests_total counter',
+    `source_requests_total ${state.requestsTotal}`,
+    '# HELP source_responses_total Total HTTP responses completed.',
+    '# TYPE source_responses_total counter',
+    `source_responses_total ${state.responsesTotal}`,
+    '# HELP source_active_requests Current requests being handled.',
+    '# TYPE source_active_requests gauge',
+    `source_active_requests ${state.activeRequests}`,
+    '# HELP source_aborted_requests_total Requests whose clients disconnected before completion.',
+    '# TYPE source_aborted_requests_total counter',
+    `source_aborted_requests_total ${state.abortedRequests}`,
+  ];
+  for (const [status, count] of state.statuses) lines.push(`source_responses_by_status_total{status="${status}"} ${count}`);
+  const body = `${lines.join('\n')}\n`;
+  res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4', 'Content-Length': Buffer.byteLength(body) });
+  res.end(body);
+}
+
 function html(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': Buffer.byteLength(body) });
   res.end(body);
@@ -256,11 +277,29 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
   };
 
   const handler = async (req, res) => {
+    const state = server.metrics;
+    state.requestsTotal += 1;
+    state.activeRequests += 1;
+    let accounted = false;
+    const accountResponse = (aborted) => {
+      if (accounted) return;
+      accounted = true;
+      state.activeRequests = Math.max(0, state.activeRequests - 1);
+      if (aborted) state.abortedRequests += 1;
+      else {
+        state.responsesTotal += 1;
+        const status = String(res.statusCode || 200);
+        state.statuses.set(status, (state.statuses.get(status) || 0) + 1);
+      }
+    };
+    res.once('finish', () => accountResponse(false));
+    res.once('close', () => { if (!res.writableFinished) accountResponse(true); });
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const pathname = url.pathname;
     const fields = url.searchParams.get('fields') || undefined;
 
     try {
+      if (req.method === 'GET' && pathname === '/metrics') return metrics(res, state);
       if (server.draining && pathname !== '/healthz' && pathname !== '/readyz') {
         return json(res, 503, { error: 'server is draining' });
       }
@@ -819,6 +858,13 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
   };
 
   const server = tls ? https.createServer(tls, handler) : http.createServer(handler);
+  server.metrics = {
+    requestsTotal: 0,
+    responsesTotal: 0,
+    activeRequests: 0,
+    abortedRequests: 0,
+    statuses: new Map(),
+  };
   server.draining = false;
   server.beginDrain = () => { server.draining = true; };
   server.requestTimeout = 120_000;
