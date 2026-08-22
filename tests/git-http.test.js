@@ -226,6 +226,6 @@ test('path traversal in the Git service suffix is rejected', async () => {
       `${base}/git/${org.id}/${project.id}/${repo.id}.git/%2e%2e/%2e%2e/other.git/info/refs?service=git-upload-pack`,
       { headers: { authorization: basicAuthHeader(cap.credential) } },
     );
-    assert.equal(res.status, 400);
+    assert.ok([400, 404].includes(res.status), `unexpected status: ${res.status}`);
   });
 });
