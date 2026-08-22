@@ -22,6 +22,7 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { freshSource, seedRepo } from './helpers.js';
 import { startServer } from '../src/api.js';
+import { gitHttpBackend } from '../src/git-http.js';
 
 function run(args, cwd) {
   return new Promise((resolve, reject) => {
@@ -62,6 +63,17 @@ function basicAuthHeader(credential) {
 function gitCap(src, orgId, projectId, principalId) {
   return src.issueGitCapability({ orgId, projectId, principalId });
 }
+
+test('aborting a Git backend request rejects promptly', async () => {
+  const controller = new AbortController();
+  const request = gitHttpBackend({
+    projectRoot: '/tmp',
+    pathInfo: '/missing.git/info/refs',
+    abortSignal: controller.signal,
+  });
+  controller.abort();
+  await assert.rejects(request, /Git request was aborted/);
+});
 
 test('git clone works over smart HTTP (authenticated)', async () => {
   const { src, org, project, human } = freshSource();
