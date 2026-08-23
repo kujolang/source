@@ -52,7 +52,9 @@ node bin/source.js org create --name kujolang --slug kujolang
 node bin/source.js org list
 node bin/source.js org show O1
 node bin/source.js project create --org O1 --name spec --slug spec
+node bin/source.js repo create --org O1 --project P1 --name main
 node bin/source.js principal create --type human --name maintainer --password '<12+ character password>'
+node bin/source.js org member add --org O1 --principal U1 --role admin
 node bin/source.js work create --org O1 --project P1 --intent "fix parser regression"
 node bin/source.js work claim --org O1 --project P1 W1 --principal U1
 
