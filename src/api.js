@@ -419,7 +419,7 @@ async function changeWork(src, orgId, projectId, changeId) {
   return c ? c.workId : undefined;
 }
 
-export function createServer(src, { port = 8787, tls, host, trustProxy = false, webhookSecret = process.env.SOURCE_WEBHOOK_SECRET || null, secretBroker = null, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxJobPayloadBytes = 64 * 1024, maxJobQueueDepth = 100_000, maxWorkflowJobs = 1_000, maxGitBodyBytes = 100_000_000, maxChunkedGitBodyBytes = 16 * 1024 * 1024, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTenantConcurrency = 8, gitTenantQueue = 256, gitTimeoutMs = 120_000, artifactConcurrency = 8, artifactQueue = 64, requestConcurrency = 2_048, requestQueue = 4_096, maxConnections = 10_000, requireReplication = false, replicationRole = 'primary', replicationMinStandbys = 1, replicationMaxLagBytes = 64 * 1024 * 1024, readOnly = false } = {}) {
+export function createServer(src, { port = 8787, tls, host, trustProxy = false, webhookSecret = process.env.SOURCE_WEBHOOK_SECRET || null, secretBroker = null, writerLease = null, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxJobPayloadBytes = 64 * 1024, maxJobQueueDepth = 100_000, maxWorkflowJobs = 1_000, maxGitBodyBytes = 100_000_000, maxChunkedGitBodyBytes = 16 * 1024 * 1024, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTenantConcurrency = 8, gitTenantQueue = 256, gitTimeoutMs = 120_000, artifactConcurrency = 8, artifactQueue = 64, requestConcurrency = 2_048, requestQueue = 4_096, maxConnections = 10_000, requireReplication = false, replicationRole = 'primary', replicationMinStandbys = 1, replicationMaxLagBytes = 64 * 1024 * 1024, readOnly = false } = {}) {
   const limiter = new RateLimiter({ maxKeys: rateLimit.maxKeys || 100_000, store: rateLimit.store || src.store });
   const gitSlots = new Semaphore({ capacity: gitConcurrency, queue: gitQueue });
   const gitTenantSlots = new KeyedSemaphore({ capacity: gitTenantConcurrency, queue: gitTenantQueue, maxKeys: rateLimit.maxKeys || 100_000 });
@@ -483,6 +483,9 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
       if (server.readOnly && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
         res.setHeader('Retry-After', '5');
         return json(res, 503, { error: 'read-only replica', retryable: true });
+      }
+      if (server.writerLease && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+        await server.writerLease.assertAsync();
       }
       // --- login ---------------------------------------------------------
       if (req.method === 'GET' && pathname === '/login') {
@@ -578,6 +581,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           if (typeof src.checkHealthAsync === 'function') await src.checkHealthAsync();
           else if (typeof src.store.checkHealthAsync === 'function') await src.store.checkHealthAsync();
           if (server.secretBroker) await server.secretBroker.checkHealth();
+          if (server.writerLease) await server.writerLease.assertAsync();
           if (server.requireReplication) {
             if (typeof src.store.checkReplicationAsync !== 'function') throw new Error('replication readiness is not supported by the configured store');
             await src.store.checkReplicationAsync({ role: server.replicationRole, minStandbys: server.replicationMinStandbys, maxLagBytes: server.replicationMaxLagBytes });
@@ -1225,6 +1229,10 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
         res.setHeader('Retry-After', '1');
         return json(res, 503, { error: 'canonical update capacity exhausted', retryable: true });
       }
+      if (e?.code === 'WRITER_LEASE_LOST' || e?.code === 'WRITER_LEASE_HELD') {
+        res.setHeader('Retry-After', '1');
+        return json(res, 503, { error: 'writer lease unavailable', retryable: true });
+      }
       if (isRetryableStoreError(e)) {
         res.setHeader('Retry-After', '1');
         return json(res, 503, { error: 'storage temporarily unavailable', retryable: true });
@@ -1243,6 +1251,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
   };
   server.discoveryInstancePromise = null;
   server.secretBroker = secretBroker;
+  server.writerLease = writerLease;
   server.artifactSlots = artifactSlots;
   server.requestSlots = requestSlots;
   server.draining = false;

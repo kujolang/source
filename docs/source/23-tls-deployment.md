@@ -272,6 +272,32 @@ durable sentinel record; it does not claim consensus or failover promotion.
 When `--max-rto-ms` is supplied, the command exits non-zero when the measured
 recovery exceeds that SLO, making the drill suitable for a release gate.
 
+### Single-writer fencing
+
+For deployments with more than one application node, use the Postgres writer
+lease primitive to prevent an expired or partitioned node from continuing to
+mutate the control plane. `PostgresStore.acquireWriterLeaseAsync()` creates or
+renews a named lease and returns a monotonically increasing fencing token.
+The active node must renew it, and wire a guard around the token into the API:
+
+```js
+const lease = await store.acquireWriterLeaseAsync({ name: 'primary', owner: process.env.INSTANCE_ID });
+const writerLease = {
+  assertAsync: () => store.assertWriterLeaseAsync(lease),
+  renewAsync: () => store.renewWriterLeaseAsync(lease),
+  releaseAsync: () => store.releaseWriterLeaseAsync(lease),
+};
+const server = await startServer(source, { writerLease });
+```
+
+The API checks the guard during readiness and before every mutating HTTP
+request; a lost lease returns retryable `503` and leaves liveness, metrics, and
+read requests available. A deployment must run renewal and stop serving when
+`renewAsync()` returns `null`. Fencing is scoped to one Postgres control plane:
+it prevents application split-brain, but it is not a consensus algorithm and
+does not turn independent databases into a multi-writer topology. Use a
+Postgres HA/consensus deployment and the replication gates above for that.
+
 ## Security notes
 
 - TLS resolves the "no TLS" remaining risk in `12-threat-model.md` T4

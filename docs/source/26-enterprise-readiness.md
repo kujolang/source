@@ -113,6 +113,13 @@ Deployment-specific CDC, consensus, or standby consumers can consume
 cursor page; a committed cursor therefore never points at a partial domain
 mutation. This is a replication seam, not application-level multi-writer
 consensus, which remains a deployment responsibility.
+For multiple application nodes sharing one Postgres control plane, the
+`writer_leases` table provides a durable single-writer lease with monotonically
+increasing fencing tokens. Nodes must acquire and renew a lease, pass an
+`assertAsync` guard to `startServer`, and stop mutating when renewal fails;
+readiness and all mutating HTTP routes then fail closed with retryable `503`.
+This is split-brain protection for one control plane, not cross-database
+consensus.
 Request-body readers also terminate promptly on client aborts, preventing
 disconnected agent requests from retaining promises and admission state.
 HTTP requests also pass through a bounded process-local admission queue (2,048

@@ -465,6 +465,42 @@ test('secret broker health gates readiness and exposes lease metrics', async () 
   }
 });
 
+test('writer lease health gates readiness and fences mutating HTTP', async () => {
+  const { src } = freshSource();
+  const writerLease = {
+    active: false,
+    async assertAsync() {
+      if (!this.active) {
+        const error = new Error('writer lease is not valid');
+        error.code = 'WRITER_LEASE_LOST';
+        throw error;
+      }
+    },
+  };
+  const server = await startServer(src, { port: 0, writerLease });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    assert.equal((await fetch(`${base}/readyz`)).status, 503);
+    const blocked = await fetch(`${base}/login`, { method: 'POST', body: '{}' });
+    assert.equal(blocked.status, 503);
+    assert.equal(blocked.headers.get('retry-after'), '1');
+    writerLease.active = true;
+    assert.equal((await fetch(`${base}/readyz`)).status, 200);
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});
+
+test('Postgres writer lease uses durable fencing tokens and fail-closed errors', () => {
+  const source = readFileSync(new URL('../src/postgres-store.js', import.meta.url), 'utf8');
+  assert.match(source, /CREATE TABLE IF NOT EXISTS .*writer_leases/);
+  assert.match(source, /fencing_token BIGINT NOT NULL/);
+  assert.match(source, /WRITER_LEASE_HELD/);
+  assert.match(source, /WRITER_LEASE_LOST/);
+  assert.match(source, /renewWriterLeaseAsync/);
+});
+
 test('standby replicas fence all mutating HTTP and Git requests', async () => {
   const { src } = freshSource();
   src.store.checkReplicationAsync = async () => ({ role: 'standby', observed: { inRecovery: true, receiverStatus: 'streaming' } });

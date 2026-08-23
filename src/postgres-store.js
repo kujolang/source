@@ -523,6 +523,16 @@ class PostgresStore {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
+
+    this._run(`
+      CREATE TABLE IF NOT EXISTS ${this._qualified('writer_leases')} (
+        name TEXT PRIMARY KEY,
+        owner TEXT NOT NULL,
+        fencing_token BIGINT NOT NULL,
+        lease_until TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
     this._run(`ALTER TABLE ${this._qualified('replication_events')} ADD COLUMN IF NOT EXISTS previous_hash TEXT`);
     this._run(`ALTER TABLE ${this._qualified('replication_events')} ADD COLUMN IF NOT EXISTS current_hash TEXT`);
 
@@ -1676,6 +1686,70 @@ class PostgresStore {
   async checkHealthAsync() {
     await this._runAsync('SELECT 1');
     return true;
+  }
+
+  async acquireWriterLeaseAsync({ name = 'primary', owner, leaseMs = 30_000 } = {}) {
+    if (typeof name !== 'string' || !/^[A-Za-z0-9_.:-]{1,120}$/.test(name)) throw new Error('writer lease name is invalid');
+    if (typeof owner !== 'string' || !/^[A-Za-z0-9_.:-]{1,240}$/.test(owner)) throw new Error('writer lease owner is invalid');
+    const safeLease = Math.min(86_400_000, Math.max(1_000, Math.trunc(leaseMs)));
+    const rows = await this._fetchJsonRowsAsync(`
+      INSERT INTO ${this._qualified('writer_leases')} (name, owner, fencing_token, lease_until)
+      VALUES (${escapeSqlLiteral(name)}, ${escapeSqlLiteral(owner)}, 1, NOW() + (${safeLease} * INTERVAL '1 millisecond'))
+      ON CONFLICT (name) DO UPDATE SET
+        owner = EXCLUDED.owner,
+        fencing_token = ${this._qualified('writer_leases')}.fencing_token + 1,
+        lease_until = EXCLUDED.lease_until,
+        updated_at = NOW()
+      WHERE ${this._qualified('writer_leases')}.lease_until < NOW()
+         OR ${this._qualified('writer_leases')}.owner = EXCLUDED.owner
+      RETURNING name, owner, fencing_token AS "fencingToken", lease_until AS "leaseUntil"
+    `);
+    if (!rows[0]) {
+      const error = new Error('writer lease is held by another owner');
+      error.code = 'WRITER_LEASE_HELD';
+      throw error;
+    }
+    return rows[0];
+  }
+
+  async renewWriterLeaseAsync({ name = 'primary', owner, fencingToken, leaseMs = 30_000 } = {}) {
+    if (!owner || !Number.isSafeInteger(Number(fencingToken))) throw new Error('writer lease renewal identity is invalid');
+    const safeLease = Math.min(86_400_000, Math.max(1_000, Math.trunc(leaseMs)));
+    const rows = await this._fetchJsonRowsAsync(`
+      UPDATE ${this._qualified('writer_leases')}
+      SET lease_until = NOW() + (${safeLease} * INTERVAL '1 millisecond'), updated_at = NOW()
+      WHERE name = ${escapeSqlLiteral(name)} AND owner = ${escapeSqlLiteral(owner)}
+        AND fencing_token = ${Number(fencingToken)} AND lease_until >= NOW()
+      RETURNING name, owner, fencing_token AS "fencingToken", lease_until AS "leaseUntil"
+    `);
+    return rows[0] || null;
+  }
+
+  async assertWriterLeaseAsync({ name = 'primary', owner, fencingToken } = {}) {
+    if (!owner || !Number.isSafeInteger(Number(fencingToken))) throw new Error('writer lease assertion identity is invalid');
+    const rows = await this._fetchJsonRowsAsync(`
+      SELECT name, owner, fencing_token AS "fencingToken", lease_until AS "leaseUntil"
+      FROM ${this._qualified('writer_leases')}
+      WHERE name = ${escapeSqlLiteral(name)} AND owner = ${escapeSqlLiteral(owner)}
+        AND fencing_token = ${Number(fencingToken)} AND lease_until >= NOW()
+      LIMIT 1
+    `);
+    if (!rows[0]) {
+      const error = new Error('writer lease is not valid');
+      error.code = 'WRITER_LEASE_LOST';
+      throw error;
+    }
+    return rows[0];
+  }
+
+  async releaseWriterLeaseAsync({ name = 'primary', owner, fencingToken } = {}) {
+    if (!owner || !Number.isSafeInteger(Number(fencingToken))) throw new Error('writer lease release identity is invalid');
+    const rows = await this._fetchJsonRowsAsync(`
+      DELETE FROM ${this._qualified('writer_leases')}
+      WHERE name = ${escapeSqlLiteral(name)} AND owner = ${escapeSqlLiteral(owner)} AND fencing_token = ${Number(fencingToken)}
+      RETURNING name
+    `);
+    return Boolean(rows[0]);
   }
 
   async checkReplicationAsync({ role = 'primary', minStandbys = 1, maxLagBytes = 64 * 1024 * 1024 } = {}) {
