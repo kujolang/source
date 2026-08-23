@@ -13,6 +13,8 @@
     "test:postgres": "node --test tests/postgres-live.test.js",
     "test:container": "bash scripts/container-cluster-smoke.sh",
     "test:worker": "node --test tests/worker.test.js",
+    "lint": "node scripts/lint.js",
+    "format:check": "git diff --check",
     "load": "node scripts/load.js",
     "backup": "node scripts/backup.js",
     "backup:verify": "node scripts/verify-backup.js"

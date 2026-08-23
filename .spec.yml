@@ -1,0 +1,82 @@
+name: "Source enterprise agent platform"
+version: "0.1.0"
+status: "in-progress"
+priority: "high"
+goal: "Provide a production-grade, agent-facing Git source service that remains bounded and horizontally scalable for thousands of concurrent agents."
+background: >
+  Source combines native Git transport with durable Work, Change, Evidence,
+  Decision, capability, workflow, and queue primitives. Git remains the
+  distributed source-of-truth surface while Postgres coordinates shared API
+  and worker state across serving nodes.
+scope: >
+  Agent discovery and API contracts, capability authorization, smart-HTTP Git,
+  bounded request and artifact resources, Postgres-backed queues and workers,
+  isolated workflow actions, container deployment, failover validation, and
+  Kujo-backed deterministic release evidence.
+non_goals:
+  - "Claim external multi-region or multi-host performance without target-environment evidence."
+  - "Treat GitHub-specific composite actions or hosted custom domains as implemented when they remain deferred."
+relevant_systems:
+  - "Node.js and Git"
+  - "Postgres"
+  - "Kujo Eval, Spec, Concord, ShipCheck, and ChangeBucket"
+  - "Podman or Docker isolated action runner"
+likely_files:
+  - "src/api.js"
+  - "src/postgres-store.js"
+  - "src/job-queue.js"
+  - "src/worker.js"
+  - "src/action-runner.js"
+  - "Dockerfile"
+  - "eval.json"
+  - "docs/source/26-enterprise-readiness.md"
+acceptance_criteria:
+  - "The default Node test suite passes with no failures and only documented opt-in skips."
+  - "The scale suite proves bounded admission and 1,000 concurrent discovery requests."
+  - "The live Postgres gate proves a 1,000-agent lifecycle, queue fan-out, and peer-node failover."
+  - "The repeatable container gate proves two non-root serving nodes share Git storage and survive one-node loss."
+  - "Git smart-HTTP request bodies, responses, subprocesses, and per-project concurrency are bounded."
+  - "Artifact retrieval has bounded admission, retryable backpressure, and observable metrics."
+  - "Kujo Eval and ShipCheck release gates pass without error-level findings."
+  - "Known external validation gaps remain explicitly documented and are not represented as completed proof."
+eval_requirements:
+  - description: "Run the deterministic release gate."
+    check_type: "command_succeeds"
+    params:
+      command: "kujo run ../eval/main.kujo run eval.json --output-dir .eval_results --json --artifact-checksums"
+  - description: "Run the live Postgres scale gate when the deployment DSN is available."
+    check_type: "command_succeeds"
+    params:
+      command: "SOURCE_TEST_DATABASE_URL=postgresql:///postgres npm run test:postgres"
+  - description: "Run the repeatable container failover gate when container DSNs are available."
+    check_type: "command_succeeds"
+    params:
+      command: "npm run test:container"
+  - description: "Run the release-readiness metadata gate."
+    check_type: "command_succeeds"
+    params:
+      command: "kujo run ../shipcheck/shipcheck.kujo gate --dir . --format json"
+risks:
+  - risk: "External multi-host network load, geo-replication, and restore drills remain deployment-specific."
+    mitigation: "Keep local Postgres/container results separate from target-environment certification and require production load evidence before launch."
+    severity: "high"
+  - risk: "Runner images, host container runtimes, and secret brokers remain operator trust boundaries."
+    mitigation: "Use the isolated runner controls and validate runtime/image/secret-provider policy in each deployment."
+    severity: "high"
+dependencies:
+  - "Node.js >= 18"
+  - "Git"
+  - "Postgres for multi-process production mode"
+  - "Kujo runtime for release gates"
+review_expectations:
+  - "Review resource bounds and tenant fairness before increasing concurrency defaults."
+  - "Review target-environment evidence before claiming enterprise readiness."
+human_approval_points:
+  - "Before exposing a deployment beyond a trusted network boundary"
+  - "Before enabling workflow secrets or arbitrary runner images"
+  - "Before declaring external multi-host or multi-region readiness"
+tags:
+  - "source"
+  - "agent-first"
+  - "scalability"
+  - "enterprise-readiness"

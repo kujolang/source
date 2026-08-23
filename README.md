@@ -87,6 +87,11 @@ git clone http://source:<credential>@localhost:8787/git/O1/P1/R1.git
 node bin/source.js submit --url http://localhost:8787 --credential <credential>
 ```
 
+Repository-level acceptance criteria live in `[.spec.yml](.spec.yml)`. The
+portable checks are available through `npm run lint`, `npm run format:check`,
+and `npm test`; the GitHub Actions workflow mirrors those deterministic checks
+while Source's own Kujo release gate remains the authoritative ecosystem gate.
+
 The server applies bounded resource controls by default: JSON requests are
 limited to 1 MiB, Git request bodies to 100 MiB, chunked Git uploads to 16 MiB
 and four concurrent buffered uploads, Git CGI subprocesses to 32

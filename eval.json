@@ -6,6 +6,16 @@
   "stop_on_failure": false,
   "tests": [
     {
+      "name": "JavaScript syntax lint",
+      "check": "command_succeeds",
+      "params": { "command": "npm run lint" }
+    },
+    {
+      "name": "Formatting hygiene",
+      "check": "command_succeeds",
+      "params": { "command": "npm run format:check" }
+    },
+    {
       "name": "Node test suite",
       "check": "command_succeeds",
       "params": { "command": "npm test" },
