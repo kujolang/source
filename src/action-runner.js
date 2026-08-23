@@ -6,7 +6,9 @@
 // by CPU, memory, PIDs, output, and wall-clock limits.
 
 import { spawn } from 'node:child_process';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
+import { Semaphore } from './concurrency.js';
 
 function boundedInteger(value, fallback, min, max) {
   const number = Number(value);
@@ -45,6 +47,40 @@ function safeEnvironment(env) {
     && typeof value === 'string'
     && value.length <= 4096
   )));
+}
+
+export class EphemeralWorkspaceManager {
+  constructor({ root, maxActive = 256, queue = 512 } = {}) {
+    if (typeof root !== 'string' || !root) throw new Error('workspace root is required');
+    this.root = path.resolve(root);
+    this.slots = new Semaphore({ capacity: boundedInteger(maxActive, 256, 1, 10_000), queue: boundedInteger(queue, 512, 0, 100_000) });
+    this.active = new Map();
+  }
+
+  async acquire(job) {
+    const releaseSlot = await this.slots.acquire();
+    if (!releaseSlot) throw new Error('workflow workspace capacity exhausted');
+    try {
+      await mkdir(this.root, { recursive: true });
+      const prefix = `source-${String(job?.id || 'job').replace(/[^A-Za-z0-9_-]/g, '_')}-`;
+      const workspace = await mkdtemp(path.join(this.root, prefix));
+      this.active.set(job?.id || workspace, { workspace, releaseSlot });
+      return workspace;
+    } catch (error) {
+      releaseSlot();
+      throw error;
+    }
+  }
+
+  async release(job) {
+    const key = job?.id;
+    const entry = this.active.get(key);
+    if (!entry) return false;
+    this.active.delete(key);
+    try { await rm(entry.workspace, { recursive: true, force: true }); }
+    finally { entry.releaseSlot(); }
+    return true;
+  }
 }
 
 export class IsolatedActionRunner {
@@ -123,14 +159,20 @@ export class IsolatedActionRunner {
   }
 }
 
-export function createGitHubActionsHandler({ runner, workspaceForJob, secretProvider = async () => ({}) } = {}) {
+export function createGitHubActionsHandler({ runner, workspaceForJob, workspaceManager = null, secretProvider = async () => ({}) } = {}) {
   if (!runner || typeof runner.run !== 'function') throw new Error('runner is required');
-  if (typeof workspaceForJob !== 'function') throw new Error('workspaceForJob is required');
+  if (!workspaceManager && typeof workspaceForJob !== 'function') throw new Error('workspaceForJob is required');
   return async (payload, job) => {
     const parameters = payload?.parameters;
     if (!parameters) throw new Error('workflow job parameters are missing');
-    const workspace = await workspaceForJob(payload, job);
-    const env = await secretProvider(payload, job);
-    return runner.run({ steps: parameters.steps }, { workspace, env });
+    const workspace = workspaceManager
+      ? await workspaceManager.acquire(job)
+      : await workspaceForJob(payload, job);
+    try {
+      const env = await secretProvider(payload, job);
+      return await runner.run({ steps: parameters.steps }, { workspace, env });
+    } finally {
+      if (workspaceManager) await workspaceManager.release(job);
+    }
   };
 }

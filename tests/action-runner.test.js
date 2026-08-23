@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGitHubActionsHandler, IsolatedActionRunner } from '../src/action-runner.js';
+import { createGitHubActionsHandler, EphemeralWorkspaceManager, IsolatedActionRunner } from '../src/action-runner.js';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 test('isolated runner builds a bounded no-network container command', () => {
   const runner = new IsolatedActionRunner({ image: 'kujo/runner:latest', workspaceRoot: '/srv/workspaces' });
@@ -34,4 +37,27 @@ test('GitHub handler resolves an isolated workspace and passes brokered secrets 
     { steps: [{ run: 'kujo check' }] },
     { workspace: '/srv/workspaces/job-2', env: { TOKEN: 'redacted', NODE_OPTIONS: '--require evil' } },
   ]);
+});
+
+test('ephemeral workspace manager bounds and cleans action workspaces', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'source-workspaces-'));
+  const manager = new EphemeralWorkspaceManager({ root, maxActive: 1, queue: 0 });
+  const job = { id: 'J/unsafe' };
+  const workspace = await manager.acquire(job);
+  assert.match(workspace, /source-J_unsafe-/);
+  assert.equal(manager.active.size, 1);
+  assert.equal(await manager.release(job), true);
+  assert.equal(manager.active.size, 0);
+  assert.equal(await manager.release(job), false);
+});
+
+test('GitHub handler releases managed workspaces after runner failure', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'source-handler-workspaces-'));
+  const manager = new EphemeralWorkspaceManager({ root, maxActive: 1, queue: 0 });
+  const handler = createGitHubActionsHandler({
+    runner: { run: async () => { throw new Error('runner failed'); } },
+    workspaceManager: manager,
+  });
+  await assert.rejects(handler({ parameters: { steps: [{ run: 'false' }] } }, { id: 'J2' }), /runner failed/);
+  assert.equal(manager.active.size, 0);
 });

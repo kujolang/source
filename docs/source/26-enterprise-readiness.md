@@ -42,3 +42,8 @@ Git requests also use a per-project admission budget (eight active requests and
 256 queued by default) in addition to the process-wide Git budget. This keeps a
 single noisy tenant from consuming every Git subprocess slot; both budgets are
 configurable through `createServer`/`startServer` or the CLI.
+
+Action handlers can use `EphemeralWorkspaceManager` to apply a separate bounded
+workspace budget and automatically remove temporary workspaces on success or
+failure. This prevents abandoned action directories from consuming shared
+runner storage during large fan-out events.
