@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign } from 'node:crypto';
-import { canonicalActionManifestPayload, createGitHubActionsHandler, EphemeralWorkspaceManager, IsolatedActionRunner, loadActionKeyring, loadSecretLeaseBroker, loadSignedActionRegistry, SecretLeaseBroker, StaticActionRegistry } from '../src/action-runner.js';
+import { canonicalActionManifestPayload, createGitHubActionsHandler, createHttpSecretBroker, EphemeralWorkspaceManager, HttpSecretProvider, IsolatedActionRunner, loadActionKeyring, loadSecretLeaseBroker, loadSignedActionRegistry, SecretLeaseBroker, StaticActionRegistry } from '../src/action-runner.js';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -202,6 +202,35 @@ test('secret provider module loader enforces the production adapter contract', a
   const invalidPath = path.join(root, 'invalid.mjs');
   await writeFile(invalidPath, 'export const resolveSecretLease = async () => ({});\n', 'utf8');
   await assert.rejects(loadSecretLeaseBroker({ modulePath: invalidPath }), /secret broker/);
+});
+
+test('HTTPS secret provider adapter rotates auth and enforces bounded lease responses', async () => {
+  let tokenCalls = 0;
+  let request;
+  const provider = new HttpSecretProvider({
+    baseUrl: 'https://secrets.example.test/api',
+    token: async () => `rotated-token-${++tokenCalls}`,
+    fetchImpl: async (url, options) => {
+      request = { url: String(url), options };
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ env: { TOKEN: 'provider-secret' }, expiresAt: new Date(Date.now() + 1_000).toISOString() }),
+      };
+    },
+  });
+  const expiresAt = new Date(Date.now() + 2_000).toISOString();
+  const result = await provider.resolve({ identity: 'agent-1', references: ['TOKEN'], expiresAt, job: { id: 'J-http' } });
+  assert.deepEqual(result, { env: { TOKEN: 'provider-secret' } });
+  assert.equal(tokenCalls, 1);
+  assert.equal(request.url, 'https://secrets.example.test/api/v1/leases');
+  assert.match(request.options.headers.authorization, /^Bearer rotated-token-1$/);
+  assert.throws(() => new HttpSecretProvider({ baseUrl: 'http://secrets.example.test', token: 'x' }), /HTTPS/);
+  const broker = createHttpSecretBroker({
+    baseUrl: 'https://secrets.example.test', token: 'x', identity: 'agent-1', audit: () => {},
+    fetchImpl: async () => ({ ok: true, text: async () => JSON.stringify({ env: {}, expiresAt: new Date(Date.now() + 1_000).toISOString() }) }),
+  });
+  assert.deepEqual(await broker.get({ parameters: { secretRefs: [] } }, { id: 'J-http-broker' }), {});
 });
 
 test('ephemeral workspace manager bounds and cleans action workspaces', async () => {

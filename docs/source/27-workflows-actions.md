@@ -95,4 +95,8 @@ secret system and revocation policy. Worker bootstrap can load that adapter with
 `--secret-provider-module <path>`; the module must export
 `resolveSecretLease`, `resolveIdentity`, and `auditSecretLease` (or equivalent
 names on its default export). `--secret-lease-ms` bounds each lease.
+For a standard HTTPS deployment, `createHttpSecretBroker` / `HttpSecretProvider`
+POSTs identity and secret references to the provider over TLS, obtains a fresh
+rotating bearer token per lease, rejects oversized or overlong responses, and
+requires the provider to return an expiry no later than the requested lease.
 against the operator's secret system.

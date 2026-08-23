@@ -96,6 +96,62 @@ export async function loadSecretLeaseBroker({ modulePath, leaseMs = 15 * 60_000 
   return new SecretLeaseBroker({ resolve, identity, audit, leaseMs });
 }
 
+export class HttpSecretProvider {
+  constructor({ baseUrl, token, fetchImpl = globalThis.fetch, timeoutMs = 5_000, allowInsecureLocalhost = false } = {}) {
+    if (typeof baseUrl !== 'string' || !baseUrl) throw new Error('secret provider base URL is required');
+    let parsed;
+    try { parsed = new URL(baseUrl); } catch { throw new Error('secret provider base URL is invalid'); }
+    if (parsed.protocol !== 'https:' && !(allowInsecureLocalhost === true && parsed.protocol === 'http:' && ['127.0.0.1', 'localhost', '::1'].includes(parsed.hostname))) throw new Error('secret provider must use HTTPS');
+    if (typeof token !== 'string' && typeof token !== 'function') throw new Error('secret provider token is required');
+    if (typeof fetchImpl !== 'function') throw new Error('secret provider fetch implementation is required');
+    const root = parsed.toString().endsWith('/') ? parsed.toString() : `${parsed}/`;
+    this.endpoint = new URL('v1/leases', root);
+    this.token = token;
+    this.fetchImpl = fetchImpl;
+    this.timeoutMs = Math.min(60_000, Math.max(100, Math.trunc(timeoutMs)));
+  }
+
+  async resolve({ identity, references, expiresAt, job } = {}) {
+    const token = typeof this.token === 'function' ? await this.token() : this.token;
+    if (typeof token !== 'string' || !token || token.length > 16 * 1024) throw new Error('secret provider token is invalid');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    timer.unref?.();
+    let response;
+    try {
+      response = await this.fetchImpl(this.endpoint, {
+        method: 'POST',
+        headers: { accept: 'application/json', 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ identity, references, expiresAt, jobId: String(job?.id || '') }),
+        signal: controller.signal,
+      });
+    } catch {
+      throw new Error('secret provider request failed');
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!response?.ok) throw new Error(`secret provider rejected lease (${Number(response?.status) || 0})`);
+    let body;
+    try {
+      const text = await response.text();
+      if (text.length > 1 * 1024 * 1024) throw new Error('response too large');
+      body = JSON.parse(text);
+    } catch {
+      throw new Error('secret provider response is invalid');
+    }
+    if (!body || typeof body !== 'object' || Array.isArray(body) || !body.env || typeof body.env !== 'object' || Array.isArray(body.env)) throw new Error('secret provider response is invalid');
+    const providerExpiry = Date.parse(body.expiresAt);
+    const requestedExpiry = Date.parse(expiresAt);
+    if (!Number.isFinite(providerExpiry) || providerExpiry <= Date.now() || providerExpiry > requestedExpiry) throw new Error('secret provider lease expiry is invalid');
+    return { env: body.env };
+  }
+}
+
+export function createHttpSecretBroker({ identity, audit, leaseMs, ...providerOptions } = {}) {
+  const provider = new HttpSecretProvider(providerOptions);
+  return new SecretLeaseBroker({ identity, audit, leaseMs, resolve: provider.resolve.bind(provider) });
+}
+
 function redactSecretOutput(result, env) {
   if (!result || typeof result !== 'object') return result;
   const secrets = Object.values(env).filter((value) => value.length >= 4);
