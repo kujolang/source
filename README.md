@@ -253,6 +253,12 @@ the result. Run `npm run backup:restore-drill -- --backup <directory>
 temporary Postgres database, verify Git objects, and remove the drill resources.
 See the deployment document for backup replication and recovery procedures.
 
+Git roots can be replicated to an independent peer with bounded, resumable
+mirror jobs: `npm run replicate:git -- --source-root "$SOURCE_GIT_ROOT"
+--target-root /srv/source-peer/git --concurrency 8`. Each repository is
+replicated independently with Git's mirror refspec, pruning deleted refs and
+running `git fsck`; rerunning after a peer outage is safe.
+
 Set `SOURCE_WEBHOOK_SECRET` to enable HMAC-signed workflow webhook ingress;
 deliveries require a provider signature and delivery ID and are replay-safe.
 Workflow dispatch is bounded to 1,000 jobs per event by default; operators can

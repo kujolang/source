@@ -18,7 +18,8 @@
     "load": "node scripts/load.js",
     "backup": "node scripts/backup.js",
     "backup:verify": "node scripts/verify-backup.js",
-    "backup:restore-drill": "node scripts/restore-drill.js"
+    "backup:restore-drill": "node scripts/restore-drill.js",
+    "replicate:git": "node scripts/replicate-git.js"
   },
   "engines": {
     "node": ">=18"

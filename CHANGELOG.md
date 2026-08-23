@@ -13,6 +13,8 @@ All notable changes to Source are recorded here.
 - Added an executable backup restore drill that restores Postgres into a
   temporary database, extracts isolated filesystem roots, verifies Git object
   integrity, and removes all drill resources on completion or failure.
+- Added bounded, resumable Git-root mirror replication with per-repository
+  retries, ref pruning, and post-replication `git fsck` verification.
 - Made the default Node test command deterministic by serializing test files;
   the dedicated scale suite still exercises the 1,000-connection burst while
   avoiding host TCP backlog contention from unrelated test servers.

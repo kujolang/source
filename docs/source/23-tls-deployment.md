@@ -187,6 +187,21 @@ roots, runs `git fsck` on every restored bare repository, checks that the
 `source` schema was restored, and removes the temporary database and roots in
 all completion paths.
 
+For a second Git peer, run the bounded mirror job from a host with access to
+both durable roots:
+
+```bash
+npm run replicate:git -- \
+  --source-root "$SOURCE_GIT_ROOT" \
+  --target-root /srv/source-peer/git \
+  --concurrency 8
+```
+
+Replication is resumable per repository and uses Git's mirror refspec, so
+branches, tags, deletions, and objects are reconciled without loading packfiles
+into Node memory. This replicates Git source state; Postgres metadata still
+requires its own native replication/consensus deployment.
+
 ## Security notes
 
 - TLS resolves the "no TLS" remaining risk in `12-threat-model.md` T4
