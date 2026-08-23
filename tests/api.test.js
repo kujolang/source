@@ -95,6 +95,29 @@ test('agents can enqueue a bounded job batch through one capability-gated reques
   });
 });
 
+test('job idempotency keys deduplicate retries across the single and batch endpoints', async () => {
+  const { src, org, project, agent } = freshSource();
+  const capability = src.capabilities.issue({
+    principalId: agent.id,
+    scope: { org: org.id, project: project.id },
+    allowed: ['enqueue_job'],
+  });
+  const calls = [];
+  src.jobs.enqueue = async (job) => { calls.push(job); return { ...job, id: 'J1', status: 'queued' }; };
+  src.jobs.enqueueBatch = async ({ jobs }) => { calls.push(...jobs); return jobs.map((job) => ({ ...job, id: 'J2', status: 'queued' })); };
+  await withServer(src, async (base) => {
+    const headers = { ...auth(capability.credential), 'content-type': 'application/json', 'idempotency-key': 'agent-retry-1' };
+    const single = await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/jobs`, { method: 'POST', headers, body: JSON.stringify({ kind: 'agent.retry' }) });
+    assert.equal(single.status, 202);
+    const batch = await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/jobs/batch`, { method: 'POST', headers, body: JSON.stringify({ jobs: [{ kind: 'agent.retry' }] }) });
+    assert.equal(batch.status, 202);
+  });
+  assert.equal(calls.length, 2);
+  assert.notEqual(calls[0].dedupeKey, calls[1].dedupeKey);
+  assert.match(calls[0].dedupeKey, /^http:/);
+  assert.match(calls[1].dedupeKey, /^http:/);
+});
+
 test('batch enqueue enforces work-scoped capabilities for every item', async () => {
   const { src, org, project, agent } = freshSource();
   const firstWork = src.createWork({ orgId: org.id, projectId: project.id, intent: 'first', requester: agent.id });

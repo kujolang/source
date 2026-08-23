@@ -23,7 +23,7 @@
 
 import http from 'node:http';
 import https from 'node:https';
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { Source } from './source.js';
 import { renderOrgIndex, renderIndex, renderProject, renderWork, renderChange, renderLogin } from './web.js';
 import { gitHttpBackend } from './git-http.js';
@@ -112,6 +112,14 @@ function isRetryableStoreError(error) {
     || code === '57P01'
     || code === '40001'
     || code === '40P01';
+}
+
+function requestIdempotencyKey(req, orgId, projectId, index = '') {
+  const raw = req.headers['idempotency-key'];
+  if (raw == null) return null;
+  const key = Array.isArray(raw) ? raw[0] : String(raw);
+  if (!/^[A-Za-z0-9._:-]{1,200}$/.test(key)) throw new Error('Idempotency-Key must contain 1-200 safe characters');
+  return `http:${createHash('sha256').update(`${orgId}\0${projectId}\0${key}\0${index}`).digest('hex')}`;
 }
 
 function readText(req, maxBytes = 1_000_000) {
@@ -837,6 +845,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
 
         if (rest === '/jobs/batch' && req.method === 'POST') {
           const body = await readBody(req, maxJsonBodyBytes);
+          const requestKey = requestIdempotencyKey(req, orgId, projectId);
           const ip = clientAddress(req, trustProxy);
           if (!(await limiter.allowAsync(`jobbatch:${ip}:${orgId}:${projectId}`, { ...limits.jobEnqueue, cost: Array.isArray(body.jobs) ? body.jobs.length : 1 }))) {
             return json(res, 429, { error: 'rate limit exceeded' });
@@ -856,7 +865,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
               availableAt: job.availableAt,
               workId: job.workId || null,
               maxAttempts: job.maxAttempts,
-              dedupeKey: job.dedupeKey || null,
+              dedupeKey: job.dedupeKey || (requestKey ? `${requestKey}:${jobs.length}` : null),
               orgId,
               projectId,
             });
@@ -867,6 +876,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
 
         if (rest === '/jobs' && req.method === 'POST') {
           const body = await readBody(req, maxJsonBodyBytes);
+          const requestKey = requestIdempotencyKey(req, orgId, projectId);
           const ip = clientAddress(req, trustProxy);
           if (!(await limiter.allowAsync(`job:${ip}:${orgId}:${projectId}`, limits.jobEnqueue))) {
             return json(res, 429, { error: 'rate limit exceeded' });
@@ -891,6 +901,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
               projectId,
               workId: body.workId || null,
               maxQueueDepth: maxJobQueueDepth,
+              dedupeKey: body.dedupeKey || requestKey,
             });
           } catch (error) {
             if (error?.message === 'job queue depth exceeded') return json(res, 429, { error: error.message });

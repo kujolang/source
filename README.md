@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **147/147 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
+- **148/148 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
@@ -149,6 +149,9 @@ one transactional quota check and bulk insert, with per-job payload bounds and
 work-level authorization and deduplication keys, reducing database round trips
 during workflow fan-out. Batch requests are rate-limited by item count, so
 batching cannot bypass per-agent admission policy.
+Clients should send an `Idempotency-Key` on retriable single or batch enqueue
+requests; Source hashes that scoped key into the durable job dedupe key so
+agent retries do not create duplicate work.
 
 Postgres-backed workers can claim deferred jobs through `src/job-queue.js`.
 Claims use row locking with `SKIP LOCKED`; expired leases are reclaimable and

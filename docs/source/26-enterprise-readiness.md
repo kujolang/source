@@ -53,3 +53,6 @@ runner storage during large fan-out events.
 Evidence artifacts are limited to 64 MiB by default through `Source`'s
 `maxArtifactBytes` option (hard-capped at 512 MiB), protecting both worker
 memory and durable storage from oversized verification output.
+
+Enqueue endpoints accept `Idempotency-Key`; the scoped hash becomes the durable
+job dedupe key, allowing agents to retry after a 503 without multiplying work.
