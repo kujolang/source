@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **160/160 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
+- **194/194 non-skipped default tests pass** (one documented opt-in skip), including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
@@ -32,6 +32,9 @@ scanning).
   and `git` on PATH are also required. The SQLite backend requires Node ≥ 22.5
   (`node:sqlite`); the JSON store works on Node ≥ 18.
 - Deterministic-first: no LLM is required for any operation in the slice.
+- The live Postgres profile has been verified at 5,000 concurrent agents locally;
+  CI continuously certifies the 1,000-agent gate and two-container writer
+  failover gate on every release-gate run.
 
 ## Quick start
 
