@@ -13,13 +13,18 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 
+function sleepSync(milliseconds) {
+  const signal = new Int32Array(new SharedArrayBuffer(4));
+  Atomics.wait(signal, 0, 0, milliseconds);
+}
+
 export class SqliteStore {
   constructor(root) {
     this.root = root;
     this._txDepth = 0;
     fs.mkdirSync(root, { recursive: true });
     this.db = new DatabaseSync(path.join(root, 'source.sqlite'));
-    this.db.exec(`
+    const schema = `
       PRAGMA busy_timeout = 5000;
       PRAGMA journal_mode = WAL;
       PRAGMA synchronous = FULL;
@@ -44,7 +49,17 @@ export class SqliteStore {
         count INTEGER NOT NULL,
         reset_at INTEGER NOT NULL
       );
-    `);
+    `;
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        this.db.exec(schema);
+        break;
+      } catch (error) {
+        const locked = error?.code === 'ERR_SQLITE_ERROR' && /database is locked|SQLITE_BUSY/i.test(String(error.message || error));
+        if (!locked || attempt >= 8) throw error;
+        sleepSync(Math.min(500, 25 * (2 ** attempt)));
+      }
+    }
   }
 
   // --- JSON records -------------------------------------------------------
