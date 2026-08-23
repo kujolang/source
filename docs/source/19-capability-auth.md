@@ -37,6 +37,9 @@ discovery manifest):
 | `modify_policy` | change policy (not yet exposed) |
 | `publish_release` | publish a release (not yet exposed) |
 | `manage_org` | create an Organization (tenant) |
+| `manage_workflows` | create workflow definitions |
+| `read_workflows` | list or inspect workflow definitions |
+| `dispatch_workflow` | dispatch a workflow event into the durable queue |
 
 ## Endpoint → action mapping
 
@@ -64,6 +67,9 @@ discovery manifest):
 | `/api/v1/orgs/{org}/projects/{p}/evidence/{e}` | GET | `read_context` | org + project |
 | `/api/v1/orgs/{org}/projects/{p}/evidence/{e}/artifact` | GET | `read_context` | org + project |
 | `/api/v1/orgs/{org}/projects/{p}/submit` | POST | public | — |
+| `/api/v1/orgs/{org}/projects/{p}/workflows` | GET | `read_workflows` | org + project |
+| `/api/v1/orgs/{org}/projects/{p}/workflows` | POST | `manage_workflows` | org + project |
+| `/api/v1/orgs/{org}/projects/{p}/workflows/{w}/dispatch` | POST | `dispatch_workflow` | org + project |
 
 ## Scope enforcement
 

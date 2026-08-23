@@ -59,6 +59,23 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     const quotaJob = (await src.jobs.claim({ workerId: 'quota-worker', limit: 1 }))[0];
     assert.equal(quotaJob.id, quotaResults.find((result) => result.status === 'fulfilled').value.id);
     await src.jobs.complete({ id: quotaJob.id, workerId: 'quota-worker', leaseToken: quotaJob.leaseToken, result: { ok: true } });
+    const workflow = await src.createWorkflowAsync({
+      orgId: org.id,
+      projectId: project.id,
+      name: 'push checks',
+      triggers: ['push'],
+      jobs: [{ kind: 'agent.workflow.check', payload: { command: 'kujo check' } }],
+    });
+    const dispatches = await Promise.all(Array.from({ length: 20 }, () => src.dispatchWorkflowAsync({
+      orgId: org.id, projectId: project.id, workflowId: workflow.id, event: 'push', eventId: 'push-1', payload: { ref: 'main' },
+    })));
+    const dispatchedJobs = dispatches.map((dispatch) => dispatch.workflows[0].jobs[0]);
+    assert.equal(new Set(dispatchedJobs.map((job) => job.id)).size, 1);
+    assert.equal(dispatchedJobs.filter((job) => job.status === 'queued').length, 1);
+    assert.equal(dispatchedJobs.filter((job) => job.status === 'deduplicated').length, 19);
+    const workflowJob = (await src.jobs.claim({ workerId: 'workflow-worker', limit: 1 }))[0];
+    assert.equal(workflowJob.id, dispatchedJobs[0].id);
+    await src.jobs.complete({ id: workflowJob.id, workerId: 'workflow-worker', leaseToken: workflowJob.leaseToken, result: { ok: true } });
     const peerJob = await src.jobs.enqueue({ kind: 'agent.peer', payload: { node: 'primary' } });
     const peerClaim = (await peerSrc.jobs.claim({ workerId: 'peer-worker', limit: 1 }))[0];
     assert.equal(peerClaim.id, peerJob.id);
@@ -134,7 +151,7 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     const jobCapability = await src.capabilities.issueAsync({
       principalId: principal.id,
       scope: { org: org.id, project: project.id },
-      allowed: ['enqueue_job', 'read_jobs'],
+      allowed: ['enqueue_job', 'read_jobs', 'manage_workflows', 'read_workflows', 'dispatch_workflow'],
     });
     const jobUrl = `http://127.0.0.1:${server.address().port}/api/v1/orgs/${org.id}/projects/${project.id}/jobs`;
     const enqueuedResponse = await fetch(jobUrl, {
@@ -167,6 +184,26 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
       body: JSON.stringify({ kind: 'agent.scoped', workId: 'W2', payload: {} }),
     });
     assert.equal(outOfScopeJob.status, 403);
+    const workflowUrl = `http://127.0.0.1:${server.address().port}/api/v1/orgs/${org.id}/projects/${project.id}/workflows`;
+    const workflowResponse = await fetch(workflowUrl, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${jobCapability.credential}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'api checks', triggers: ['api.push'], jobs: [{ kind: 'agent.api-check', payload: { check: 'smoke' } }] }),
+    });
+    assert.equal(workflowResponse.status, 201);
+    const apiWorkflow = await workflowResponse.json();
+    const dispatchResponse = await fetch(`${workflowUrl}/${apiWorkflow.id}/dispatch`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${jobCapability.credential}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: 'api.push', eventId: 'api-push-1', payload: { ref: 'main' } }),
+    });
+    assert.equal(dispatchResponse.status, 202, await dispatchResponse.clone().text());
+    const apiDispatch = await dispatchResponse.json();
+    const apiJob = apiDispatch.workflows[0].jobs[0];
+    const claimedApiJobs = await src.jobs.claim({ workerId: 'api-workflow-worker', limit: 10 });
+    const claimedApiJob = claimedApiJobs.find((job) => job.id === apiJob.id);
+    assert.ok(claimedApiJob);
+    await Promise.all(claimedApiJobs.map((job) => src.jobs.complete({ id: job.id, workerId: 'api-workflow-worker', leaseToken: job.leaseToken, result: { ok: true } })));
     const url = `http://127.0.0.1:${server.address().port}/.well-known/source`;
     const responses = await Promise.all(Array.from({ length: 1_000 }, () => fetch(url)));
     assert.ok(responses.every((response) => response.status === 200));

@@ -292,6 +292,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
     gitPush: { limit: 30, windowMs: 60_000, ...(rateLimit.gitPush || {}) },
     gitRead: { limit: 120, windowMs: 60_000, ...(rateLimit.gitRead || {}) },
     jobEnqueue: { limit: 120, windowMs: 60_000, ...(rateLimit.jobEnqueue || {}) },
+    workflowDispatch: { limit: 120, windowMs: 60_000, ...(rateLimit.workflowDispatch || {}) },
     login: { limit: 20, windowMs: 60_000, ...(rateLimit.login || {}) },
     session: { limit: 30, windowMs: 60_000, ...(rateLimit.session || {}) },
   };
@@ -476,6 +477,7 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
             work: '/api/v1/orgs/{org}/projects/{project}/work',
             changes: '/api/v1/orgs/{org}/projects/{project}/changes',
             jobs: '/api/v1/orgs/{org}/projects/{project}/jobs',
+            workflows: '/api/v1/orgs/{org}/projects/{project}/workflows',
             evidence: '/api/v1/orgs/{org}/projects/{project}/evidence',
             git: '/git/{org}/{project}/{repo}.git',
             policy: '/api/v1/orgs/{org}/projects/{project}/policy',
@@ -693,6 +695,42 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
               fields,
             ),
           );
+        }
+
+        const workflowMatch = rest.match(/^\/workflows(?:\/([^/]+)(\/dispatch)?)?$/);
+        if (workflowMatch && !workflowMatch[1] && req.method === 'GET') {
+          const g = await guard(src, req, ACTIONS.read_workflows, { org: orgId, project: projectId });
+          if (g) return json(res, g.status, g.body);
+          const pagination = parseListParams(url);
+          const workflows = await src.listWorkflowsAsync(orgId, projectId, { cursor: pagination.cursor, limit: pagination.limit ? pagination.limit + 1 : 100 });
+          return json(res, 200, paginatedResponse(workflows, pagination, fields));
+        }
+
+        if (workflowMatch && !workflowMatch[1] && req.method === 'POST') {
+          const g = await guard(src, req, ACTIONS.manage_workflows, { org: orgId, project: projectId });
+          if (g) return json(res, g.status, g.body);
+          const body = await readBody(req, maxJsonBodyBytes);
+          const workflow = await src.createWorkflowAsync({ orgId, projectId, name: body.name, triggers: body.triggers, jobs: body.jobs, enabled: body.enabled });
+          return json(res, 201, workflow);
+        }
+
+        if (workflowMatch && workflowMatch[1] && workflowMatch[2] === '/dispatch' && req.method === 'POST') {
+          const ip = req.socket.remoteAddress || 'unknown';
+          if (!(await limiter.allowAsync(`workflow:${ip}:${orgId}:${projectId}`, limits.workflowDispatch))) return json(res, 429, { error: 'rate limit exceeded' });
+          const g = await guard(src, req, ACTIONS.dispatch_workflow, { org: orgId, project: projectId });
+          if (g) return json(res, g.status, g.body);
+          const workflow = await src.getWorkflowAsync(orgId, projectId, workflowMatch[1]);
+          if (!workflow) return json(res, 404, { error: 'workflow not found' });
+          const body = await readBody(req, maxJsonBodyBytes);
+          const dispatch = await src.dispatchWorkflowAsync({ orgId, projectId, workflowId: workflow.id, event: body.event, eventId: body.eventId, payload: body.payload ?? {}, maxQueueDepth: maxJobQueueDepth });
+          return json(res, 202, dispatch);
+        }
+
+        if (workflowMatch && workflowMatch[1] && !workflowMatch[2] && req.method === 'GET') {
+          const g = await guard(src, req, ACTIONS.read_workflows, { org: orgId, project: projectId });
+          if (g) return json(res, g.status, g.body);
+          const workflow = await src.getWorkflowAsync(orgId, projectId, workflowMatch[1]);
+          return workflow ? json(res, 200, selectFields(workflow, fields)) : json(res, 404, { error: 'workflow not found' });
         }
 
         if (rest === '/jobs' && req.method === 'GET') {

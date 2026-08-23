@@ -16,6 +16,7 @@ const PREFIXES = {
   repository: 'R',
   principal: 'U',
   capability: 'K',
+  workflow: 'F',
 };
 
 export function nextId(store, kind) {

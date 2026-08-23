@@ -1327,6 +1327,79 @@ export class Source {
     return { principalId, evidence, decisions };
   }
 
+  _workflowRel(orgId, projectId, workflowId) {
+    return `${this._projectRel(orgId, projectId)}/workflows/${workflowId}.json`;
+  }
+
+  _validateWorkflow({ name, triggers, jobs }) {
+    if (typeof name !== 'string' || name.length < 1 || name.length > 160) throw new Error('workflow name must be 1-160 characters');
+    if (!Array.isArray(triggers) || triggers.length < 1 || triggers.length > 32 || triggers.some((event) => typeof event !== 'string' || !/^[A-Za-z0-9_.:-]{1,120}$/.test(event))) {
+      throw new Error('workflow triggers must contain 1-32 safe event names');
+    }
+    if (!Array.isArray(jobs) || jobs.length < 1 || jobs.length > 100) throw new Error('workflow jobs must contain 1-100 steps');
+    for (const job of jobs) {
+      if (!job || typeof job.kind !== 'string' || !/^[A-Za-z0-9_.:-]{1,120}$/.test(job.kind)) throw new Error('workflow job kinds must be safe event names');
+      if (Buffer.byteLength(JSON.stringify(job.payload ?? {})) > 16 * 1024) throw new Error('workflow job payload too large');
+    }
+  }
+
+  async createWorkflowAsync({ orgId, projectId, name, triggers, jobs, enabled = true }) {
+    this._validateWorkflow({ name, triggers, jobs });
+    const id = await nextIdAsync(this.store, 'workflow');
+    const workflow = {
+      id,
+      orgId,
+      projectId,
+      name,
+      version: 1,
+      triggers: [...new Set(triggers)],
+      jobs: jobs.map((job) => ({ kind: job.kind, payload: job.payload ?? {} })),
+      enabled: enabled !== false,
+      createdAt: new Date().toISOString(),
+    };
+    await this._asyncWrite(this._workflowRel(orgId, projectId, id), workflow);
+    await this._asyncAudit({ event: 'workflow.create', orgId, projectId, workflowId: id, name, triggers: workflow.triggers });
+    return workflow;
+  }
+
+  async getWorkflowAsync(orgId, projectId, workflowId) {
+    const rel = this._workflowRel(orgId, projectId, workflowId);
+    return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.store.readJson(rel);
+  }
+
+  async listWorkflowsAsync(orgId, projectId, { cursor, limit } = {}) {
+    const rel = `${this._projectRel(orgId, projectId)}/workflows`;
+    const ids = typeof this.store.listJsonAsync === 'function'
+      ? await this.store.listJsonAsync(rel, { cursor, limit })
+      : this.store.listJson(rel, { cursor, limit });
+    return (await Promise.all(ids.map((id) => this.getWorkflowAsync(orgId, projectId, id)))).filter(Boolean);
+  }
+
+  async dispatchWorkflowAsync({ orgId, projectId, workflowId = null, event, eventId = null, payload = {}, maxQueueDepth = 100_000 }) {
+    if (typeof event !== 'string' || !/^[A-Za-z0-9_.:-]{1,120}$/.test(event)) throw new Error('event must be a safe event name');
+    if (Buffer.byteLength(JSON.stringify(payload)) > 64 * 1024) throw new Error('event payload too large');
+    const resolvedEventId = eventId || randomHex(16);
+    if (String(resolvedEventId).length > 120) throw new Error('eventId must be at most 120 characters');
+    const workflows = await this.listWorkflowsAsync(orgId, projectId, { limit: 1000 });
+    const runs = [];
+    for (const workflow of workflows.filter((candidate) => (!workflowId || candidate.id === workflowId) && candidate.enabled && candidate.triggers.includes(event))) {
+      const jobs = [];
+      for (const [step, definition] of workflow.jobs.entries()) {
+        jobs.push(await this.jobs.enqueue({
+          kind: definition.kind,
+          payload: { workflowId: workflow.id, workflowVersion: workflow.version, event, eventId: resolvedEventId, step, input: payload, parameters: definition.payload },
+          orgId,
+          projectId,
+          maxQueueDepth,
+          dedupeKey: `${orgId}:${projectId}:${workflow.id}:${resolvedEventId}:${step}`,
+        }));
+      }
+      runs.push({ workflowId: workflow.id, version: workflow.version, jobs });
+    }
+    await this._asyncAudit({ event: 'workflow.dispatch', orgId, projectId, workflowEvent: event, eventId: resolvedEventId, workflowCount: runs.length });
+    return { event, eventId: resolvedEventId, workflows: runs };
+  }
+
   readAudit() {
     return this.store.readAudit();
   }

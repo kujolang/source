@@ -404,13 +404,14 @@ class PostgresStore {
         leased_until TIMESTAMPTZ,
         worker_id TEXT,
         lease_token TEXT,
+        dedupe_key TEXT UNIQUE,
         result JSONB,
         last_error TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
-    for (const column of ['org_id TEXT', 'project_id TEXT', 'work_id TEXT', 'max_attempts INTEGER NOT NULL DEFAULT 5', 'lease_token TEXT']) {
+    for (const column of ['org_id TEXT', 'project_id TEXT', 'work_id TEXT', 'max_attempts INTEGER NOT NULL DEFAULT 5', 'lease_token TEXT', 'dedupe_key TEXT']) {
       this._run(`ALTER TABLE ${this._qualified('jobs')} ADD COLUMN IF NOT EXISTS ${column}`);
     }
 
@@ -421,6 +422,7 @@ class PostgresStore {
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_claim`)} ON ${this._qualified('jobs')} (status, available_at, created_at)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_scope`)} ON ${this._qualified('jobs')} (org_id, project_id, work_id, created_at)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_leased`)} ON ${this._qualified('jobs')} (leased_until, created_at) WHERE status = 'leased'`);
+    this._run(`CREATE UNIQUE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_dedupe`)} ON ${this._qualified('jobs')} (dedupe_key) WHERE dedupe_key IS NOT NULL`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_rate_limits_reset`)} ON ${this._qualified('rate_limits')} (reset_at)`);
   }
 
@@ -966,14 +968,16 @@ class PostgresStore {
     )`);
   }
 
-  async enqueueJobAsync({ kind, payload = {}, availableAt = new Date(), orgId = null, projectId = null, workId = null, maxAttempts = 5, maxQueueDepth = null }) {
+  async enqueueJobAsync({ kind, payload = {}, availableAt = new Date(), orgId = null, projectId = null, workId = null, maxAttempts = 5, maxQueueDepth = null, dedupeKey = null }) {
     if (!kind || typeof kind !== 'string') throw new Error('job kind is required');
     const safeAttempts = Math.min(100, Math.max(1, Math.trunc(maxAttempts)));
     const id = await this.nextIdAsync('job', 'J');
     const at = new Date(availableAt).toISOString();
     const safeDepth = maxQueueDepth == null ? null : Math.min(10_000_000, Math.max(1, Math.trunc(maxQueueDepth)));
-    const insert = () => this._runAsync(`INSERT INTO ${this._qualified('jobs')} (id, kind, payload, org_id, project_id, work_id, status, available_at, max_attempts)
-      VALUES (${escapeSqlLiteral(id)}, ${escapeSqlLiteral(kind)}, ${toJson(payload)}, ${escapeSqlLiteral(orgId)}, ${escapeSqlLiteral(projectId)}, ${escapeSqlLiteral(workId)}, 'queued', ${escapeSqlLiteral(at)}, ${safeAttempts})
+    const safeDedupeKey = dedupeKey == null ? null : String(dedupeKey).slice(0, 240);
+    const insert = () => this._runAsync(`INSERT INTO ${this._qualified('jobs')} (id, kind, payload, org_id, project_id, work_id, status, available_at, max_attempts, dedupe_key)
+      VALUES (${escapeSqlLiteral(id)}, ${escapeSqlLiteral(kind)}, ${toJson(payload)}, ${escapeSqlLiteral(orgId)}, ${escapeSqlLiteral(projectId)}, ${escapeSqlLiteral(workId)}, 'queued', ${escapeSqlLiteral(at)}, ${safeAttempts}, ${escapeSqlLiteral(safeDedupeKey)})
+      ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING
       RETURNING id`);
     let inserted;
     if (safeDepth != null && orgId && projectId) {
@@ -982,6 +986,10 @@ class PostgresStore {
       // lock, which would make a count-then-insert quota race under burst load.
       inserted = await this.transactionAsync(async () => {
         await this._runAsync(`SELECT id FROM ${this._qualified('projects')} WHERE id = ${escapeSqlLiteral(projectId)} FOR UPDATE`);
+        if (safeDedupeKey) {
+          const existing = await this._runAsync(`SELECT id FROM ${this._qualified('jobs')} WHERE dedupe_key = ${escapeSqlLiteral(safeDedupeKey)} LIMIT 1`);
+          if (existing) return `dedupe:${existing}`;
+        }
         const current = await this._runAsync(`SELECT COUNT(*) FROM ${this._qualified('jobs')}
           WHERE org_id = ${escapeSqlLiteral(orgId)} AND project_id = ${escapeSqlLiteral(projectId)}`);
         if (Number(current || 0) >= safeDepth) return '';
@@ -990,12 +998,21 @@ class PostgresStore {
     } else {
       inserted = await insert();
     }
+    if (typeof inserted === 'string' && inserted.startsWith('dedupe:')) {
+      return { id: inserted.slice('dedupe:'.length), kind, payload, orgId, projectId, workId, status: 'deduplicated', attempts: 0, maxAttempts: safeAttempts, availableAt: at, dedupeKey: safeDedupeKey };
+    }
+    if (!inserted && safeDedupeKey) {
+      const existing = await this._runAsync(`SELECT id FROM ${this._qualified('jobs')} WHERE dedupe_key = ${escapeSqlLiteral(safeDedupeKey)} LIMIT 1`);
+      if (existing) {
+        return { id: existing, kind, payload, orgId, projectId, workId, status: 'deduplicated', attempts: 0, maxAttempts: safeAttempts, availableAt: at, dedupeKey: safeDedupeKey };
+      }
+    }
     if (safeDepth != null && orgId && projectId && !inserted) {
       throw new Error('job queue depth exceeded');
     }
     this._jobMaintenanceOps += 1;
     if (this._jobMaintenanceOps % 1_000 === 0) await this.pruneJobsAsync({ limit: 1_000 });
-    return { id, kind, payload, orgId, projectId, workId, status: 'queued', attempts: 0, maxAttempts: safeAttempts, availableAt: at };
+    return { id, kind, payload, orgId, projectId, workId, status: 'queued', attempts: 0, maxAttempts: safeAttempts, availableAt: at, dedupeKey: safeDedupeKey };
   }
 
   async pruneJobsAsync({ limit = 1_000 } = {}) {
@@ -1016,7 +1033,7 @@ class PostgresStore {
     const workClause = workId ? `AND work_id = ${escapeSqlLiteral(workId)}` : '';
     return this._fetchJsonRowsAsync(`
       SELECT id, kind, payload, org_id, project_id, work_id, status, attempts, max_attempts,
-             available_at, leased_until, worker_id, result, last_error, created_at, updated_at
+             dedupe_key AS "dedupeKey", available_at, leased_until, worker_id, result, last_error, created_at, updated_at
       FROM ${this._qualified('jobs')}
       WHERE org_id = ${escapeSqlLiteral(orgId)} AND project_id = ${escapeSqlLiteral(projectId)}
         ${workClause} ${cursorClause}

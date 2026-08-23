@@ -255,6 +255,7 @@ The full architecture, domain model, threat model, and MVP scope are in
 - `23-tls-deployment.md` — TLS termination + self-host deployment path
 - `24-multi-repo-changes.md` — multi-repository Changes
 - `25-rate-limiting-scanning.md` — rate limiting + credential scanning
+- `27-workflows-actions.md` — durable workflow/action dispatch and idempotency
 - `decisions/` — architecture decision records
 
 ## License
