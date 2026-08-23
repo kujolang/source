@@ -17,7 +17,8 @@
     "format:check": "git diff --check",
     "load": "node scripts/load.js",
     "backup": "node scripts/backup.js",
-    "backup:verify": "node scripts/verify-backup.js"
+    "backup:verify": "node scripts/verify-backup.js",
+    "backup:restore-drill": "node scripts/restore-drill.js"
   },
   "engines": {
     "node": ">=18"

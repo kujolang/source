@@ -10,6 +10,9 @@ All notable changes to Source are recorded here.
   temp-file and counter behavior.
 - Serialized Postgres schema bootstrap statements across serving nodes with a
   transaction-scoped advisory lock, preventing concurrent startup DDL races.
+- Added an executable backup restore drill that restores Postgres into a
+  temporary database, extracts isolated filesystem roots, verifies Git object
+  integrity, and removes all drill resources on completion or failure.
 - Made the default Node test command deterministic by serializing test files;
   the dedicated scale suite still exercises the 1,000-connection burst while
   avoiding host TCP backlog contention from unrelated test servers.

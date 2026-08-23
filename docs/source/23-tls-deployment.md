@@ -173,6 +173,20 @@ off-host, and periodically perform a
 restore drill into an isolated Postgres schema and filesystem root before
 declaring recovery readiness.
 
+The executable drill requires a PostgreSQL URL and a backup directory:
+
+```bash
+npm run backup:restore-drill -- \
+  --backup /var/backups/source/source-backup-<timestamp> \
+  --database-url "$SOURCE_DATABASE_URL"
+```
+
+It creates a temporary database (the URL must use PostgreSQL URI syntax),
+restores the custom dump, extracts both filesystem archives into temporary
+roots, runs `git fsck` on every restored bare repository, checks that the
+`source` schema was restored, and removes the temporary database and roots in
+all completion paths.
+
 ## Security notes
 
 - TLS resolves the "no TLS" remaining risk in `12-threat-model.md` T4

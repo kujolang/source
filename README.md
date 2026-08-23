@@ -248,7 +248,10 @@ serving nodes and worker processes independently behind the reverse proxy.
 Backups are executable and verifiable: `npm run backup -- --output
 /var/backups/source` archives the metadata/Git roots, verifies bare repositories,
 and emits checksums; `npm run backup:verify -- --backup <directory>` validates
-the result. See the deployment document for Postgres and restore-drill commands.
+the result. Run `npm run backup:restore-drill -- --backup <directory>
+--database-url <postgresql-url>` to restore into temporary filesystem roots and a
+temporary Postgres database, verify Git objects, and remove the drill resources.
+See the deployment document for backup replication and recovery procedures.
 
 Set `SOURCE_WEBHOOK_SECRET` to enable HMAC-signed workflow webhook ingress;
 deliveries require a provider signature and delivery ID and are replay-safe.
