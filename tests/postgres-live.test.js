@@ -14,7 +14,8 @@ const dsn = process.env.SOURCE_TEST_DATABASE_URL;
 
 test('Postgres async lifecycle and HTTP burst remain correct under a configurable agent fleet', { skip: !dsn }, async () => {
   const agentCount = Math.min(5_000, Math.max(1_000, Math.trunc(Number(process.env.SOURCE_LIVE_AGENTS) || 1_000)));
-  const dbQueue = Math.min(100_000, Math.max(4_096, Math.trunc(Number(process.env.SOURCE_LIVE_DB_QUEUE) || 4_096)));
+  const defaultDbQueue = Math.min(100_000, Math.max(4_096, agentCount * 2));
+  const dbQueue = Math.min(100_000, Math.max(agentCount, Math.trunc(Number(process.env.SOURCE_LIVE_DB_QUEUE) || defaultDbQueue)));
   const httpConcurrency = Math.min(agentCount, Math.max(1, Math.trunc(Number(process.env.SOURCE_LIVE_HTTP_CONCURRENCY) || 256)));
   const schema = `source_test_${Date.now()}_${process.pid}`;
   let store;
