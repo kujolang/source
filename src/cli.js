@@ -50,6 +50,11 @@ export async function run(argv) {
   // Select the store backend: --store json|sqlite|postgres, or SOURCE_STORE.
   // SQLite requires Node >= 22.5 (node:sqlite); PostgreSQL requires a DSN.
   const backend = flag('--store') || process.env.SOURCE_STORE || 'json';
+  if (cmd === 'serve' && (backend === 'json' || backend === 'sqlite') && !hasFlag('--allow-unsafe-local-store')) {
+    const host = flag('--host');
+    const loopback = !host || host === '127.0.0.1' || host === 'localhost' || host === '::1';
+    if (!loopback) fail(`--store ${backend} is single-node only; use --store postgres for an exposed server or explicitly pass --allow-unsafe-local-store`);
+  }
   let src;
   if (backend === 'sqlite') {
     const { SqliteStore } = await import('./sqlite-store.js');
@@ -433,12 +438,13 @@ export async function run(argv) {
           '  decision accept|reject|request-revision --org <o> --project <p>',
           '  policy show --org <o> --project <p>',
           '  audit',
-          '  serve --port <n> [--host <addr>] [--trust-proxy] [--git-concurrency <n>] [--git-queue <n>] [--git-tenant-concurrency <n>] [--git-tenant-queue <n>] [--git-timeout-ms <n>] [--request-concurrency <n>] [--request-queue <n>] [--max-connections <n>] [--max-git-response <bytes>] [--max-workflow-jobs <n>] [--artifact-concurrency <n>] [--artifact-queue <n>]',
+          '  serve --port <n> [--host <addr>] [--store postgres] [--trust-proxy] [--git-concurrency <n>] [--git-queue <n>] [--git-tenant-concurrency <n>] [--git-tenant-queue <n>] [--git-timeout-ms <n>] [--request-concurrency <n>] [--request-queue <n>] [--max-connections <n>] [--max-git-response <bytes>] [--max-workflow-jobs <n>] [--artifact-concurrency <n>] [--artifact-queue <n>]',
           '  worker --store postgres --handler-module <path> [--worker-id <id> --worker-concurrency <n> --worker-project-burst <n> --worker-jitter-ratio <0..1> --worker-handler-timeout-ms <n> --worker-shutdown-timeout-ms <n>]',
           '  submit [--intent <s>] [--url <base>] [--credential <c>] [--cwd <dir>]',
           '',
           'Env: SOURCE_DATA (default .source), SOURCE_STORE (json|sqlite|postgres)',
           'Flags: --store json|sqlite|postgres (select the storage backend)',
+          'Exposed servers require --store postgres unless --allow-unsafe-local-store is explicitly provided',
           'Postgres flags: --database-url <dsn>, --schema <schema>',
         ]);
         return;

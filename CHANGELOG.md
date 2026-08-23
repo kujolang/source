@@ -17,6 +17,9 @@ All notable changes to Source are recorded here.
   retries, ref pruning, and post-replication `git fsck` verification.
 - Added an executable Postgres replication readiness gate that checks primary
   streaming standbys, standby WAL receivers, and bounded replay/receive lag.
+- Prevented accidental exposure of JSON/SQLite single-node stores; exposed
+  `serve` bindings now require Postgres unless an explicit unsafe override is
+  supplied.
 - Made the default Node test command deterministic by serializing test files;
   the dedicated scale suite still exercises the 1,000-connection burst while
   avoiding host TCP backlog contention from unrelated test servers.

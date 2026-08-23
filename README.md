@@ -72,6 +72,10 @@ node bin/source.js serve --port 8787
 node bin/source.js serve --host 0.0.0.0 --port 443 \
   --tls-key /path/to/privkey.pem --tls-cert /path/to/fullchain.pem
 
+JSON and SQLite stores are single-node backends. Exposed `serve` bindings
+require Postgres by default; `--allow-unsafe-local-store` is reserved for
+intentional local testing.
+
 # Production storage: use a pooled Postgres backend for multi-process serving
 SOURCE_DATABASE_URL='postgres://source:password@db/source' \
   node bin/source.js --store postgres serve --host 0.0.0.0 --port 8787
