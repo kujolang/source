@@ -1,4 +1,4 @@
-// Source — minimal human-facing HTML views.
+// Source — SiteKit-backed human-facing HTML views.
 //
 // The frontend is not the primary innovation. These views are enough for a
 // maintainer to understand what happened: org, project, work, change, evidence.
@@ -12,8 +12,8 @@ export function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
-function page(title, body, extraCss = '') {
-  return `<!doctype html><html lang="en" data-theme="kujo-light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title><link rel="stylesheet" href="/assets/sitekit/sitekit.css"><link rel="stylesheet" href="/assets/source.css"><script src="/assets/sitekit/sitekit.js" defer></script>${extraCss ? `<style>${extraCss}</style>` : ''}</head>
+function page(title, body) {
+  return `<!doctype html><html lang="en" data-theme="kujo-light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title><link rel="stylesheet" href="/assets/sitekit/sitekit.css"><link rel="stylesheet" href="/assets/source.css"><script src="/assets/sitekit/sitekit.js" defer></script></head>
  <body><div class="sk-container sk-stack source-page">${body}</div></body></html>`;
 }
 
@@ -214,7 +214,7 @@ export function managementPage(title, body, orgId, projectId) {
     .replace(/<button(?![^>]*class=)/g, '<button class="sk-button"')
     .replace(/<table/g, '<div class="sk-table"><table')
     .replace(/<\/table>/g, '</table></div>');
-  return page(title, `${nav(orgId, projectId)}${styledBody}`, '');
+  return page(title, `${nav(orgId, projectId)}${styledBody}`);
 }
 
 export async function renderRepositoryAsync(src, orgId, projectId, repoId, ref = 'HEAD', directory = '') {
