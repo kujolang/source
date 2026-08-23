@@ -121,8 +121,22 @@ What is catastrophic to lose (MEGA_PROMPT §41), and the recovery requirement:
 The data root is `SOURCE_DATA` (default `.source`). Set `SOURCE_GIT_ROOT` when
 Git objects live on a separate shared durable volume; every serving node must
 mount the same Git root. A consistent backup of both roots captures
-everything. Full backup automation (scheduling, off-site replication, restore
-drills) is outside the MVP but these are the required durability boundaries.
+everything. Source includes an executable backup and verification workflow:
+
+```bash
+npm run backup -- --data-root "$SOURCE_DATA" --git-root "$SOURCE_GIT_ROOT" \
+  --output /var/backups/source --database-url "$SOURCE_DATABASE_URL" --schema source
+npm run backup:verify -- --backup /var/backups/source/source-backup-<timestamp>
+```
+
+The backup command runs `git fsck` on every bare repository, archives both
+filesystem roots, uses `pg_dump` custom format for Postgres, writes SHA-256
+checksums, and promotes the staging directory only after all artifacts finish.
+Verification checks every checksum, lists every tar archive, and validates the
+Postgres dump with `pg_restore --list`. Operators must schedule the command,
+replicate completed backup directories off-host, and periodically perform a
+restore drill into an isolated Postgres schema and filesystem root before
+declaring recovery readiness.
 
 ## Security notes
 

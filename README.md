@@ -198,6 +198,11 @@ Caddy, HAProxy). See `docs/source/23-tls-deployment.md` for the full self-host
 path, certificate management, custom domains, and data-durability/backup
 requirements.
 
+Backups are executable and verifiable: `npm run backup -- --output
+/var/backups/source` archives the metadata/Git roots, verifies bare repositories,
+and emits checksums; `npm run backup:verify -- --backup <directory>` validates
+the result. See the deployment document for Postgres and restore-drill commands.
+
 ## Architecture
 
 A **modular monolith** in Node.js (ESM), with a small native Postgres client
