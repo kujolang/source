@@ -160,6 +160,12 @@ export class GitRepo {
     try { await runAsync(['cat-file', '-e', `${hash}^{commit}`], { cwd: this.barePath }); return true; } catch { return false; }
   }
 
+  async showFileAsync(ref, filePath) {
+    if (typeof ref !== 'string' || !/^[A-Za-z0-9._/@-]{1,200}$/.test(ref)) throw new Error('invalid Git ref');
+    if (typeof filePath !== 'string' || filePath.includes('..') || filePath.startsWith('/') || filePath.includes(':')) throw new Error('invalid repository file path');
+    return runAsync(['show', `${ref}:${filePath}`], { cwd: this.barePath });
+  }
+
   async isAncestorAsync(ancestor, descendant) {
     try { await runAsync(['merge-base', '--is-ancestor', ancestor, descendant], { cwd: this.barePath }); return true; } catch { return false; }
   }

@@ -30,6 +30,7 @@ import { nextId, nextIdAsync, randomHex } from './ids.js';
 import { normalizeEvalSummary, normalizeEvalManifest, normalizeEvalRun, readEvalArtifacts } from './integrations/kujo.js';
 import { scanSecrets } from './scan.js';
 import { JobQueue } from './job-queue.js';
+import { translateGitHubActions } from './integrations/github-actions.js';
 
 const DEFAULT_HUMAN_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_HUMAN_SESSION_ACTIONS = ['read_source', 'read_context', 'accept_change'];
@@ -1343,7 +1344,7 @@ export class Source {
     }
   }
 
-  async createWorkflowAsync({ orgId, projectId, name, triggers, jobs, enabled = true }) {
+  async createWorkflowAsync({ orgId, projectId, name, triggers, jobs, enabled = true, source = null }) {
     this._validateWorkflow({ name, triggers, jobs });
     const id = await nextIdAsync(this.store, 'workflow');
     const workflow = {
@@ -1355,11 +1356,23 @@ export class Source {
       triggers: [...new Set(triggers)],
       jobs: jobs.map((job) => ({ kind: job.kind, payload: job.payload ?? {} })),
       enabled: enabled !== false,
+      source,
       createdAt: new Date().toISOString(),
     };
     await this._asyncWrite(this._workflowRel(orgId, projectId, id), workflow);
     await this._asyncAudit({ event: 'workflow.create', orgId, projectId, workflowId: id, name, triggers: workflow.triggers });
     return workflow;
+  }
+
+  async importGitHubWorkflowAsync({ orgId, projectId, repoId, ref = 'HEAD', path: workflowPath }) {
+    if (!repoId || typeof workflowPath !== 'string' || !/^\.github\/workflows\/[^/]+\.ya?ml$/.test(workflowPath)) {
+      throw new Error('workflow path must be a .github/workflows/*.yml file');
+    }
+    const repo = await this.getRepositoryAsync(orgId, projectId, repoId);
+    if (!repo) throw new Error(`repository not found: ${repoId}`);
+    const raw = await new GitRepo(repo.barePath).showFileAsync(ref, workflowPath);
+    const translated = translateGitHubActions(raw, { path: workflowPath, repoId, ref });
+    return this.createWorkflowAsync({ orgId, projectId, ...translated });
   }
 
   async getWorkflowAsync(orgId, projectId, workflowId) {

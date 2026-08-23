@@ -19,6 +19,9 @@ Agents or trusted services use the capability-gated endpoints:
 
 - `POST /api/v1/orgs/{org}/projects/{project}/workflows` creates a definition
   (`manage_workflows`).
+- `POST /api/v1/orgs/{org}/projects/{project}/workflows/import-github` reads a
+  committed `.github/workflows/*.yml`/`.yaml` file from a Source repository and
+  translates its bounded trigger/job metadata (`manage_workflows`).
 - `GET /api/v1/orgs/{org}/projects/{project}/workflows` lists definitions
   (`read_workflows`).
 - `POST /api/v1/orgs/{org}/projects/{project}/workflows/{id}/dispatch` submits
@@ -42,7 +45,9 @@ artifacts as Source Evidence. This preserves the Kujo artifact boundary while
 allowing hundreds or thousands of workers to process independent steps.
 
 This is a workflow/action control plane, not a claim of complete GitHub Actions
-runtime compatibility. Container isolation, runner provisioning, secrets
+runtime compatibility. YAML import preserves `run`, `uses`, permissions, and
+environment as untrusted step data; it never executes them in Source. Container
+isolation, runner provisioning, secrets
 brokering, and per-provider secret rotation remain deployment-specific work
 required before advertising drop-in `.github/workflows` compatibility. The
 webhook endpoint itself is provider-neutral: it uses the delivery ID as the

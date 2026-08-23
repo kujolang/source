@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { PostgresStore } from '../src/postgres-store.js';
@@ -34,6 +34,15 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     assert.equal((await peerSrc.getProjectAsync(org.id, project.id)).id, project.id);
     const peerRepo = src.createRepository({ orgId: org.id, projectId: project.id, name: 'shared-main' });
     assert.equal((await peerSrc.getRepositoryAsync(org.id, project.id, peerRepo.id)).barePath, peerRepo.barePath);
+    const workflowClone = mkdtempSync(path.join(tmpdir(), 'source-workflow-'));
+    execFileSync('git', ['clone', peerRepo.barePath, workflowClone], { stdio: 'ignore' });
+    mkdirSync(path.join(workflowClone, '.github', 'workflows'), { recursive: true });
+    writeFileSync(path.join(workflowClone, '.github', 'workflows', 'checks.yml'), 'name: checks\non: [push]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: kujo check\n');
+    execFileSync('git', ['-C', workflowClone, 'config', 'user.email', 'source@test.invalid']);
+    execFileSync('git', ['-C', workflowClone, 'config', 'user.name', 'Source Test']);
+    execFileSync('git', ['-C', workflowClone, 'add', '.github/workflows/checks.yml']);
+    execFileSync('git', ['-C', workflowClone, 'commit', '-m', 'add workflow'], { stdio: 'ignore' });
+    execFileSync('git', ['-C', workflowClone, 'push', 'origin', 'HEAD:main'], { stdio: 'ignore' });
     const works = await Promise.all(Array.from({ length: 1_000 }, (_, i) => src.createWorkAsync({
       orgId: org.id,
       projectId: project.id,
@@ -164,6 +173,14 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     const listedResponse = await fetch(`${jobUrl}?limit=2`, { headers: { Authorization: `Bearer ${jobCapability.credential}` } });
     assert.equal(listedResponse.status, 200);
     assert.ok(Array.isArray((await listedResponse.json()).items));
+    const workflowUrl = `http://127.0.0.1:${server.address().port}/api/v1/orgs/${org.id}/projects/${project.id}/workflows`;
+    const importedWorkflowResponse = await fetch(`${workflowUrl}/import-github`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${jobCapability.credential}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repository: peerRepo.id, path: '.github/workflows/checks.yml', ref: 'main' }),
+    });
+    assert.equal(importedWorkflowResponse.status, 201);
+    assert.equal((await importedWorkflowResponse.json()).source.provider, 'github-actions');
     const workCapability = await src.capabilities.issueAsync({
       principalId: principal.id,
       scope: { org: org.id, project: project.id, work: 'W1' },
@@ -185,7 +202,6 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
       body: JSON.stringify({ kind: 'agent.scoped', workId: 'W2', payload: {} }),
     });
     assert.equal(outOfScopeJob.status, 403);
-    const workflowUrl = `http://127.0.0.1:${server.address().port}/api/v1/orgs/${org.id}/projects/${project.id}/workflows`;
     const workflowResponse = await fetch(workflowUrl, {
       method: 'POST',
       headers: { Authorization: `Bearer ${jobCapability.credential}`, 'Content-Type': 'application/json' },

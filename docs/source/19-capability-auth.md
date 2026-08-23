@@ -69,6 +69,7 @@ discovery manifest):
 | `/api/v1/orgs/{org}/projects/{p}/submit` | POST | public | — |
 | `/api/v1/orgs/{org}/projects/{p}/workflows` | GET | `read_workflows` | org + project |
 | `/api/v1/orgs/{org}/projects/{p}/workflows` | POST | `manage_workflows` | org + project |
+| `/api/v1/orgs/{org}/projects/{p}/workflows/import-github` | POST | `manage_workflows` | org + project |
 | `/api/v1/orgs/{org}/projects/{p}/workflows/{w}/dispatch` | POST | `dispatch_workflow` | org + project |
 | `/api/v1/orgs/{org}/projects/{p}/workflows/{w}/webhook` | POST | signed delivery | org + project + shared webhook secret |
 

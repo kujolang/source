@@ -707,6 +707,13 @@ export function createServer(src, { port = 8787, tls, host, webhookSecret = proc
         }
 
         const workflowMatch = rest.match(/^\/workflows(?:\/([^/]+)(\/dispatch)?)?$/);
+        if (rest === '/workflows/import-github' && req.method === 'POST') {
+          const g = await guard(src, req, ACTIONS.manage_workflows, { org: orgId, project: projectId });
+          if (g) return json(res, g.status, g.body);
+          const body = await readBody(req, maxJsonBodyBytes);
+          const workflow = await src.importGitHubWorkflowAsync({ orgId, projectId, repoId: body.repository, ref: body.ref || 'HEAD', path: body.path });
+          return json(res, 201, workflow);
+        }
         const webhookMatch = rest.match(/^\/workflows\/([^/]+)\/webhook$/);
         if (webhookMatch && req.method === 'POST') {
           if (!webhookSecret) return json(res, 503, { error: 'webhook ingress is not configured' });
