@@ -45,6 +45,8 @@ Workflow, organization, Work listing/dispatch, and repository-resolution paths
 use bounded bulk record reads on Postgres, so large tenants do not fan out into
 one database round trip per returned record. Bulk results preserve path order so
 keyset pagination remains correct.
+Git repository resolution on Postgres uses tenant-scoped indexed ID/name lookup,
+avoiding a scan of every repository in a large project.
 
 Chunked Git uploads use a separate four-slot admission budget and a 16 MiB
 buffer limit by default. Known-length uploads remain streamed directly to

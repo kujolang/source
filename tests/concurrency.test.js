@@ -160,6 +160,18 @@ test('Postgres workflow records use one bounded bulk read', async () => {
   await assert.rejects(() => store.readJsonManyAsync(Array.from({ length: 1_001 }, (_, index) => `W${index}`)), /0-1000/);
 });
 
+test('Postgres repository resolution uses a tenant-scoped indexed query', async () => {
+  const store = Object.create(PostgresStore.prototype);
+  let query = '';
+  store._qualified = (name) => `"source"."${name}"`;
+  store._fetchJsonRowsAsync = async (sql) => { query = sql; return [{ json: { id: 'R1', name: 'main' } }]; };
+  assert.deepEqual(await store.findRepositoryAsync('O1', 'P1', 'main'), { id: 'R1', name: 'main' });
+  assert.match(query, /kind = 'repository'/);
+  assert.match(query, /org_id = 'O1'/);
+  assert.match(query, /project_id = 'P1'/);
+  assert.match(query, /json->>'name'/);
+});
+
 test('SQLite counter allocation returns unique monotonic IDs', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'source-counter-'));
   const store = new SqliteStore(root);

@@ -443,6 +443,8 @@ class PostgresStore {
     }
 
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_records_path`)} ON ${this._qualified('records')} (path)`);
+    this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_records_repository`)} ON ${this._qualified('records')} (kind, org_id, project_id, entity_id)`);
+    this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_records_repository_name`)} ON ${this._qualified('records')} (org_id, project_id, (json->>'name')) WHERE kind = 'repository'`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_evidence_project`)} ON ${this._qualified('evidence')} (org_id, project_id)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_changes_work`)} ON ${this._qualified('changes')} (org_id, project_id, work_id)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_decisions_change`)} ON ${this._qualified('decisions')} (org_id, project_id, change_id)`);
@@ -688,6 +690,20 @@ class PostgresStore {
       WHERE path IN (${paths.map(escapeSqlLiteral).join(',')})
       ORDER BY path
     `);
+  }
+
+  async findRepositoryAsync(orgId, projectId, repoRef) {
+    if (typeof repoRef !== 'string' || !repoRef || repoRef.length > 240) throw new Error('repository reference is invalid');
+    const rows = await this._fetchJsonRowsAsync(`
+      SELECT json
+      FROM ${this._qualified('records')}
+      WHERE kind = 'repository'
+        AND org_id = ${escapeSqlLiteral(orgId)}
+        AND project_id = ${escapeSqlLiteral(projectId)}
+        AND (entity_id = ${escapeSqlLiteral(repoRef)} OR json->>'name' = ${escapeSqlLiteral(repoRef)})
+      LIMIT 1
+    `);
+    return rows[0]?.json || null;
   }
 
   writeJson(relPath, obj) {

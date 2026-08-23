@@ -297,6 +297,9 @@ export class Source {
   }
 
   async resolveRepositoryAsync(orgId, projectId, repoRef) {
+    if (typeof this.store.findRepositoryAsync === 'function') {
+      return this.store.findRepositoryAsync(orgId, projectId, repoRef);
+    }
     const readJson = typeof this.store.readJsonAsync === 'function'
       ? (rel) => this.store.readJsonAsync(rel)
       : (rel) => this.store.readJson(rel);

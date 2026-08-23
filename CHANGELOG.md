@@ -19,6 +19,8 @@ All notable changes to Source are recorded here.
   removing their per-record query fan-out.
 - Applied the same bulk-read path to repository resolution, keeping Git-facing
   repository lookup bounded for projects with many repositories.
+- Added tenant-scoped Postgres repository lookup indexes so name/ID resolution
+  does not scan a project’s repository list.
 
 ## [0.1.0]
 
