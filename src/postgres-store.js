@@ -443,6 +443,7 @@ class PostgresStore {
     }
 
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_records_path`)} ON ${this._qualified('records')} (path)`);
+    this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_records_path_pattern`)} ON ${this._qualified('records')} (path text_pattern_ops)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_records_repository`)} ON ${this._qualified('records')} (kind, org_id, project_id, entity_id)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_records_repository_name`)} ON ${this._qualified('records')} (org_id, project_id, (json->>'name')) WHERE kind = 'repository'`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_evidence_project`)} ON ${this._qualified('evidence')} (org_id, project_id)`);

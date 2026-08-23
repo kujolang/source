@@ -8,7 +8,7 @@ import { startServer } from '../src/api.js';
 import { gitHttpBackend } from '../src/git-http.js';
 import { PostgresStore } from '../src/postgres-store.js';
 import { freshSource } from './helpers.js';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -170,6 +170,12 @@ test('Postgres repository resolution uses a tenant-scoped indexed query', async 
   assert.match(query, /org_id = 'O1'/);
   assert.match(query, /project_id = 'P1'/);
   assert.match(query, /json->>'name'/);
+});
+
+test('Postgres record directory listings have a prefix-search index', () => {
+  const source = readFileSync(new URL('../src/postgres-store.js', import.meta.url), 'utf8');
+  assert.match(source, /records_path_pattern/);
+  assert.match(source, /path text_pattern_ops/);
 });
 
 test('SQLite counter allocation returns unique monotonic IDs', () => {

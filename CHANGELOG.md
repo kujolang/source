@@ -31,6 +31,8 @@ All notable changes to Source are recorded here.
   promotions cannot exhaust the Postgres connection pool across projects.
 - Exposed canonical-promotion admission depth and rejection metrics for
   capacity planning and alerting.
+- Added a Postgres `text_pattern_ops` index for bounded prefix directory
+  listings over compatibility records.
 
 ## [0.1.0]
 

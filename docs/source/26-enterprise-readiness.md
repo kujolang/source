@@ -62,6 +62,9 @@ project-row lock. This limits the number of database connections held while
 Git subprocesses perform promotion work.
 The gate exposes active, waiting, and rejected counts through `/metrics`, making
 promotion pressure visible to operators.
+Postgres compatibility-record directory listings use a `text_pattern_ops`
+prefix index, keeping keyset listing scans indexable as total tenant records
+grow.
 
 Chunked Git uploads use a separate four-slot admission budget and a 16 MiB
 buffer limit by default. Known-length uploads remain streamed directly to
