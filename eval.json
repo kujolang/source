@@ -1,0 +1,37 @@
+{
+  "name": "source-release-gate",
+  "description": "Deterministic release checks for the agent-facing Source service.",
+  "version": "1.0.0",
+  "output_dir": ".eval_results",
+  "stop_on_failure": false,
+  "tests": [
+    {
+      "name": "Node test suite",
+      "check": "command_succeeds",
+      "params": { "command": "npm test" },
+      "timeout_seconds": 300
+    },
+    {
+      "name": "Concurrency regression suite",
+      "check": "command_succeeds",
+      "params": { "command": "npm run test:scale" },
+      "timeout_seconds": 120
+    },
+    {
+      "name": "CLI help remains available",
+      "check": "command_succeeds",
+      "params": { "command": "node bin/source.js help" }
+    },
+    {
+      "name": "Working tree diff is whitespace-clean",
+      "check": "command_succeeds",
+      "params": { "command": "git diff --check" }
+    },
+    {
+      "name": "Kujo environment doctor passes without failures",
+      "check": "command_succeeds",
+      "params": { "command": "kujo doctor --deep --json" },
+      "timeout_seconds": 120
+    }
+  ]
+}
