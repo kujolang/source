@@ -23,6 +23,7 @@
 
 import http from 'node:http';
 import https from 'node:https';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Source } from './source.js';
 import { renderOrgIndex, renderIndex, renderProject, renderWork, renderChange, renderLogin } from './web.js';
 import { gitHttpBackend } from './git-http.js';
@@ -123,6 +124,14 @@ function readBody(req, maxBytes = 1_000_000) {
       })
       .catch(reject);
   });
+}
+
+function validWebhookSignature(raw, header, secret) {
+  if (!secret || typeof header !== 'string') return false;
+  const supplied = header.replace(/^sha256=/i, '').trim();
+  if (!/^[0-9a-f]{64}$/i.test(supplied)) return false;
+  const expected = createHmac('sha256', secret).update(raw).digest('hex');
+  return timingSafeEqual(Buffer.from(supplied.toLowerCase(), 'hex'), Buffer.from(expected, 'hex'));
 }
 
 async function readLoginBody(req) {
@@ -283,7 +292,7 @@ async function changeWork(src, orgId, projectId, changeId) {
   return c ? c.workId : undefined;
 }
 
-export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxJobPayloadBytes = 64 * 1024, maxJobQueueDepth = 100_000, maxGitBodyBytes = 100_000_000, maxChunkedGitBodyBytes = 16 * 1024 * 1024, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTimeoutMs = 120_000, maxConnections = 10_000 } = {}) {
+export function createServer(src, { port = 8787, tls, host, webhookSecret = process.env.SOURCE_WEBHOOK_SECRET || null, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxJobPayloadBytes = 64 * 1024, maxJobQueueDepth = 100_000, maxGitBodyBytes = 100_000_000, maxChunkedGitBodyBytes = 16 * 1024 * 1024, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTimeoutMs = 120_000, maxConnections = 10_000 } = {}) {
   const limiter = new RateLimiter({ maxKeys: rateLimit.maxKeys || 100_000, store: rateLimit.store || src.store });
   const gitSlots = new Semaphore({ capacity: gitConcurrency, queue: gitQueue });
   const chunkedGitSlots = new Semaphore({ capacity: Math.max(1, Math.min(4, gitConcurrency)), queue: Math.max(0, Math.min(32, gitQueue)) });
@@ -698,6 +707,23 @@ export function createServer(src, { port = 8787, tls, host, rateLimit = {}, maxJ
         }
 
         const workflowMatch = rest.match(/^\/workflows(?:\/([^/]+)(\/dispatch)?)?$/);
+        const webhookMatch = rest.match(/^\/workflows\/([^/]+)\/webhook$/);
+        if (webhookMatch && req.method === 'POST') {
+          if (!webhookSecret) return json(res, 503, { error: 'webhook ingress is not configured' });
+          const ip = req.socket.remoteAddress || 'unknown';
+          if (!(await limiter.allowAsync(`webhook:${ip}:${orgId}:${projectId}`, limits.workflowDispatch))) return json(res, 429, { error: 'rate limit exceeded' });
+          const raw = await readText(req, maxJsonBodyBytes);
+          if (!validWebhookSignature(raw, req.headers['x-hub-signature-256'] || req.headers['x-source-signature-256'], webhookSecret)) return json(res, 401, { error: 'invalid webhook signature' });
+          let body;
+          try { body = raw ? JSON.parse(raw) : {}; } catch { return json(res, 400, { error: 'invalid JSON body' }); }
+          const workflow = await src.getWorkflowAsync(orgId, projectId, webhookMatch[1]);
+          if (!workflow) return json(res, 404, { error: 'workflow not found' });
+          const eventId = body.eventId || req.headers['x-github-delivery'] || req.headers['x-source-delivery'];
+          if (!eventId) return json(res, 400, { error: 'webhook delivery id is required' });
+          const event = body.event || req.headers['x-github-event'] || 'webhook';
+          const dispatch = await src.dispatchWorkflowAsync({ orgId, projectId, workflowId: workflow.id, event, eventId, payload: body.payload ?? body, maxQueueDepth: maxJobQueueDepth });
+          return json(res, 202, dispatch);
+        }
         if (workflowMatch && !workflowMatch[1] && req.method === 'GET') {
           const g = await guard(src, req, ACTIONS.read_workflows, { org: orgId, project: projectId });
           if (g) return json(res, g.status, g.body);

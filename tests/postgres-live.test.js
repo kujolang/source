@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -147,7 +148,7 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     assert.equal(handled, 100);
     assert.equal(retryAttempts, 2);
 
-    server = await startServer(src, { port: 0, maxConnections: 2_000 });
+    server = await startServer(src, { port: 0, maxConnections: 2_000, webhookSecret: 'live-webhook-secret' });
     const jobCapability = await src.capabilities.issueAsync({
       principalId: principal.id,
       scope: { org: org.id, project: project.id },
@@ -200,10 +201,25 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     assert.equal(dispatchResponse.status, 202, await dispatchResponse.clone().text());
     const apiDispatch = await dispatchResponse.json();
     const apiJob = apiDispatch.workflows[0].jobs[0];
-    const claimedApiJobs = await src.jobs.claim({ workerId: 'api-workflow-worker', limit: 10 });
+    const webhookUrl = `${workflowUrl}/${apiWorkflow.id}/webhook`;
+    const webhookBody = JSON.stringify({ event: 'api.push', payload: { ref: 'main' } });
+    const signature = `sha256=${createHmac('sha256', 'live-webhook-secret').update(webhookBody).digest('hex')}`;
+    const invalidWebhook = await fetch(webhookUrl, { method: 'POST', headers: { 'X-GitHub-Event': 'api.push', 'X-GitHub-Delivery': 'github-1', 'X-Hub-Signature-256': 'sha256=' + '0'.repeat(64), 'Content-Type': 'application/json' }, body: webhookBody });
+    assert.equal(invalidWebhook.status, 401);
+    const webhookResponse = await fetch(webhookUrl, { method: 'POST', headers: { 'X-GitHub-Event': 'api.push', 'X-GitHub-Delivery': 'github-1', 'X-Hub-Signature-256': signature, 'Content-Type': 'application/json' }, body: webhookBody });
+    assert.equal(webhookResponse.status, 202);
+    const webhookDispatch = await webhookResponse.json();
+    const replayResponse = await fetch(webhookUrl, { method: 'POST', headers: { 'X-GitHub-Event': 'api.push', 'X-GitHub-Delivery': 'github-1', 'X-Hub-Signature-256': signature, 'Content-Type': 'application/json' }, body: webhookBody });
+    assert.equal(replayResponse.status, 202);
+    const replayDispatch = await replayResponse.json();
+    assert.equal(replayDispatch.workflows[0].jobs[0].id, webhookDispatch.workflows[0].jobs[0].id);
+    assert.equal(replayDispatch.workflows[0].jobs[0].status, 'deduplicated');
+    const claimedApiJobs = await src.jobs.claim({ workerId: 'api-workflow-worker', limit: 3 });
     const claimedApiJob = claimedApiJobs.find((job) => job.id === apiJob.id);
     assert.ok(claimedApiJob);
-    await Promise.all(claimedApiJobs.map((job) => src.jobs.complete({ id: job.id, workerId: 'api-workflow-worker', leaseToken: job.leaseToken, result: { ok: true } })));
+    const claimedWebhookJobs = await src.jobs.claim({ workerId: 'webhook-worker', limit: 10 });
+    assert.ok(claimedWebhookJobs.some((job) => job.id === webhookDispatch.workflows[0].jobs[0].id));
+    await Promise.all([...claimedApiJobs, ...claimedWebhookJobs].map((job) => src.jobs.complete({ id: job.id, workerId: job.workerId, leaseToken: job.leaseToken, result: { ok: true } })));
     const url = `http://127.0.0.1:${server.address().port}/.well-known/source`;
     const responses = await Promise.all(Array.from({ length: 1_000 }, () => fetch(url)));
     assert.ok(responses.every((response) => response.status === 200));

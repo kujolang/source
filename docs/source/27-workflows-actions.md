@@ -23,6 +23,9 @@ Agents or trusted services use the capability-gated endpoints:
   (`read_workflows`).
 - `POST /api/v1/orgs/{org}/projects/{project}/workflows/{id}/dispatch` submits
   an event (`dispatch_workflow`).
+- `POST /api/v1/orgs/{org}/projects/{project}/workflows/{id}/webhook` accepts a
+  bounded HMAC-SHA256-signed delivery (`X-Hub-Signature-256` or
+  `X-Source-Signature-256`) when `SOURCE_WEBHOOK_SECRET` is configured.
 
 Dispatch is durable and multi-node safe. Each step becomes a Postgres queue job
 with the workflow version, event ID, event input, and step number in its
@@ -40,5 +43,8 @@ allowing hundreds or thousands of workers to process independent steps.
 
 This is a workflow/action control plane, not a claim of complete GitHub Actions
 runtime compatibility. Container isolation, runner provisioning, secrets
-brokering, and hosted webhook signature adapters remain deployment-specific
-work required before advertising drop-in `.github/workflows` compatibility.
+brokering, and per-provider secret rotation remain deployment-specific work
+required before advertising drop-in `.github/workflows` compatibility. The
+webhook endpoint itself is provider-neutral: it uses the delivery ID as the
+idempotency key and maps `X-GitHub-Event` plus the JSON payload into the Source
+workflow event contract.

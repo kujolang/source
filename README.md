@@ -203,6 +203,9 @@ Backups are executable and verifiable: `npm run backup -- --output
 and emits checksums; `npm run backup:verify -- --backup <directory>` validates
 the result. See the deployment document for Postgres and restore-drill commands.
 
+Set `SOURCE_WEBHOOK_SECRET` to enable HMAC-signed workflow webhook ingress;
+deliveries require a provider signature and delivery ID and are replay-safe.
+
 ## Architecture
 
 A **modular monolith** in Node.js (ESM), with a small native Postgres client
