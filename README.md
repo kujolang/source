@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **130/130 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
+- **131/131 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
@@ -185,7 +185,8 @@ SOURCE_DATABASE_URL='postgres://source:password@db/source' \
   node bin/source.js --store postgres serve --host 0.0.0.0 --port 8787
 ```
 
-Postgres is the recommended backend for large agent fleets; configure pool
+Postgres is the recommended backend for large agent fleets; asynchronous
+relational record fan-out is committed in one database transaction. Configure pool
 options through the store integration and place Git repositories on shared,
 durable storage. Set `SOURCE_GIT_ROOT` to the shared Git volume when metadata
 and repository objects need separate mounts; all serving nodes must use the

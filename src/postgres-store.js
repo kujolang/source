@@ -718,6 +718,10 @@ class PostgresStore {
   }
 
   async writeJsonAsync(relPath, obj) {
+    return this.transactionAsync(() => this._writeJsonAsync(relPath, obj));
+  }
+
+  async _writeJsonAsync(relPath, obj) {
     const classified = this._classifyRelPath(relPath);
     await this._runAsync(`INSERT INTO ${this._qualified('records')} (path, kind, org_id, project_id, entity_id, json)
       VALUES (${escapeSqlLiteral(relPath)}, ${escapeSqlLiteral(classified.kind)}, ${escapeSqlLiteral(classified.orgId || null)}, ${escapeSqlLiteral(classified.projectId || null)}, ${escapeSqlLiteral(classified.id || null)}, ${toJson(obj)})

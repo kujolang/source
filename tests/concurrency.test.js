@@ -71,6 +71,26 @@ test('Postgres async transactions keep all statements on one pooled client', asy
   assert.deepEqual(calls, ['BEGIN', 'SELECT 1', 'COMMIT', 'RELEASE']);
 });
 
+test('Postgres async transactions roll back relational record fan-out on failure', async () => {
+  const calls = [];
+  const client = {
+    async query(sql) {
+      calls.push(String(sql).trim());
+      if (String(sql).includes('FAIL')) throw new Error('forced failure');
+      return { rows: [] };
+    },
+    release() { calls.push('RELEASE'); },
+  };
+  const store = Object.create(PostgresStore.prototype);
+  store.pool = { connect: async () => client };
+  store._asyncTransaction = new (await import('node:async_hooks')).AsyncLocalStorage();
+  await assert.rejects(() => store.transactionAsync(async () => {
+    await store._runAsync('INSERT INTO records VALUES (1)');
+    await store._runAsync('FAIL');
+  }), /forced failure/);
+  assert.deepEqual(calls, ['BEGIN', 'INSERT INTO records VALUES (1)', 'FAIL', 'ROLLBACK', 'RELEASE']);
+});
+
 test('SQLite counter allocation returns unique monotonic IDs', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'source-counter-'));
   const store = new SqliteStore(root);
