@@ -226,7 +226,7 @@ All six items of the original "Recommended Next Phase" are now complete:
   org-scoped capabilities are enforced server-side, and org list/get/create is
   exposed via API, CLI, and web.
 
-The default test suite is now **148/148 non-skipped tests passing**, with the live Postgres gate
+The default test suite is now **149/149 non-skipped tests passing**, with the live Postgres gate
 available through `SOURCE_TEST_DATABASE_URL=... npm run test:postgres`.
 
 ## Next phase (fresh prioritization)

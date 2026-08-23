@@ -37,7 +37,7 @@ function json(res, status, obj) {
   res.end(body);
 }
 
-function metrics(res, state, src, gitSlots, gitTenantSlots) {
+function metrics(res, state, src, gitSlots, gitTenantSlots, artifactSlots) {
   const lines = [
     '# HELP source_requests_total Total HTTP requests received.',
     '# TYPE source_requests_total counter',
@@ -89,6 +89,16 @@ function metrics(res, state, src, gitSlots, gitTenantSlots) {
       '# HELP source_git_tenant_admission_rejected_total Git requests rejected by per-project admission.',
       '# TYPE source_git_tenant_admission_rejected_total counter',
       `source_git_tenant_admission_rejected_total ${gitTenantSlots?.rejected || 0}`,
+    );
+  }
+  if (artifactSlots) {
+    lines.push(
+      '# HELP source_artifact_admission_rejected_total Artifact downloads rejected by the bounded admission queue.',
+      '# TYPE source_artifact_admission_rejected_total counter',
+      `source_artifact_admission_rejected_total ${artifactSlots.rejected || 0}`,
+      '# HELP source_artifact_admission_active Current artifact downloads admitted.',
+      '# TYPE source_artifact_admission_active gauge',
+      `source_artifact_admission_active ${artifactSlots.active || 0}`,
     );
   }
   for (const [status, count] of state.statuses) lines.push(`source_responses_by_status_total{status="${status}"} ${count}`);
@@ -346,11 +356,15 @@ async function changeWork(src, orgId, projectId, changeId) {
   return c ? c.workId : undefined;
 }
 
-export function createServer(src, { port = 8787, tls, host, trustProxy = false, webhookSecret = process.env.SOURCE_WEBHOOK_SECRET || null, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxJobPayloadBytes = 64 * 1024, maxJobQueueDepth = 100_000, maxWorkflowJobs = 1_000, maxGitBodyBytes = 100_000_000, maxChunkedGitBodyBytes = 16 * 1024 * 1024, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTenantConcurrency = 8, gitTenantQueue = 256, gitTimeoutMs = 120_000, maxConnections = 10_000 } = {}) {
+export function createServer(src, { port = 8787, tls, host, trustProxy = false, webhookSecret = process.env.SOURCE_WEBHOOK_SECRET || null, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxJobPayloadBytes = 64 * 1024, maxJobQueueDepth = 100_000, maxWorkflowJobs = 1_000, maxGitBodyBytes = 100_000_000, maxChunkedGitBodyBytes = 16 * 1024 * 1024, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTenantConcurrency = 8, gitTenantQueue = 256, gitTimeoutMs = 120_000, artifactConcurrency = 8, artifactQueue = 64, maxConnections = 10_000 } = {}) {
   const limiter = new RateLimiter({ maxKeys: rateLimit.maxKeys || 100_000, store: rateLimit.store || src.store });
   const gitSlots = new Semaphore({ capacity: gitConcurrency, queue: gitQueue });
   const gitTenantSlots = new KeyedSemaphore({ capacity: gitTenantConcurrency, queue: gitTenantQueue, maxKeys: rateLimit.maxKeys || 100_000 });
   const chunkedGitSlots = new Semaphore({ capacity: Math.max(1, Math.min(4, gitConcurrency)), queue: Math.max(0, Math.min(32, gitQueue)) });
+  const artifactSlots = new Semaphore({
+    capacity: Math.min(256, Math.max(1, Math.trunc(artifactConcurrency))),
+    queue: Math.min(10_000, Math.max(0, Math.trunc(artifactQueue))),
+  });
   const limits = {
     submit: { limit: 10, windowMs: 60_000, ...(rateLimit.submit || {}) },
     gitPush: { limit: 30, windowMs: 60_000, ...(rateLimit.gitPush || {}) },
@@ -384,7 +398,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
     const fields = url.searchParams.get('fields') || undefined;
 
     try {
-      if (req.method === 'GET' && pathname === '/metrics') return metrics(res, state, src, gitSlots, gitTenantSlots);
+      if (req.method === 'GET' && pathname === '/metrics') return metrics(res, state, src, gitSlots, gitTenantSlots, artifactSlots);
       if (server.draining && pathname !== '/healthz' && pathname !== '/readyz') {
         return json(res, 503, { error: 'server is draining' });
       }
@@ -1089,14 +1103,23 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           if (erest === '/artifact' && req.method === 'GET') {
             const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId });
             if (g) return json(res, g.status, g.body);
-            const e = await src.getEvidenceAsync(orgId, projectId, evidenceId);
-            if (!e || !e.artifactRef) return json(res, 404, { error: 'not found' });
-            const bytes = typeof src.getArtifactAsync === 'function'
-              ? await src.getArtifactAsync(e.artifactRef.hash)
-              : src.getArtifact(e.artifactRef.hash);
-            if (!bytes) return json(res, 404, { error: 'artifact not found' });
-            res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
-            return res.end(bytes);
+            const releaseArtifact = await artifactSlots.acquire();
+            if (!releaseArtifact) {
+              res.setHeader('Retry-After', '1');
+              return json(res, 503, { error: 'artifact service busy; retry later', retryable: true });
+            }
+            try {
+              const e = await src.getEvidenceAsync(orgId, projectId, evidenceId);
+              if (!e || !e.artifactRef) return json(res, 404, { error: 'not found' });
+              const bytes = typeof src.getArtifactAsync === 'function'
+                ? await src.getArtifactAsync(e.artifactRef.hash)
+                : src.getArtifact(e.artifactRef.hash);
+              if (!bytes) return json(res, 404, { error: 'artifact not found' });
+              res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': bytes.length });
+              return res.end(bytes);
+            } finally {
+              releaseArtifact();
+            }
           }
         }
       }
@@ -1128,6 +1151,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
     statuses: new Map(),
   };
   server.discoveryInstancePromise = null;
+  server.artifactSlots = artifactSlots;
   server.draining = false;
   server.beginDrain = () => { server.draining = true; };
   server.requestTimeout = 120_000;

@@ -3,8 +3,8 @@ import assert from 'node:assert';
 import { freshSource } from './helpers.js';
 import { startServer } from '../src/api.js';
 
-async function withServer(src, fn) {
-  const server = await startServer(src, { port: 0 });
+async function withServer(src, fn, options = {}) {
+  const server = await startServer(src, { port: 0, ...options });
   const port = server.address().port;
   const base = `http://127.0.0.1:${port}`;
   try {
@@ -13,6 +13,39 @@ async function withServer(src, fn) {
     server.close();
   }
 }
+
+test('artifact downloads have bounded admission and advertise their size', async () => {
+  const { src, org, project, agent } = freshSource();
+  const capability = src.capabilities.issue({
+    principalId: agent.id,
+    scope: { org: org.id, project: project.id },
+    allowed: ['read_context'],
+  });
+  let entered;
+  const enteredPromise = new Promise((resolve) => { entered = resolve; });
+  let release;
+  const releasePromise = new Promise((resolve) => { release = resolve; });
+  src.getEvidenceAsync = async () => ({ artifactRef: { hash: 'artifact-1' } });
+  src.getArtifactAsync = async () => {
+    entered();
+    await releasePromise;
+    return Buffer.from('bounded-artifact');
+  };
+  await withServer(src, async (base) => {
+    const headers = auth(capability.credential);
+    const first = fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/evidence/E1/artifact`, { headers });
+    await enteredPromise;
+    const second = await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/evidence/E2/artifact`, { headers });
+    assert.equal(second.status, 503);
+    assert.equal(second.headers.get('retry-after'), '1');
+    assert.deepEqual(await second.json(), { error: 'artifact service busy; retry later', retryable: true });
+    release();
+    const firstResponse = await first;
+    assert.equal(firstResponse.status, 200);
+    assert.equal(firstResponse.headers.get('content-length'), '16');
+    assert.equal(await firstResponse.text(), 'bounded-artifact');
+  }, { artifactConcurrency: 1, artifactQueue: 0 });
+});
 
 function auth(credential) {
   return { Authorization: `Bearer ${credential}` };

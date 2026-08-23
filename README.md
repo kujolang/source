@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **148/148 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
+- **149/149 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
@@ -97,8 +97,10 @@ active queue depth (queued plus leased jobs) defaults to 100,000 records, and
 completed/failed jobs are pruned after seven days. Evidence artifacts are
 bounded to 64 MiB by default (`Source`'s `maxArtifactBytes` option, capped at
 512 MiB), preventing verification output from becoming an unbounded memory or
-database write. Git CGI subprocesses have a
-120-second timeout. Git
+database write. Artifact downloads use a separate bounded budget of eight
+active requests and 64 queued by default, so concurrent evidence retrieval
+cannot turn bounded artifact sizes into unbounded process memory pressure.
+Git CGI subprocesses have a 120-second timeout. Git
 responses are streamed with HTTP backpressure so
 large clones, fetches, and known-length pushes do not require a full
 packfile-sized buffer per request. Override these through
@@ -118,8 +120,8 @@ infrastructure pressure as a permanent request error.
 
 `/healthz` reports process liveness. `/metrics` exposes low-cardinality
 Prometheus-compatible request, response, active-request, and abort counters,
-plus Postgres pool/admission and global/per-project Git admission metrics for
-capacity planning.
+plus Postgres pool/admission, global/per-project Git admission, and artifact
+download admission metrics for capacity planning.
 `/readyz` verifies that the Source instance, metadata store, and Git root are
 available and writable; remove an instance
 from service when readiness returns `503`. On shutdown the CLI marks the

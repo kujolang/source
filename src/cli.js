@@ -317,6 +317,8 @@ export async function run(argv) {
             gitTimeoutMs: numberFlag('--git-timeout-ms', 120_000),
             maxJsonBodyBytes: numberFlag('--max-json-body', 1_000_000),
             maxWorkflowJobs: numberFlag('--max-workflow-jobs', 1_000),
+            artifactConcurrency: numberFlag('--artifact-concurrency', 8),
+            artifactQueue: numberFlag('--artifact-queue', 64),
           }))
           .then((server) => {
             const scheme = tls ? 'https' : 'http';
@@ -427,7 +429,7 @@ export async function run(argv) {
           '  decision accept|reject|request-revision --org <o> --project <p>',
           '  policy show --org <o> --project <p>',
           '  audit',
-          '  serve --port <n> [--host <addr>] [--trust-proxy] [--git-concurrency <n>] [--git-queue <n>] [--git-tenant-concurrency <n>] [--git-tenant-queue <n>] [--git-timeout-ms <n>] [--max-connections <n>] [--max-git-response <bytes>] [--max-workflow-jobs <n>]',
+          '  serve --port <n> [--host <addr>] [--trust-proxy] [--git-concurrency <n>] [--git-queue <n>] [--git-tenant-concurrency <n>] [--git-tenant-queue <n>] [--git-timeout-ms <n>] [--max-connections <n>] [--max-git-response <bytes>] [--max-workflow-jobs <n>] [--artifact-concurrency <n>] [--artifact-queue <n>]',
           '  worker --store postgres --handler-module <path> [--worker-id <id> --worker-concurrency <n> --worker-handler-timeout-ms <n> --worker-shutdown-timeout-ms <n>]',
           '  submit [--intent <s>] [--url <base>] [--credential <c>] [--cwd <dir>]',
           '',

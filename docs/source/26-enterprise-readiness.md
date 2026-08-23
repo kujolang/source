@@ -55,5 +55,11 @@ Evidence artifacts are limited to 64 MiB by default through `Source`'s
 `maxArtifactBytes` option (hard-capped at 512 MiB), protecting both worker
 memory and durable storage from oversized verification output.
 
+Artifact retrieval has its own bounded admission budget (eight active
+downloads and 64 queued by default). The API returns retryable `503` pressure
+when that budget is exhausted and exposes active/rejected counts through
+`/metrics`; this prevents many concurrent evidence readers from multiplying
+large artifact buffers across a serving process.
+
 Enqueue endpoints accept `Idempotency-Key`; the scoped hash becomes the durable
 job dedupe key, allowing agents to retry after a 503 without multiplying work.
