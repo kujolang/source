@@ -56,6 +56,11 @@ export async function run(argv) {
     const loopback = !host || host === '127.0.0.1' || host === 'localhost' || host === '::1';
     if (!loopback) fail(`--store ${backend} is single-node only; use --store postgres for an exposed server or explicitly pass --allow-unsafe-local-store`);
   }
+  if (cmd === 'serve' && backend === 'postgres' && !hasFlag('--writer-lease')) {
+    const host = flag('--host');
+    const loopback = !host || host === '127.0.0.1' || host === 'localhost' || host === '::1';
+    if (!loopback) fail('exposed Postgres serving requires --writer-lease to fence split-brain writers');
+  }
   let src;
   if (backend === 'sqlite') {
     const { SqliteStore } = await import('./sqlite-store.js');
