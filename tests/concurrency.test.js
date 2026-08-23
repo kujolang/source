@@ -225,6 +225,8 @@ test('health and readiness endpoints expose process and storage state', async ()
     assert.match(poolMetrics, /source_postgres_admission_active 4/);
     assert.match(poolMetrics, /source_postgres_admission_waiting 5/);
     assert.match(poolMetrics, /source_postgres_admission_rejected_total 6/);
+    assert.match(poolMetrics, /source_git_admission_rejected_total 0/);
+    assert.match(poolMetrics, /source_git_tenant_buckets 0/);
     src.store.checkHealthAsync = async () => { throw new Error('database unavailable'); };
     assert.equal((await fetch(`${base}/readyz`)).status, 503);
     delete src.store.checkHealthAsync;

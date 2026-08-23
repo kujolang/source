@@ -112,8 +112,8 @@ the driver.
 
 `/healthz` reports process liveness. `/metrics` exposes low-cardinality
 Prometheus-compatible request, response, active-request, and abort counters,
-plus Postgres pool and bounded-admission gauges when the Postgres backend is in
-use.
+plus Postgres pool/admission and global/per-project Git admission metrics for
+capacity planning.
 `/readyz` verifies that the Source instance, metadata store, and Git root are
 available and writable; remove an instance
 from service when readiness returns `503`. On shutdown the CLI marks the

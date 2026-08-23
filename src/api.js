@@ -37,7 +37,7 @@ function json(res, status, obj) {
   res.end(body);
 }
 
-function metrics(res, state, src) {
+function metrics(res, state, src, gitSlots, gitTenantSlots) {
   const lines = [
     '# HELP source_requests_total Total HTTP requests received.',
     '# TYPE source_requests_total counter',
@@ -76,6 +76,19 @@ function metrics(res, state, src) {
       '# HELP source_postgres_admission_rejected_total Database operations rejected by the bounded admission queue.',
       '# TYPE source_postgres_admission_rejected_total counter',
       `source_postgres_admission_rejected_total ${pool.admissionRejected || 0}`,
+    );
+  }
+  if (gitSlots) {
+    lines.push(
+      '# HELP source_git_admission_rejected_total Git requests rejected by the global admission queue.',
+      '# TYPE source_git_admission_rejected_total counter',
+      `source_git_admission_rejected_total ${gitSlots.rejected || 0}`,
+      '# HELP source_git_tenant_buckets Current active per-project Git admission buckets.',
+      '# TYPE source_git_tenant_buckets gauge',
+      `source_git_tenant_buckets ${gitTenantSlots?.buckets?.size || 0}`,
+      '# HELP source_git_tenant_admission_rejected_total Git requests rejected by per-project admission.',
+      '# TYPE source_git_tenant_admission_rejected_total counter',
+      `source_git_tenant_admission_rejected_total ${gitTenantSlots?.rejected || 0}`,
     );
   }
   for (const [status, count] of state.statuses) lines.push(`source_responses_by_status_total{status="${status}"} ${count}`);
@@ -351,7 +364,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
     const fields = url.searchParams.get('fields') || undefined;
 
     try {
-      if (req.method === 'GET' && pathname === '/metrics') return metrics(res, state, src);
+      if (req.method === 'GET' && pathname === '/metrics') return metrics(res, state, src, gitSlots, gitTenantSlots);
       if (server.draining && pathname !== '/healthz' && pathname !== '/readyz') {
         return json(res, 503, { error: 'server is draining' });
       }

@@ -7,6 +7,7 @@ export class Semaphore {
     this.queueLimit = Math.max(0, Number.isInteger(queue) ? queue : 0);
     this.active = 0;
     this.waiters = [];
+    this.rejected = 0;
   }
 
   acquire() {
@@ -14,7 +15,10 @@ export class Semaphore {
       this.active += 1;
       return Promise.resolve(this._release);
     }
-    if (this.waiters.length >= this.queueLimit) return Promise.resolve(null);
+    if (this.waiters.length >= this.queueLimit) {
+      this.rejected += 1;
+      return Promise.resolve(null);
+    }
     return new Promise((resolve) => this.waiters.push(resolve));
   }
 
