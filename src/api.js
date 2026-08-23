@@ -29,7 +29,7 @@ import { renderOrgIndex, renderIndex, renderProject, renderWork, renderChange, r
 import { gitHttpBackend } from './git-http.js';
 import { ACTIONS, authorizeRequest, authorizeRequestAsync, authorizeGit, authorizeGitAsync, bearerCredential } from './auth.js';
 import { RateLimiter } from './ratelimit.js';
-import { Semaphore } from './concurrency.js';
+import { KeyedSemaphore, Semaphore } from './concurrency.js';
 
 function json(res, status, obj) {
   const body = JSON.stringify(obj);
@@ -313,9 +313,10 @@ async function changeWork(src, orgId, projectId, changeId) {
   return c ? c.workId : undefined;
 }
 
-export function createServer(src, { port = 8787, tls, host, trustProxy = false, webhookSecret = process.env.SOURCE_WEBHOOK_SECRET || null, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxJobPayloadBytes = 64 * 1024, maxJobQueueDepth = 100_000, maxGitBodyBytes = 100_000_000, maxChunkedGitBodyBytes = 16 * 1024 * 1024, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTimeoutMs = 120_000, maxConnections = 10_000 } = {}) {
+export function createServer(src, { port = 8787, tls, host, trustProxy = false, webhookSecret = process.env.SOURCE_WEBHOOK_SECRET || null, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxJobPayloadBytes = 64 * 1024, maxJobQueueDepth = 100_000, maxGitBodyBytes = 100_000_000, maxChunkedGitBodyBytes = 16 * 1024 * 1024, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTenantConcurrency = 8, gitTenantQueue = 256, gitTimeoutMs = 120_000, maxConnections = 10_000 } = {}) {
   const limiter = new RateLimiter({ maxKeys: rateLimit.maxKeys || 100_000, store: rateLimit.store || src.store });
   const gitSlots = new Semaphore({ capacity: gitConcurrency, queue: gitQueue });
+  const gitTenantSlots = new KeyedSemaphore({ capacity: gitTenantConcurrency, queue: gitTenantQueue, maxKeys: rateLimit.maxKeys || 100_000 });
   const chunkedGitSlots = new Semaphore({ capacity: Math.max(1, Math.min(4, gitConcurrency)), queue: Math.max(0, Math.min(32, gitQueue)) });
   const limits = {
     submit: { limit: 10, windowMs: 60_000, ...(rateLimit.submit || {}) },
@@ -587,8 +588,13 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           return gitAuthError(res, 413, 'request body too large');
         }
 
+        const tenantRelease = await gitTenantSlots.acquire(`${orgId}:${projectId}`);
+        if (!tenantRelease) return gitAuthError(res, 503, 'Git tenant service busy; retry later');
         const release = await gitSlots.acquire();
-        if (!release) return gitAuthError(res, 503, 'Git service busy; retry later');
+        if (!release) {
+          tenantRelease();
+          return gitAuthError(res, 503, 'Git service busy; retry later');
+        }
         let body = null;
         let releaseChunked = null;
         try {
@@ -656,6 +662,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
         } finally {
           releaseChunked?.();
           release();
+          tenantRelease();
         }
       }
 

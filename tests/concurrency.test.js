@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Semaphore } from '../src/concurrency.js';
+import { KeyedSemaphore, Semaphore } from '../src/concurrency.js';
 import { RateLimiter } from '../src/ratelimit.js';
 import { SqliteStore } from '../src/sqlite-store.js';
 import { GitRepo } from '../src/git.js';
@@ -27,6 +27,22 @@ test('Semaphore bounds active work and rejects beyond the queue budget', async (
   const releaseSecond = await second;
   assert.equal(typeof releaseSecond, 'function');
   releaseSecond();
+});
+
+test('KeyedSemaphore isolates tenants and removes idle buckets', async () => {
+  const slots = new KeyedSemaphore({ capacity: 1, queue: 0, maxKeys: 2 });
+  const first = await slots.acquire('project-a');
+  assert.ok(first);
+  assert.equal(await slots.acquire('project-a'), null);
+  const other = await slots.acquire('project-b');
+  assert.ok(other);
+  assert.equal(await slots.acquire('project-c'), null);
+  first();
+  other();
+  assert.equal(slots.buckets.size, 0);
+  const recycled = await slots.acquire('project-c');
+  assert.ok(recycled);
+  recycled();
 });
 
 test('RateLimiter evicts expired keys and caps memory growth', () => {

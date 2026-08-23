@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **136/136 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
+- **137/137 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
@@ -90,7 +90,8 @@ node bin/source.js submit --url http://localhost:8787 --credential <credential>
 The server applies bounded resource controls by default: JSON requests are
 limited to 1 MiB, Git request bodies to 100 MiB, chunked Git uploads to 16 MiB
 and four concurrent buffered uploads, Git CGI subprocesses to 32
-active requests with a 256-request queue, Git CGI responses to 512 MiB, and
+active requests with a 256-request queue and a default per-project budget of
+eight active requests with 256 queued, Git CGI responses to 512 MiB, and
 connections to 10,000. Durable job payloads default to 64 KiB, per-project
 active queue depth (queued plus leased jobs) defaults to 100,000 records, and
 completed/failed jobs are pruned after seven days. Git CGI subprocesses have a

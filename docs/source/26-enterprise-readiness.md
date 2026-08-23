@@ -35,3 +35,8 @@ failed state once their persisted attempt limit is reached.
 Chunked Git uploads use a separate four-slot admission budget and a 16 MiB
 buffer limit by default. Known-length uploads remain streamed directly to
 `git http-backend`.
+
+Git requests also use a per-project admission budget (eight active requests and
+256 queued by default) in addition to the process-wide Git budget. This keeps a
+single noisy tenant from consuming every Git subprocess slot; both budgets are
+configurable through `createServer`/`startServer` or the CLI.

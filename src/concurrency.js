@@ -24,3 +24,42 @@ export class Semaphore {
     else this.active -= 1;
   };
 }
+
+// Per-key admission prevents one tenant from monopolizing a shared global
+// budget. Idle key buckets are removed so attacker-controlled key cardinality
+// cannot grow memory without bound.
+export class KeyedSemaphore {
+  constructor({ capacity, queue = 0, maxKeys = 10_000 } = {}) {
+    this.capacity = capacity;
+    this.queue = queue;
+    this.maxKeys = Math.max(1, Math.trunc(maxKeys));
+    this.buckets = new Map();
+    this.rejected = 0;
+  }
+
+  async acquire(key) {
+    const normalized = String(key).slice(0, 256);
+    let bucket = this.buckets.get(normalized);
+    if (!bucket) {
+      if (this.buckets.size >= this.maxKeys) {
+        this.rejected += 1;
+        return null;
+      }
+      bucket = new Semaphore({ capacity: this.capacity, queue: this.queue });
+      this.buckets.set(normalized, bucket);
+    }
+    const release = await bucket.acquire();
+    if (!release) {
+      if (bucket.active === 0 && bucket.waiters.length === 0) this.buckets.delete(normalized);
+      this.rejected += 1;
+      return null;
+    }
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      release();
+      if (bucket.active === 0 && bucket.waiters.length === 0) this.buckets.delete(normalized);
+    };
+  }
+}
