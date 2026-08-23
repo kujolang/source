@@ -4,6 +4,9 @@ All notable changes to Source are recorded here.
 
 ## [Unreleased]
 
+- Made the default Node test command deterministic by serializing test files;
+  the dedicated scale suite still exercises the 1,000-connection burst while
+  avoiding host TCP backlog contention from unrelated test servers.
 - Added bounded artifact-download admission with retryable backpressure and
   Prometheus metrics.
 - Added repeatable Postgres-backed container failover and shared Git-volume

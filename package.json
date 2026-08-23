@@ -8,7 +8,7 @@
     "source": "./bin/source.js"
   },
   "scripts": {
-    "test": "node --test",
+    "test": "node --test --test-concurrency=1",
     "test:scale": "node --test tests/concurrency.test.js",
     "test:postgres": "node --test tests/postgres-live.test.js",
     "test:container": "bash scripts/container-cluster-smoke.sh",
