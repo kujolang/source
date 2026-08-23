@@ -27,6 +27,8 @@ export class SourceWorker {
     this.stopping = false;
     this.running = null;
     this._idleWaiters = new Set();
+    this.activeJobs = 0;
+    this.counters = { claimed: 0, completed: 0, failed: 0, errors: 0 };
   }
 
   start() {
@@ -61,6 +63,10 @@ export class SourceWorker {
     return drained;
   }
 
+  metrics() {
+    return { ...this.counters, activeJobs: this.activeJobs, stopping: this.stopping };
+  }
+
   async _loop() {
     let failures = 0;
     let idlePollMs = this.pollMs;
@@ -71,6 +77,7 @@ export class SourceWorker {
         failures = 0;
       } catch (error) {
         failures += 1;
+        this.counters.errors += 1;
         this._reportError(error);
         await sleep(this._jitteredDelay(Math.min(60_000, this.errorBackoffMs * (2 ** Math.min(failures - 1, 6)))));
         continue;
@@ -91,6 +98,7 @@ export class SourceWorker {
         idlePollMs = Math.min(this.maxPollMs, idlePollMs * 2);
         continue;
       }
+      this.counters.claimed += jobs.length;
       idlePollMs = this.pollMs;
       await Promise.all(jobs.map((job) => this._runJob(job)));
     }
@@ -101,6 +109,7 @@ export class SourceWorker {
     let heartbeat;
     let timeout;
     const controller = new AbortController();
+    this.activeJobs += 1;
     try {
       if (typeof handler !== 'function') throw new Error(`no handler registered for job kind: ${job.kind}`);
       const heartbeatMs = Math.max(1, Math.floor(this.leaseMs / 3));
@@ -121,7 +130,9 @@ export class SourceWorker {
         ])
         : await resultPromise;
       await this.queue.complete({ id: job.id, workerId: this.workerId, leaseToken: job.leaseToken, result });
+      this.counters.completed += 1;
     } catch (error) {
+      this.counters.failed += 1;
       this._reportError(error);
       try {
         await this.queue.fail({
@@ -138,6 +149,7 @@ export class SourceWorker {
         this._reportError(failureError);
       }
     } finally {
+      this.activeJobs = Math.max(0, this.activeJobs - 1);
       if (heartbeat) clearInterval(heartbeat);
       if (timeout) clearTimeout(timeout);
     }

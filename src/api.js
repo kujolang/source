@@ -37,7 +37,7 @@ function json(res, status, obj) {
   res.end(body);
 }
 
-function metrics(res, state, src, gitSlots, gitTenantSlots, artifactSlots, requestSlots) {
+function metrics(res, state, src, gitSlots, gitTenantSlots, artifactSlots, requestSlots, secretBroker) {
   const lines = [
     '# HELP source_requests_total Total HTTP requests received.',
     '# TYPE source_requests_total counter',
@@ -112,6 +112,29 @@ function metrics(res, state, src, gitSlots, gitTenantSlots, artifactSlots, reque
       '# HELP source_request_admission_rejected_total HTTP requests rejected by bounded admission.',
       '# TYPE source_request_admission_rejected_total counter',
       `source_request_admission_rejected_total ${requestSlots.rejected || 0}`,
+    );
+  }
+  const secretMetrics = typeof secretBroker?.metrics === 'function' ? secretBroker.metrics() : null;
+  if (secretMetrics) {
+    lines.push(
+      '# HELP source_secret_leases_issued_total Secret leases issued.',
+      '# TYPE source_secret_leases_issued_total counter',
+      `source_secret_leases_issued_total ${secretMetrics.issued || 0}`,
+      '# HELP source_secret_leases_denied_total Secret lease requests denied.',
+      '# TYPE source_secret_leases_denied_total counter',
+      `source_secret_leases_denied_total ${secretMetrics.denied || 0}`,
+      '# HELP source_secret_leases_revoked_total Secret leases revoked.',
+      '# TYPE source_secret_leases_revoked_total counter',
+      `source_secret_leases_revoked_total ${secretMetrics.revoked || 0}`,
+      '# HELP source_secret_leases_active Current active secret lease metadata entries.',
+      '# TYPE source_secret_leases_active gauge',
+      `source_secret_leases_active ${secretMetrics.activeLeases || 0}`,
+      '# HELP source_secret_provider_health_checks_total Secret provider health checks.',
+      '# TYPE source_secret_provider_health_checks_total counter',
+      `source_secret_provider_health_checks_total ${secretMetrics.healthChecks || 0}`,
+      '# HELP source_secret_provider_health_failures_total Secret provider health check failures.',
+      '# TYPE source_secret_provider_health_failures_total counter',
+      `source_secret_provider_health_failures_total ${secretMetrics.healthFailures || 0}`,
     );
   }
   const canonicalSlots = src?.canonicalGlobalSlots;
@@ -396,7 +419,7 @@ async function changeWork(src, orgId, projectId, changeId) {
   return c ? c.workId : undefined;
 }
 
-export function createServer(src, { port = 8787, tls, host, trustProxy = false, webhookSecret = process.env.SOURCE_WEBHOOK_SECRET || null, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxJobPayloadBytes = 64 * 1024, maxJobQueueDepth = 100_000, maxWorkflowJobs = 1_000, maxGitBodyBytes = 100_000_000, maxChunkedGitBodyBytes = 16 * 1024 * 1024, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTenantConcurrency = 8, gitTenantQueue = 256, gitTimeoutMs = 120_000, artifactConcurrency = 8, artifactQueue = 64, requestConcurrency = 2_048, requestQueue = 4_096, maxConnections = 10_000, requireReplication = false, replicationRole = 'primary', replicationMinStandbys = 1, replicationMaxLagBytes = 64 * 1024 * 1024, readOnly = false } = {}) {
+export function createServer(src, { port = 8787, tls, host, trustProxy = false, webhookSecret = process.env.SOURCE_WEBHOOK_SECRET || null, secretBroker = null, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxJobPayloadBytes = 64 * 1024, maxJobQueueDepth = 100_000, maxWorkflowJobs = 1_000, maxGitBodyBytes = 100_000_000, maxChunkedGitBodyBytes = 16 * 1024 * 1024, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTenantConcurrency = 8, gitTenantQueue = 256, gitTimeoutMs = 120_000, artifactConcurrency = 8, artifactQueue = 64, requestConcurrency = 2_048, requestQueue = 4_096, maxConnections = 10_000, requireReplication = false, replicationRole = 'primary', replicationMinStandbys = 1, replicationMaxLagBytes = 64 * 1024 * 1024, readOnly = false } = {}) {
   const limiter = new RateLimiter({ maxKeys: rateLimit.maxKeys || 100_000, store: rateLimit.store || src.store });
   const gitSlots = new Semaphore({ capacity: gitConcurrency, queue: gitQueue });
   const gitTenantSlots = new KeyedSemaphore({ capacity: gitTenantConcurrency, queue: gitTenantQueue, maxKeys: rateLimit.maxKeys || 100_000 });
@@ -453,7 +476,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
     const fields = url.searchParams.get('fields') || undefined;
 
     try {
-      if (req.method === 'GET' && pathname === '/metrics') return metrics(res, state, src, gitSlots, gitTenantSlots, artifactSlots, requestSlots);
+      if (req.method === 'GET' && pathname === '/metrics') return metrics(res, state, src, gitSlots, gitTenantSlots, artifactSlots, requestSlots, server.secretBroker);
       if (server.draining && pathname !== '/healthz' && pathname !== '/readyz') {
         return json(res, 503, { error: 'server is draining' });
       }
@@ -554,6 +577,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
         try {
           if (typeof src.checkHealthAsync === 'function') await src.checkHealthAsync();
           else if (typeof src.store.checkHealthAsync === 'function') await src.store.checkHealthAsync();
+          if (server.secretBroker) await server.secretBroker.checkHealth();
           if (server.requireReplication) {
             if (typeof src.store.checkReplicationAsync !== 'function') throw new Error('replication readiness is not supported by the configured store');
             await src.store.checkReplicationAsync({ role: server.replicationRole, minStandbys: server.replicationMinStandbys, maxLagBytes: server.replicationMaxLagBytes });
@@ -1218,6 +1242,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
     statuses: new Map(),
   };
   server.discoveryInstancePromise = null;
+  server.secretBroker = secretBroker;
   server.artifactSlots = artifactSlots;
   server.requestSlots = requestSlots;
   server.draining = false;

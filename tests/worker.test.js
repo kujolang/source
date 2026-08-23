@@ -39,6 +39,7 @@ test('worker bounds handler concurrency and stops gracefully', async () => {
   await waitFor(() => completed === 20);
   await worker.stop();
   assert.equal(maxActive, 4);
+  assert.deepEqual(worker.metrics(), { claimed: 20, completed: 20, failed: 0, errors: 0, activeJobs: 0, stopping: true });
 });
 
 test('worker routes handler failures to retry/failure state', async () => {

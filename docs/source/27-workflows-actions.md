@@ -100,6 +100,10 @@ before the workspace is released; a provider that cannot revoke is rejected by
 worker bootstrap.
 Worker startup calls the provider health check and fails closed before claiming
 jobs when it is unavailable or unhealthy.
+The HTTP server accepts the same broker through `createServer({ secretBroker })`;
+`/readyz` fails closed on provider health failure and `/metrics` publishes
+lease, revocation, active-lease, and provider-health counters. `SourceWorker`
+also exposes bounded claim/completion/failure/error counters through `metrics()`.
 For a standard HTTPS deployment, `createHttpSecretBroker` / `HttpSecretProvider`
 POSTs identity and secret references to the provider over TLS, obtains a fresh
 rotating bearer token per lease, rejects oversized or overlong responses, and

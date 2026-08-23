@@ -443,6 +443,28 @@ test('required replication keeps a node out of readiness without a durable gate'
   }
 });
 
+test('secret broker health gates readiness and exposes lease metrics', async () => {
+  const { src } = freshSource();
+  const secretBroker = {
+    healthy: false,
+    checkHealth: async function checkHealth() { if (!this.healthy) throw new Error('provider unavailable'); return true; },
+    metrics: () => ({ issued: 3, denied: 1, revoked: 2, activeLeases: 1, healthChecks: 1, healthFailures: 1 }),
+  };
+  const server = await startServer(src, { port: 0, secretBroker });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    assert.equal((await fetch(`${base}/readyz`)).status, 503);
+    secretBroker.healthy = true;
+    assert.equal((await fetch(`${base}/readyz`)).status, 200);
+    const body = await (await fetch(`${base}/metrics`)).text();
+    assert.match(body, /source_secret_leases_issued_total 3/);
+    assert.match(body, /source_secret_leases_active 1/);
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});
+
 test('standby replicas fence all mutating HTTP and Git requests', async () => {
   const { src } = freshSource();
   src.store.checkReplicationAsync = async () => ({ role: 'standby', observed: { inRecovery: true, receiverStatus: 'streaming' } });
