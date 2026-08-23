@@ -73,7 +73,7 @@ server {
 
 ## Container deployment
 
-The repository includes a non-root production image for the Postgres-backed
+The repository includes a non-root, Node 20.19.5 production image for the Postgres-backed
 server. It contains Git and the Postgres client required by the storage
 bootstrap/fallback paths, keeps metadata and bare Git objects in separate
 mounts, and exposes a container health check:

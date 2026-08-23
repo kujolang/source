@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim
+FROM node:20.19.5-bookworm
 
 RUN apt-get update \
   && apt-get install --no-install-recommends -y ca-certificates git postgresql-client \
