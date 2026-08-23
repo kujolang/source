@@ -84,6 +84,38 @@ function removeRuntimeContainer(runtime, name) {
   });
 }
 
+const IMMUTABLE_ACTION_REF = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[0-9a-fA-F]{40}$/;
+
+// A deployment-owned action catalog. Source never downloads or evaluates an
+// action reference implicitly; operators bind immutable references to steps
+// already present in the runner image (or to a resolver function they own).
+export class StaticActionRegistry {
+  constructor({ actions = {}, allowMutableRefs = false, maxActions = 10_000 } = {}) {
+    const entries = actions instanceof Map ? [...actions.entries()] : Object.entries(actions || {});
+    if (entries.length > Math.min(100_000, Math.max(1, Math.trunc(maxActions)))) throw new Error('action registry exceeds configured limit');
+    this.allowMutableRefs = allowMutableRefs === true;
+    this.actions = new Map();
+    for (const [reference, action] of entries) {
+      this._validateReference(reference);
+      if (typeof action !== 'function' && !Array.isArray(action)) throw new Error(`action registry entry is invalid: ${reference}`);
+      this.actions.set(reference, action);
+    }
+  }
+
+  _validateReference(reference) {
+    if (typeof reference !== 'string' || reference.length < 3 || reference.length > 500 || /[\0\s]/.test(reference)) throw new Error('action reference is invalid');
+    if (!this.allowMutableRefs && !IMMUTABLE_ACTION_REF.test(reference)) throw new Error(`action reference must be immutable: ${reference}`);
+  }
+
+  async resolve({ uses, with: inputs = {} } = {}) {
+    this._validateReference(uses);
+    const action = this.actions.get(uses);
+    if (!action) throw new Error(`action is not allowlisted: ${uses}`);
+    if (!inputs || typeof inputs !== 'object' || Array.isArray(inputs) || JSON.stringify(inputs).length > 64 * 1024) throw new Error('action inputs are invalid or too large');
+    return typeof action === 'function' ? action({ uses, with: inputs }) : action;
+  }
+}
+
 export class EphemeralWorkspaceManager {
   constructor({ root, maxActive = 256, queue = 512 } = {}) {
     if (typeof root !== 'string' || !root) throw new Error('workspace root is required');

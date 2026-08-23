@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGitHubActionsHandler, EphemeralWorkspaceManager, IsolatedActionRunner } from '../src/action-runner.js';
+import { createGitHubActionsHandler, EphemeralWorkspaceManager, IsolatedActionRunner, StaticActionRegistry } from '../src/action-runner.js';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -45,6 +45,15 @@ test('isolated runner expands only bounded operator-configured uses actions', as
     new IsolatedActionRunner({ image: 'kujo/runner:latest', workspaceRoot: '/srv/workspaces' }).resolveSteps([{ uses: 'actions/checkout@v4' }]),
     /not configured/,
   );
+});
+
+test('static action registry requires immutable allowlisted references', async () => {
+  const reference = `kujo/setup@${'a'.repeat(40)}`;
+  const registry = new StaticActionRegistry({ actions: { [reference]: ({ with: inputs }) => [{ run: `kujo setup ${inputs.target}` }] } });
+  assert.deepEqual(await registry.resolve({ uses: reference, with: { target: 'source' } }), [{ run: 'kujo setup source' }]);
+  await assert.rejects(registry.resolve({ uses: 'kujo/setup@v1' }), /immutable/);
+  await assert.rejects(registry.resolve({ uses: reference.replace(/a+$/, 'b'.repeat(40)) }), /not allowlisted/);
+  assert.throws(() => new StaticActionRegistry({ actions: { 'kujo/setup@v1': [] } }), /immutable/);
 });
 
 test('isolated runner bounds container admission independently of workspaces', async () => {

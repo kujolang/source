@@ -58,7 +58,10 @@ secret store. Operators may provide an explicit, bounded action resolver to map
 pinned `uses` references to trusted run steps available in the runner image;
 unresolved or unconfigured actions fail closed. The resolver is the operator's
 compatibility boundary and must not fetch or execute remote action code
-implicitly. Container
+implicitly. `StaticActionRegistry` is provided for this deployment boundary;
+its default policy accepts only 40-character commit-pinned references and
+allowlists each action before resolving it. Mutable tags require an explicit
+development-only opt-in. Container
 runtime provisioning, secrets brokering, and per-provider secret rotation
 remain deployment-specific work required before advertising drop-in
 `.github/workflows` compatibility. The
