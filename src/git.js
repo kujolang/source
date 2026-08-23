@@ -152,6 +152,19 @@ export class GitRepo {
     try { return await runAsync(['rev-parse', ref], { cwd: this.barePath }); } catch { return ''; }
   }
 
+  async listBranchesAsync() {
+    try {
+      const out = await runAsync(['for-each-ref', '--format=%(refname:short) %(objectname)', 'refs/heads'], { cwd: this.barePath });
+      if (!out) return [];
+      return out.split('\n').map((line) => {
+        const [name, hash] = line.split(' ');
+        return { name, hash };
+      });
+    } catch {
+      return [];
+    }
+  }
+
   async defaultBranchAsync() {
     try { return await runAsync(['symbolic-ref', '--short', 'HEAD'], { cwd: this.barePath }); } catch { return 'main'; }
   }
@@ -164,6 +177,41 @@ export class GitRepo {
     if (typeof ref !== 'string' || !/^[A-Za-z0-9._/@-]{1,200}$/.test(ref)) throw new Error('invalid Git ref');
     if (typeof filePath !== 'string' || filePath.includes('..') || filePath.startsWith('/') || filePath.includes(':')) throw new Error('invalid repository file path');
     return runAsync(['show', `${ref}:${filePath}`], { cwd: this.barePath });
+  }
+
+  async listCommitsAsync(ref = 'HEAD', limit = 50) {
+    if (typeof ref !== 'string' || !/^[A-Za-z0-9._/@-]{1,200}$/.test(ref)) throw new Error('invalid Git ref');
+    const safeLimit = Math.min(100, Math.max(1, Math.trunc(Number(limit) || 50)));
+    try {
+      const out = await runAsync(['log', `-${safeLimit}`, '--date=iso-strict', '--format=%H%x09%an%x09%ad%x09%s', ref], { cwd: this.barePath });
+      return out ? out.split('\n').map((line) => {
+        const [hash, author, date, ...subject] = line.split('\t');
+        return { hash, author, date, subject: subject.join('\t') };
+      }) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  async listTreeAsync(ref = 'HEAD', directory = '') {
+    if (typeof ref !== 'string' || !/^[A-Za-z0-9._/@-]{1,200}$/.test(ref)) throw new Error('invalid Git ref');
+    if (typeof directory !== 'string' || directory.includes('..') || directory.startsWith('/') || directory.includes(':')) throw new Error('invalid repository path');
+    const treeRef = directory ? `${ref}:${directory.replace(/\/$/, '')}` : ref;
+    try {
+      const out = await runAsync(['ls-tree', '-z', treeRef], { cwd: this.barePath });
+      return out ? out.split('\0').filter(Boolean).map((entry) => {
+        const tab = entry.indexOf('\t');
+        const [mode, type, hash] = entry.slice(0, tab).split(' ');
+        return { mode, type, hash, name: entry.slice(tab + 1) };
+      }) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  async commitDiffAsync(hash) {
+    if (typeof hash !== 'string' || !/^[0-9a-f]{7,64}$/i.test(hash)) throw new Error('invalid commit');
+    try { return await runAsync(['show', '--format=fuller', '--stat', '--patch', hash], { cwd: this.barePath }); } catch { return ''; }
   }
 
   async isAncestorAsync(ancestor, descendant) {

@@ -25,7 +25,7 @@ import http from 'node:http';
 import https from 'node:https';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { Source } from './source.js';
-import { renderOrgIndexAsync, renderIndexAsync, renderProjectAsync, renderWorkAsync, renderChangeAsync, renderLogin } from './web.js';
+import { renderOrgIndexAsync, renderIndexAsync, renderProjectAsync, renderWorkAsync, renderChangeAsync, renderLogin, renderRepositoryAsync, renderBlobAsync, renderCommitAsync, renderActionsAsync, renderActionDetailAsync, renderSettingsAsync, managementPage, esc } from './web.js';
 import { gitHttpBackend } from './git-http.js';
 import { ACTIONS, authorizeRequest, authorizeRequestAsync, authorizeGit, authorizeGitAsync, bearerCredential } from './auth.js';
 import { RateLimiter } from './ratelimit.js';
@@ -183,6 +183,11 @@ function metrics(res, state, src, gitSlots, gitTenantSlots, artifactSlots, reque
 function html(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': Buffer.byteLength(body) });
   res.end(body);
+}
+
+function redirect(res, location) {
+  res.writeHead(303, { Location: location });
+  res.end();
 }
 
 function isRetryableStoreError(error) {
@@ -560,6 +565,11 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
         }
         const allowed = ['read_source', 'read_context'];
         if (membership.role === 'maintainer' || membership.role === 'admin') allowed.push('accept_change');
+        if (body.management === '1' || body.management === 'true') {
+          allowed.push('read_workflows', 'read_jobs', 'claim_work', 'start_session', 'submit_change', 'submit_evidence', 'dispatch_workflow', 'enqueue_job', 'git_push');
+          if (membership.role === 'maintainer' || membership.role === 'admin') allowed.push('manage_work', 'manage_repository', 'manage_workflows');
+          if (membership.role === 'admin') allowed.push('manage_org', 'manage_project');
+        }
         const session = typeof src.createHumanSessionAsync === 'function'
           ? await src.createHumanSessionAsync({ principalId: principal.id, orgId, projectId, allowed })
           : src.createHumanSession({ principalId: principal.id, orgId, projectId, allowed });
@@ -593,6 +603,24 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
         res.end(bodyOut);
       }
 
+      if (req.method === 'POST' && pathname === '/admin/orgs') {
+        const g = await guard(src, req, ACTIONS.manage_org, {});
+        if (g) return loginPage(res, g.status, g.body.error);
+        const body = await readLoginBody(req);
+        const org = await src.createOrgAsync({ name: body.name, slug: body.slug });
+        return redirect(res, `/o/${encodeURIComponent(org.id)}`);
+      }
+
+      const projectCreateMatch = pathname.match(/^\/o\/([^/]+)\/projects$/);
+      if (req.method === 'POST' && projectCreateMatch) {
+        const orgId = projectCreateMatch[1];
+        const g = await guard(src, req, ACTIONS.manage_project, { org: orgId });
+        if (g) return loginPage(res, g.status, g.body.error);
+        const body = await readLoginBody(req);
+        const project = await src.createProjectAsync({ orgId, name: body.name, slug: body.slug, description: body.description || '', visibility: body.visibility || 'private' });
+        return redirect(res, `/o/${encodeURIComponent(orgId)}/p/${encodeURIComponent(project.id)}`);
+      }
+
       // Unauthenticated probes for load balancers and schedulers.
       if (req.method === 'GET' && pathname === '/healthz') {
         return json(res, 200, { status: 'ok' });
@@ -622,6 +650,147 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
         const g = await guard(src, req, ACTIONS.read_source, {});
         if (g) return loginPage(res, g.status, g.body.error);
         return html(res, 200, await renderOrgIndexAsync(src));
+      }
+
+      // --- human-facing repository and workflow management ---------------
+      const managementMatch = pathname.match(/^\/o\/([^/]+)\/p\/([^/]+)\/(.*)$/);
+      if (managementMatch) {
+        const [, orgId, projectId, managementPath] = managementMatch;
+        if (req.method === 'GET' && managementPath === 'actions') {
+          const g = await guard(src, req, ACTIONS.read_workflows, { org: orgId, project: projectId });
+          if (g) return loginPage(res, g.status, g.body.error);
+          return html(res, 200, await renderActionsAsync(src, orgId, projectId));
+        }
+        const actionDetail = managementPath.match(/^actions\/([^/]+)$/);
+        if (req.method === 'GET' && actionDetail) {
+          const g = await guard(src, req, ACTIONS.read_workflows, { org: orgId, project: projectId });
+          if (g) return loginPage(res, g.status, g.body.error);
+          return html(res, 200, await renderActionDetailAsync(src, orgId, projectId, actionDetail[1]));
+        }
+        if (req.method === 'GET' && managementPath === 'settings') {
+          const g = await guard(src, req, ACTIONS.read_source, { org: orgId, project: projectId });
+          if (g) return loginPage(res, g.status, g.body.error);
+          return html(res, 200, await renderSettingsAsync(src, orgId, projectId));
+        }
+        const repoTree = managementPath.match(/^r\/([^/]+)\/tree\/([^/]+)(?:\/(.*))?$/);
+        if (req.method === 'GET' && repoTree) {
+          const g = await guard(src, req, ACTIONS.read_source, { org: orgId, project: projectId });
+          if (g) return loginPage(res, g.status, g.body.error);
+          const ref = decodeURIComponent(repoTree[2]);
+          const directory = (repoTree[3] || '').split('/').filter(Boolean).map(decodeURIComponent).join('/');
+          return html(res, 200, await renderRepositoryAsync(src, orgId, projectId, repoTree[1], ref, directory));
+        }
+        const repoBlob = managementPath.match(/^r\/([^/]+)\/blob\/([^/]+)\/(.+)$/);
+        if (req.method === 'GET' && repoBlob) {
+          const g = await guard(src, req, ACTIONS.read_source, { org: orgId, project: projectId });
+          if (g) return loginPage(res, g.status, g.body.error);
+          const filePath = repoBlob[3].split('/').map(decodeURIComponent).join('/');
+          return html(res, 200, await renderBlobAsync(src, orgId, projectId, repoBlob[1], decodeURIComponent(repoBlob[2]), filePath));
+        }
+        const repoCommit = managementPath.match(/^r\/([^/]+)\/commit\/([0-9a-f]{7,64})$/i);
+        if (req.method === 'GET' && repoCommit) {
+          const g = await guard(src, req, ACTIONS.read_source, { org: orgId, project: projectId });
+          if (g) return loginPage(res, g.status, g.body.error);
+          return html(res, 200, await renderCommitAsync(src, orgId, projectId, repoCommit[1], repoCommit[2]));
+        }
+        if (req.method === 'POST' && managementPath === 'repos') {
+          const g = await guard(src, req, ACTIONS.manage_repository, { org: orgId, project: projectId });
+          if (g) return loginPage(res, g.status, g.body.error);
+          const body = await readLoginBody(req);
+          const repo = await src.createRepositoryAsync({ orgId, projectId, name: body.name, defaultBranch: body.defaultBranch || 'main' });
+          return redirect(res, `/o/${encodeURIComponent(orgId)}/p/${encodeURIComponent(projectId)}/r/${encodeURIComponent(repo.id)}/tree/${encodeURIComponent(repo.defaultBranch)}`);
+        }
+        if (req.method === 'POST' && managementPath === 'work') {
+          const g = await guard(src, req, ACTIONS.manage_work, { org: orgId, project: projectId });
+          if (g) return loginPage(res, g.status, g.body.error);
+          const body = await readLoginBody(req);
+          const split = (value) => String(value || '').split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean);
+          const work = await src.createWorkAsync({ orgId, projectId, intent: body.intent, requester: (await sessionCredential(src, req)) || 'web', requirements: split(body.requirements), acceptanceConditions: split(body.acceptanceConditions) });
+          return redirect(res, `/o/${encodeURIComponent(orgId)}/p/${encodeURIComponent(projectId)}/w/${encodeURIComponent(work.id)}`);
+        }
+        if (req.method === 'POST' && managementPath === 'settings/members') {
+          const g = await guard(src, req, ACTIONS.manage_project, { org: orgId, project: projectId });
+          if (g) return loginPage(res, g.status, g.body.error);
+          const body = await readLoginBody(req);
+          await src.addOrgMemberAsync({ orgId, principalId: body.principalId, role: body.role || 'member' });
+          return redirect(res, `/o/${encodeURIComponent(orgId)}/p/${encodeURIComponent(projectId)}/settings`);
+        }
+        const workAction = managementPath.match(/^w\/([^/]+)\/(claim|sessions)$/);
+        if (req.method === 'POST' && workAction) {
+          const workId = workAction[1];
+          const action = workAction[2];
+          const body = await readLoginBody(req);
+          const credential = await sessionCredential(src, req);
+          const required = action === 'claim' ? ACTIONS.claim_work : ACTIONS.start_session;
+          const auth = await authorizeRequestAsync(src.capabilities, req, required, { org: orgId, project: projectId, work: workId, credential });
+          if (!auth.ok) return loginPage(res, auth.status, auth.error);
+          if (action === 'claim') {
+            await src.claimWorkAsync({ orgId, projectId, workId, principalId: auth.cap.principalId });
+          } else {
+            const environment = typeof body.environment === 'string' ? JSON.parse(body.environment || '{}') : body.environment || {};
+            await src.startSessionAsync({ orgId, projectId, workId, principalId: auth.cap.principalId, environment, baseCommit: body.baseCommit || '' });
+          }
+          return redirect(res, `/o/${encodeURIComponent(orgId)}/p/${encodeURIComponent(projectId)}/w/${encodeURIComponent(workId)}`);
+        }
+        if (req.method === 'POST' && managementPath === 'actions') {
+          const g = await guard(src, req, ACTIONS.manage_workflows, { org: orgId, project: projectId });
+          if (g) return loginPage(res, g.status, g.body.error);
+          const body = await readLoginBody(req);
+          const jobs = typeof body.jobs === 'string' ? JSON.parse(body.jobs) : body.jobs;
+          const workflow = await src.createWorkflowAsync({ orgId, projectId, name: body.name, triggers: String(body.triggers || 'push').split(',').map((item) => item.trim()).filter(Boolean), jobs });
+          return redirect(res, `/o/${encodeURIComponent(orgId)}/p/${encodeURIComponent(projectId)}/actions/${encodeURIComponent(workflow.id)}`);
+        }
+        if (req.method === 'POST' && managementPath === 'actions/import') {
+          const g = await guard(src, req, ACTIONS.manage_workflows, { org: orgId, project: projectId });
+          if (g) return loginPage(res, g.status, g.body.error);
+          const body = await readLoginBody(req);
+          const workflow = await src.importGitHubWorkflowAsync({ orgId, projectId, repoId: body.repository, ref: body.ref || 'HEAD', path: body.path });
+          return redirect(res, `/o/${encodeURIComponent(orgId)}/p/${encodeURIComponent(projectId)}/actions/${encodeURIComponent(workflow.id)}`);
+        }
+        const dispatch = managementPath.match(/^actions\/([^/]+)\/dispatch$/);
+        if (req.method === 'POST' && dispatch) {
+          const g = await guard(src, req, ACTIONS.dispatch_workflow, { org: orgId, project: projectId });
+          if (g) return loginPage(res, g.status, g.body.error);
+          const body = await readLoginBody(req);
+          const payload = typeof body.payload === 'string' ? JSON.parse(body.payload || '{}') : body.payload || {};
+          await src.dispatchWorkflowAsync({ orgId, projectId, workflowId: dispatch[1], event: body.event, eventId: body.eventId || null, payload });
+          return redirect(res, `/o/${encodeURIComponent(orgId)}/p/${encodeURIComponent(projectId)}/actions/${encodeURIComponent(dispatch[1])}`);
+        }
+        const changeAction = managementPath.match(/^c\/([^/]+)\/(decision|evidence|evaluate|scan|canonical)$/);
+        if (changeAction) {
+          const changeId = changeAction[1];
+          const action = changeAction[2];
+          const workId = await changeWork(src, orgId, projectId, changeId);
+          if (action === 'scan' && req.method === 'GET') {
+            const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
+            if (g) return loginPage(res, g.status, g.body.error);
+            const findings = await src.scanChangeSecretsAsync({ orgId, projectId, changeId });
+            return html(res, 200, managementPage(`Secret scan ${changeId}`, `<h1>Secret scan</h1><pre>${esc(JSON.stringify(findings, null, 2))}</pre><p><a href="/o/${esc(orgId)}/p/${esc(projectId)}/c/${esc(changeId)}">Back to change</a></p>`, orgId, projectId));
+          }
+          if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' });
+          const body = await readLoginBody(req);
+          if (action === 'decision') {
+            const g = await guard(src, req, ACTIONS.accept_change, { org: orgId, project: projectId });
+            if (g) return loginPage(res, g.status, g.body.error);
+            const credential = await sessionCredential(src, req);
+            const auth = await authorizeRequestAsync(src.capabilities, req, ACTIONS.accept_change, { org: orgId, project: projectId, credential });
+            if (!auth.ok) return loginPage(res, auth.status, auth.error);
+            await src.makeDecisionAsync({ orgId, projectId, changeId, decision: body.decision, decider: auth.cap.principalId, reasoning: body.reasoning || '' });
+          } else if (action === 'evidence') {
+            const g = await guard(src, req, ACTIONS.submit_evidence, { org: orgId, project: projectId, work: workId });
+            if (g) return loginPage(res, g.status, g.body.error);
+            await src.addEvidenceAsync({ orgId, projectId, changeId, type: body.type, claim: body.claim, producer: body.producer || 'web', subject: body.subject || 'web', result: typeof body.result === 'string' ? JSON.parse(body.result || '{}') : body.result || {} });
+          } else if (action === 'evaluate') {
+            const g = await guard(src, req, ACTIONS.submit_evidence, { org: orgId, project: projectId, work: workId });
+            if (g) return loginPage(res, g.status, g.body.error);
+            await src.evaluateChangeAsync({ orgId, projectId, changeId });
+          } else if (action === 'canonical') {
+            const g = await guard(src, req, ACTIONS.accept_change, { org: orgId, project: projectId });
+            if (g) return loginPage(res, g.status, g.body.error);
+            await src.updateCanonicalStateAsync({ orgId, projectId, changeId });
+          }
+          return redirect(res, `/o/${encodeURIComponent(orgId)}/p/${encodeURIComponent(projectId)}/c/${encodeURIComponent(changeId)}`);
+        }
       }
 
       const orgPageMatch = pathname.match(/^\/o\/([^/]+)$/);

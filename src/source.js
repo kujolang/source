@@ -197,6 +197,18 @@ export class Source {
     return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.getOrgMembership(orgId, principalId);
   }
 
+  async listOrgMembersAsync(orgId, { limit = 1_000 } = {}) {
+    const rel = `${this._orgRel(orgId)}/members`;
+    const ids = typeof this.store.listJsonAsync === 'function'
+      ? await this.store.listJsonAsync(rel, { limit })
+      : this.store.listJson(rel, { limit });
+    if (typeof this.store.readJsonManyAsync === 'function') {
+      const rows = await this.store.readJsonManyAsync(ids.map((id) => this._orgMemberRel(orgId, id)));
+      return rows.map((row) => row.json).filter(Boolean);
+    }
+    return Promise.all(ids.map((id) => this.getOrgMembershipAsync(orgId, id))).then((items) => items.filter(Boolean));
+  }
+
   listOrgs({ cursor, limit } = {}) {
     const ids = this.store.listJson('orgs', { cursor, limit, includeDirs: true });
     return ids.map((id) => this.getOrg(id)).filter(Boolean);
@@ -286,6 +298,22 @@ export class Source {
       this.store.writeJson(`${this._projectRel(orgId, projectId)}/repos/${id}.json`, repo);
     });
     this.store.audit({ event: 'repository.create', orgId, projectId, repoId: id, name });
+    return repo;
+  }
+
+  async createRepositoryAsync({ orgId, projectId, name, defaultBranch = 'main' }) {
+    const project = await this.getProjectAsync(orgId, projectId);
+    if (!project) throw new Error(`project not found: ${projectId}`);
+    if (!Array.isArray(project.repositories) || project.repositories.length >= MAX_PROJECT_REPOSITORIES) throw new Error('project repository limit exceeded');
+    const id = await nextIdAsync(this.store, 'repository');
+    const repo = { id, projectId, name, defaultBranch, barePath: this._repoPath(orgId, projectId, id), visibility: project.visibility, createdAt: new Date().toISOString() };
+    new GitRepo(repo.barePath).init(defaultBranch);
+    project.repositories.push(id);
+    await this._asyncTransaction(async () => {
+      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/project.json`, project);
+      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/repos/${id}.json`, repo);
+    });
+    await this._asyncAudit({ event: 'repository.create', orgId, projectId, repoId: id, name });
     return repo;
   }
 
