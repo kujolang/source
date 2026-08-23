@@ -17,6 +17,21 @@ test('a capability authorizes allowed actions and denies others', () => {
   assert.equal(src.capabilities.authorize(cap.credential, 'modify_policy').ok, false);
 });
 
+test('hashed capability stores never persist the bearer credential', async () => {
+  let persisted;
+  const service = new CapabilityService({
+    hashCapabilities: true,
+    nextId: () => 'C1',
+    writeJson: (_path, value) => { persisted = value; },
+    getCapabilityByCredential: (credential) => credential === persisted?.credential ? persisted : null,
+    listJson: () => [],
+  });
+  const issued = service.issue({ principalId: 'P1', scope: {}, allowed: ['read_source'] });
+  assert.notEqual(persisted.credential, issued.credential);
+  assert.equal(service.authorize(issued.credential, 'read_source').ok, true);
+  assert.equal(service.authorize(persisted.credential, 'read_source').ok, false);
+});
+
 test('an expired capability is refused', () => {
   const { src, agent } = freshSource();
   const cap = src.capabilities.issue({

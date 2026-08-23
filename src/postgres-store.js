@@ -85,6 +85,7 @@ class PostgresStore {
     this.schema = schema;
     this.psqlPath = psql;
     this.projectPrefix = projectPrefix;
+    this.hashCapabilities = true;
     this.connectionOptions = connectionOptions;
     const poolOptions = { ...connectionOptions };
     delete poolOptions.env;

@@ -146,3 +146,8 @@ large artifact buffers across a serving process.
 
 Enqueue endpoints accept `Idempotency-Key`; the scoped hash becomes the durable
 job dedupe key, allowing agents to retry after a 503 without multiplying work.
+Postgres-backed capability grants hash bearer credentials before persistence;
+the raw token is returned only at issuance and is never stored in the
+capability JSON, normalized table, or replication event feed. Indexed lookup
+hashes the presented token server-side, so database and CDC readers cannot
+reuse a leaked bearer token directly.

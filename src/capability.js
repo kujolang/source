@@ -6,6 +6,11 @@
 
 import { createCapability } from './domain.js';
 import { nextId, nextIdAsync, randomHex } from './ids.js';
+import { createHash } from 'node:crypto';
+
+function hashCredential(credential) {
+  return createHash('sha256').update(credential, 'utf8').digest('hex');
+}
 
 export class CapabilityService {
   constructor(store) {
@@ -19,13 +24,25 @@ export class CapabilityService {
     return `capabilities/${id}.json`;
   }
 
+  _storageCredential(credential) {
+    return this.store.hashCapabilities ? hashCredential(credential) : credential;
+  }
+
+  _persisted(cap) {
+    return this.store.hashCapabilities ? { ...cap, credential: hashCredential(cap.credential) } : cap;
+  }
+
+  _hydrate(cap, credential) {
+    return cap && this.store.hashCapabilities ? { ...cap, credential } : cap;
+  }
+
   // Issue a capability. Returns the grant record (including the credential).
   issue({ principalId, scope, allowed = [], denied = [], ttlMs = 4 * 60 * 60 * 1000 }) {
     const id = nextId(this.store, 'capability');
     const credential = randomHex(24);
     const expiresAt = new Date(Date.now() + ttlMs).toISOString();
     const cap = createCapability({ id, principalId, scope, allowed, denied, expiresAt, credential });
-    this.store.writeJson(this._rel(id), cap);
+    this.store.writeJson(this._rel(id), this._persisted(cap));
     this._cache.set(credential, cap);
     return cap;
   }
@@ -35,8 +52,8 @@ export class CapabilityService {
     const credential = randomHex(24);
     const expiresAt = new Date(Date.now() + ttlMs).toISOString();
     const cap = createCapability({ id, principalId, scope, allowed, denied, expiresAt, credential });
-    if (typeof this.store.writeJsonAsync === 'function') await this.store.writeJsonAsync(this._rel(id), cap);
-    else this.store.writeJson(this._rel(id), cap);
+    if (typeof this.store.writeJsonAsync === 'function') await this.store.writeJsonAsync(this._rel(id), this._persisted(cap));
+    else this.store.writeJson(this._rel(id), this._persisted(cap));
     this._cache.set(credential, cap);
     return cap;
   }
@@ -44,10 +61,13 @@ export class CapabilityService {
   // Look up a grant by credential. Returns null if unknown.
   lookup(credential) {
     if (!credential) return null;
-    const storeLookup = typeof this.store.getCapabilityByCredential === 'function' ? this.store.getCapabilityByCredential(credential) : null;
+    const storeLookup = typeof this.store.getCapabilityByCredential === 'function'
+      ? this.store.getCapabilityByCredential(this._storageCredential(credential))
+      : null;
     if (storeLookup) {
-      this._cache.set(credential, storeLookup);
-      return storeLookup;
+      const hydrated = this._hydrate(storeLookup, credential);
+      this._cache.set(credential, hydrated);
+      return hydrated;
     }
 
     this._refreshCache();
@@ -59,10 +79,11 @@ export class CapabilityService {
   async lookupAsync(credential) {
     if (!credential) return null;
     if (typeof this.store.getCapabilityByCredentialAsync === 'function') {
-      const storeLookup = await this.store.getCapabilityByCredentialAsync(credential);
+      const storeLookup = await this.store.getCapabilityByCredentialAsync(this._storageCredential(credential));
       if (storeLookup) {
-        this._cache.set(credential, storeLookup);
-        return storeLookup;
+        const hydrated = this._hydrate(storeLookup, credential);
+        this._cache.set(credential, hydrated);
+        return hydrated;
       }
       return null;
     }
@@ -118,7 +139,7 @@ export class CapabilityService {
     const cap = this.store.readJson(this._rel(id));
     if (!cap) return false;
     cap.revoked = true;
-    this.store.writeJson(this._rel(id), cap);
+    this.store.writeJson(this._rel(id), this._persisted(cap));
     this._cache.delete(cap.credential);
     this._cacheAt = 0;
     return true;
