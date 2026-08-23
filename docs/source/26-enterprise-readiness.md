@@ -21,6 +21,12 @@ retained for seven days by default and pruned in bounded batches. Postgres
 fallback `psql` processes have a four-process budget and a ten-second timeout
 by default.
 
+Every asynchronous Postgres operation also passes through a bounded admission
+queue (eight waiters per pool connection by default). Once that queue is full,
+the operation is rejected rather than retained indefinitely in the database
+driver's internal wait list. Admission activity and rejections are exposed
+through `/metrics` for capacity planning.
+
 Distributed workers receive a random lease token on every claim. Extend,
 complete, and fail operations require that token, so a stale worker cannot
 mutate a lease reclaimed by another node. Expired jobs are atomically moved to

@@ -14,6 +14,7 @@ import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import pg from 'pg';
+import { Semaphore } from './concurrency.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -67,6 +68,7 @@ class PostgresStore {
     delete poolOptions.fallbackConcurrency;
     delete poolOptions.fallbackTimeoutMs;
     const maxConnections = connectionOptions.maxConnections || poolOptions.max || 32;
+    const maxDbQueue = Math.min(100_000, Math.max(0, Math.trunc(connectionOptions.maxDbQueue ?? maxConnections * 8)));
     this.pool = pool || new pg.Pool({
       connectionString: dsn,
       ...poolOptions,
@@ -76,6 +78,8 @@ class PostgresStore {
       query_timeout: poolOptions.query_timeout ?? 30_000,
     });
     this.lastPoolError = null;
+    this.dbAdmission = new Semaphore({ capacity: maxConnections, queue: maxDbQueue });
+    this.dbAdmissionRejected = 0;
     this.fallbackConcurrency = Math.min(32, Math.max(1, Math.trunc(connectionOptions.fallbackConcurrency ?? 4)));
     this.fallbackTimeoutMs = Math.min(60_000, Math.max(1_000, Math.trunc(connectionOptions.fallbackTimeoutMs ?? 10_000)));
     this._fallbackActive = 0;
@@ -133,6 +137,7 @@ class PostgresStore {
       const result = await context.client.query(String(sql).trim());
       return this._formatAsyncRows(result.rows);
     }
+    const release = await this._acquireDbSlot();
     try {
       const result = await this.pool.query(String(sql).trim());
       this.lastPoolError = null;
@@ -156,8 +161,18 @@ class PostgresStore {
           return String(stdout || '').replace(/\r/g, '').trim();
         } finally {
           this._fallbackActive -= 1;
-        }
       }
+    } finally {
+      release();
+    }
+  }
+
+  async _acquireDbSlot() {
+    if (!this.dbAdmission) return () => {};
+    const release = await this.dbAdmission.acquire();
+    if (release) return release;
+    this.dbAdmissionRejected += 1;
+    throw new Error('Postgres query admission queue exhausted');
   }
 
   _formatAsyncRows(rows) {
@@ -1212,7 +1227,11 @@ class PostgresStore {
   async transactionAsync(fn) {
     const existing = this._asyncTransaction.getStore();
     if (existing?.client) return fn();
-    const client = await this.pool.connect();
+    const release = await this._acquireDbSlot();
+    const client = await this.pool.connect().catch((error) => {
+      release();
+      throw error;
+    });
     try {
       await client.query('BEGIN');
       const result = await this._asyncTransaction.run({ client }, fn);
@@ -1223,6 +1242,7 @@ class PostgresStore {
       throw error;
     } finally {
       client.release();
+      release();
     }
   }
 
@@ -1241,6 +1261,10 @@ class PostgresStore {
       idle: Number(this.pool.idleCount || 0),
       waiting: Number(this.pool.waitingCount || 0),
       fallbackActive: this._fallbackActive,
+      admissionCapacity: this.dbAdmission?.capacity || 0,
+      admissionActive: this.dbAdmission?.active || 0,
+      admissionWaiting: this.dbAdmission?.waiters?.length || 0,
+      admissionRejected: this.dbAdmissionRejected || 0,
     };
   }
 

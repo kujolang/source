@@ -67,6 +67,15 @@ function metrics(res, state, src) {
       '# HELP source_postgres_fallback_active Current legacy psql fallback processes.',
       '# TYPE source_postgres_fallback_active gauge',
       `source_postgres_fallback_active ${pool.fallbackActive}`,
+      '# HELP source_postgres_admission_active Current admitted database operations.',
+      '# TYPE source_postgres_admission_active gauge',
+      `source_postgres_admission_active ${pool.admissionActive || 0}`,
+      '# HELP source_postgres_admission_waiting Current operations waiting for database admission.',
+      '# TYPE source_postgres_admission_waiting gauge',
+      `source_postgres_admission_waiting ${pool.admissionWaiting || 0}`,
+      '# HELP source_postgres_admission_rejected_total Database operations rejected by the bounded admission queue.',
+      '# TYPE source_postgres_admission_rejected_total counter',
+      `source_postgres_admission_rejected_total ${pool.admissionRejected || 0}`,
     );
   }
   for (const [status, count] of state.statuses) lines.push(`source_responses_by_status_total{status="${status}"} ${count}`);

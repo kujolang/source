@@ -102,13 +102,16 @@ packfile-sized buffer per request. Override these through
 deployment sized to its CPU, memory, and Git workload. For multi-process
 deployments use SQLite or Postgres for durable coordination; the JSON backend
 is single-process only. Postgres uses a bounded pool (32 connections by
+default), a bounded database admission queue (eight waiters per connection by
 default), a 10-second connection timeout, a 30-second idle timeout, and a
 30-second query timeout; tune these through the store's `connectionOptions` for
-the deployment's database capacity.
+the deployment's database capacity. Requests are rejected with backpressure
+when the admission queue is exhausted instead of accumulating unboundedly in
+the driver.
 
 `/healthz` reports process liveness. `/metrics` exposes low-cardinality
 Prometheus-compatible request, response, active-request, and abort counters,
-plus Postgres pool connection and wait gauges when the Postgres backend is in
+plus Postgres pool and bounded-admission gauges when the Postgres backend is in
 use.
 `/readyz` verifies that the Source instance, metadata store, and Git root are
 available and writable; remove an instance

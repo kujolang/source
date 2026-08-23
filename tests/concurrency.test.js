@@ -91,6 +91,23 @@ test('Postgres async transactions roll back relational record fan-out on failure
   assert.deepEqual(calls, ['BEGIN', 'INSERT INTO records VALUES (1)', 'FAIL', 'ROLLBACK', 'RELEASE']);
 });
 
+test('Postgres admission queue rejects excess work instead of buffering it unboundedly', async () => {
+  let releaseQuery;
+  const queryBlocked = new Promise((resolve) => { releaseQuery = resolve; });
+  const store = Object.create(PostgresStore.prototype);
+  store.dbAdmission = new Semaphore({ capacity: 1, queue: 0 });
+  store.dbAdmissionRejected = 0;
+  store._asyncTransaction = new (await import('node:async_hooks')).AsyncLocalStorage();
+  store.pool = { query: async () => { await queryBlocked; return { rows: [] }; } };
+  const first = store._runAsync('SELECT 1');
+  for (let attempt = 0; attempt < 20 && store.dbAdmission.active !== 1; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 1));
+  assert.equal(store.dbAdmission.active, 1);
+  await assert.rejects(() => store._runAsync('SELECT 2'), /admission queue exhausted/);
+  assert.equal(store.dbAdmissionRejected, 1);
+  releaseQuery();
+  await first;
+});
+
 test('SQLite counter allocation returns unique monotonic IDs', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'source-counter-'));
   const store = new SqliteStore(root);
@@ -184,11 +201,14 @@ test('health and readiness endpoints expose process and storage state', async ()
     const metricResponse = await fetch(`${base}/metrics`);
     assert.equal(metricResponse.status, 200);
     assert.match(await metricResponse.text(), /source_requests_total/);
-    src.store.poolStats = () => ({ total: 8, idle: 3, waiting: 2, fallbackActive: 1 });
+    src.store.poolStats = () => ({ total: 8, idle: 3, waiting: 2, fallbackActive: 1, admissionActive: 4, admissionWaiting: 5, admissionRejected: 6 });
     const poolMetricResponse = await fetch(`${base}/metrics`);
     const poolMetrics = await poolMetricResponse.text();
     assert.match(poolMetrics, /source_postgres_pool_connections 8/);
     assert.match(poolMetrics, /source_postgres_pool_waiting 2/);
+    assert.match(poolMetrics, /source_postgres_admission_active 4/);
+    assert.match(poolMetrics, /source_postgres_admission_waiting 5/);
+    assert.match(poolMetrics, /source_postgres_admission_rejected_total 6/);
     src.store.checkHealthAsync = async () => { throw new Error('database unavailable'); };
     assert.equal((await fetch(`${base}/readyz`)).status, 503);
     delete src.store.checkHealthAsync;
