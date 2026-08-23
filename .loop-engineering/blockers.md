@@ -13,3 +13,14 @@ blockers:
  create mode 100644 .loop-engineering/iterations"
     status: external-blocked
     next_action: "Restore SSH/Git remote access."
+  - id: remote-ssh-unavailable
+    command: "git push origin HEAD"
+    evidence: "[main aca1a21] Loop engineering: Audit and harden Source for secure, agent-facing decentralized Git hosting with Kujo evidence integration.
+ 18 files changed, 5993 insertions(+), 998 deletions(-)
+ create mode 100644 .loop-engineering/iterations/002/action.md
+ create mode 100644 .loop-engineering/iterations/002/context.md
+ create mode 100644 .loop-engineering/iterations/002/diff.patch
+ create mode 100644 .loop-engineering/iterations/002/eval.log
+ create mode 100644 .loop-engineering/iterations/00"
+    status: external-blocked
+    next_action: "Restore SSH/Git remote access."

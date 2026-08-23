@@ -1,21 +1,6 @@
 # Context
 
 - objective: Audit and harden Source for secure, agent-facing decentralized Git hosting with Kujo evidence integration.
-- git_head: f842a29
+- git_head: af11091
 - changed_files:
-  - README.md
-  - docs/source/19-capability-auth.md
-  - src/api.js
-  - src/capability.js
-  - src/cli.js
-  - src/domain.js
-  - src/postgres-store.js
-  - src/source.js
-  - src/sqlite-store.js
-  - src/store.js
-  - src/web.js
-  - tests/api.test.js
-  - tests/auth.test.js
-  - tests/capability.test.js
-  - tests/helpers.js
-  - tests/ratelimit.test.js
+  - none

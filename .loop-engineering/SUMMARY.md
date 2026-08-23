@@ -2,17 +2,17 @@
 
 ## Verdict
 
-success
+blocked
 
 ## Completed
 
-- configured loop run completed through iteration 1
+- configured loop run completed through iteration 3
 
 ## Verification
 
-- passed: node_tests, diff_check
+- passed: none
 - blocked: none
-- failed: none
+- failed: diff_check, diff_check, diff_check
 
 ## Commits
 
@@ -24,11 +24,11 @@ success
 
 ## External Blockers
 
-- none
+- remote-ssh-unavailable: Restore SSH/Git remote access.
 
 ## Next Start
 
-- success: required gates passed
+- repeated-failure: required gate failed 3 times
 
 ## Push Blocker
 
