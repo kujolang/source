@@ -17,6 +17,7 @@ import pg from 'pg';
 import { Semaphore } from './concurrency.js';
 
 const execFileAsync = promisify(execFile);
+const MAX_BULK_RECORD_READS = 1_001;
 
 function escapeSqlLiteral(value) {
   if (value === null || value === undefined) return 'NULL';
@@ -680,7 +681,7 @@ class PostgresStore {
   }
 
   async readJsonManyAsync(relPaths) {
-    if (!Array.isArray(relPaths) || relPaths.length > 1_000) throw new Error('bulk record read must contain 0-1000 paths');
+    if (!Array.isArray(relPaths) || relPaths.length > MAX_BULK_RECORD_READS) throw new Error(`bulk record read must contain 0-${MAX_BULK_RECORD_READS} paths`);
     const paths = [...new Set(relPaths.map((relPath) => {
       if (typeof relPath !== 'string' || !relPath || relPath.length > 1_000) throw new Error('record path is invalid');
       return relPath;
@@ -877,7 +878,7 @@ class PostgresStore {
     const normalized = dirRel.endsWith('/') ? dirRel.slice(0, -1) : dirRel;
     const prefix = `${normalized}/`;
     const where = `WHERE path LIKE ${escapeSqlLiteral(`${prefix}%`)}`;
-    const limitClause = Number.isInteger(limit) && limit > 0 ? ` LIMIT ${Math.min(limit, 1000)}` : '';
+    const limitClause = Number.isInteger(limit) && limit > 0 ? ` LIMIT ${Math.min(limit, MAX_BULK_RECORD_READS)}` : '';
 
     const rows = this._fetchJsonRows(`
       SELECT path
@@ -916,7 +917,7 @@ class PostgresStore {
   async listJsonAsync(dirRel, { cursor, limit, includeDirs = false } = {}) {
     const normalized = dirRel.endsWith('/') ? dirRel.slice(0, -1) : dirRel;
     const prefix = `${normalized}/`;
-    const limitClause = Number.isInteger(limit) && limit > 0 ? ` LIMIT ${Math.min(limit, 1000)}` : '';
+    const limitClause = Number.isInteger(limit) && limit > 0 ? ` LIMIT ${Math.min(limit, MAX_BULK_RECORD_READS)}` : '';
     const restExpr = `substring(path from ${prefix.length + 1})`;
     const nameExpr = includeDirs
       ? `CASE WHEN position('/' in ${restExpr}) > 0 THEN split_part(${restExpr}, '/', 1)
@@ -1181,7 +1182,7 @@ class PostgresStore {
   }
 
   async listJobsAsync({ orgId, projectId, workId = null, cursor = null, limit = 100 }) {
-    const safeLimit = Math.min(1000, Math.max(1, Math.trunc(limit)));
+    const safeLimit = Math.min(MAX_BULK_RECORD_READS, Math.max(1, Math.trunc(limit)));
     const cursorClause = cursor ? `AND id > ${escapeSqlLiteral(cursor)}` : '';
     const workClause = workId ? `AND work_id = ${escapeSqlLiteral(workId)}` : '';
     return this._fetchJsonRowsAsync(`

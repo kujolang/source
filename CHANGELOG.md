@@ -22,6 +22,8 @@ All notable changes to Source are recorded here.
   1,000 entries, removing another large-Change query fan-out path.
 - Hardened isolated action timeout/output cleanup to kill the runtime process
   group, preventing orphaned containers from consuming worker capacity.
+- Fixed maximum-size Postgres keyset pagination by allowing one bounded
+  lookahead row, so 1,000-item pages continue to return a correct next cursor.
 - Added durable workflow job dependencies with cycle validation and
   dependency-aware claims for GitHub Actions `needs` semantics.
 - Batched Postgres workflow record reads to avoid one database round trip per

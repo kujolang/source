@@ -65,6 +65,9 @@ I/O.
 Change decision relationships are capped at 1,000 entries and decision
 listing uses one bounded bulk read, keeping review responses from creating a
 per-decision database round trip.
+Postgres list endpoints fetch at most 1,001 records internally—1,000 returned
+items plus one lookahead row—so maximum-size keyset pages retain correct
+continuation cursors without unbounded reads.
 Mutation-time limits also cap project repository membership at 10,000 entries
 and Change repository/evidence relationships at 1,000 entries, preventing a
 single tenant record from growing without bound.

@@ -177,7 +177,7 @@ test('Postgres workflow records use one bounded bulk read', async () => {
   const rows = await store.readJsonManyAsync(['workflows/W1.json', 'workflows/W1.json']);
   assert.deepEqual(rows, [{ path: 'workflows/W1.json', json: { id: 'W1' } }]);
   assert.match(query, /path IN \('workflows\/W1\.json'\)/);
-  await assert.rejects(() => store.readJsonManyAsync(Array.from({ length: 1_001 }, (_, index) => `W${index}`)), /0-1000/);
+  await assert.rejects(() => store.readJsonManyAsync(Array.from({ length: 1_002 }, (_, index) => `W${index}`)), /0-1001/);
 });
 
 test('decision reads use one bounded bulk read', async () => {
@@ -209,6 +209,17 @@ test('Postgres record directory listings have a prefix-search index', () => {
   const source = readFileSync(new URL('../src/postgres-store.js', import.meta.url), 'utf8');
   assert.match(source, /records_path_pattern/);
   assert.match(source, /path text_pattern_ops/);
+});
+
+test('Postgres list pagination fetches a bounded lookahead row at the maximum page size', async () => {
+  const store = Object.create(PostgresStore.prototype);
+  let query = '';
+  store._qualified = (name) => `"source"."${name}"`;
+  store._fetchJsonRowsAsync = async (sql) => { query = sql; return []; };
+  await store.listJsonAsync('orgs', { limit: 1_001 });
+  assert.match(query, /LIMIT 1001/);
+  await store.listJobsAsync({ orgId: 'O1', projectId: 'P1', limit: 1_001 });
+  assert.match(query, /LIMIT 1001/);
 });
 
 test('Postgres fair worker claims have a tenant/status/time index', () => {
