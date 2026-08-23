@@ -118,6 +118,29 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     const workflowJob = (await src.jobs.claim({ workerId: 'workflow-worker', limit: 1 }))[0];
     assert.equal(workflowJob.id, dispatchedJobs[0].id);
     await src.jobs.complete({ id: workflowJob.id, workerId: 'workflow-worker', leaseToken: workflowJob.leaseToken, result: { ok: true } });
+    const dependentWorkflow = await src.createWorkflowAsync({
+      orgId: org.id,
+      projectId: project.id,
+      name: 'dependent checks',
+      triggers: ['push'],
+      jobs: [
+        { kind: 'agent.workflow.build', payload: { jobId: 'build' } },
+        { kind: 'agent.workflow.test', payload: { jobId: 'test', needs: ['build'] } },
+      ],
+    });
+    const dependentDispatch = await src.dispatchWorkflowAsync({
+      orgId: org.id, projectId: project.id, workflowId: dependentWorkflow.id, event: 'push', eventId: 'dependent-1',
+    });
+    const rootJob = dependentDispatch.workflows[0].jobs[0];
+    const childJob = dependentDispatch.workflows[0].jobs[1];
+    assert.deepEqual(childJob.dependsOn, [rootJob.dedupeKey]);
+    const rootClaim = (await src.jobs.claim({ workerId: 'dependency-worker', limit: 10 })).find((job) => job.id === rootJob.id);
+    assert.equal(rootClaim.id, rootJob.id);
+    assert.equal((await src.jobs.claim({ workerId: 'dependency-worker-2', limit: 10 })).some((job) => job.id === childJob.id), false);
+    await src.jobs.complete({ id: rootClaim.id, workerId: 'dependency-worker', leaseToken: rootClaim.leaseToken, result: { ok: true } });
+    const childClaim = (await src.jobs.claim({ workerId: 'dependency-worker-3', limit: 10 })).find((job) => job.id === childJob.id);
+    assert.equal(childClaim.id, childJob.id);
+    await src.jobs.complete({ id: childClaim.id, workerId: 'dependency-worker-3', leaseToken: childClaim.leaseToken, result: { ok: true } });
     const peerJob = await src.jobs.enqueue({ kind: 'agent.peer', payload: { node: 'primary' } });
     const peerClaim = (await peerSrc.jobs.claim({ workerId: 'peer-worker', limit: 1 }))[0];
     assert.equal(peerClaim.id, peerJob.id);

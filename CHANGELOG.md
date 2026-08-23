@@ -11,6 +11,8 @@ All notable changes to Source are recorded here.
 - Added Kujo Eval, dependency-audit, and Kujo Doctor release checks.
 - Added bounded per-project worker claim bursts so a noisy project cannot starve
   other eligible projects in a shared Postgres worker fleet.
+- Added durable workflow job dependencies with cycle validation and
+  dependency-aware claims for GitHub Actions `needs` semantics.
 
 ## [0.1.0]
 

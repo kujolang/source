@@ -43,6 +43,15 @@ function toJson(value) {
   return escapeSqlLiteral(JSON.stringify(value));
 }
 
+function normalizeJobDependencies(value) {
+  if (value == null) return [];
+  if (!Array.isArray(value) || value.length > 100) throw new Error('job dependencies must contain 0-100 references');
+  return [...new Set(value.map((dependency) => {
+    if (typeof dependency !== 'string' || !dependency || dependency.length > 240) throw new Error('job dependency reference is invalid');
+    return dependency;
+  }))];
+}
+
 class PostgresStore {
   constructor({
     dsn = process.env.SOURCE_DATABASE_URL || process.env.DATABASE_URL,
@@ -421,6 +430,7 @@ class PostgresStore {
         leased_until TIMESTAMPTZ,
         worker_id TEXT,
         lease_token TEXT,
+        depends_on JSONB NOT NULL DEFAULT '[]'::jsonb,
         dedupe_key TEXT UNIQUE,
         result JSONB,
         last_error TEXT,
@@ -428,7 +438,7 @@ class PostgresStore {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
-    for (const column of ['org_id TEXT', 'project_id TEXT', 'work_id TEXT', 'max_attempts INTEGER NOT NULL DEFAULT 5', 'lease_token TEXT', 'dedupe_key TEXT']) {
+    for (const column of ['org_id TEXT', 'project_id TEXT', 'work_id TEXT', 'max_attempts INTEGER NOT NULL DEFAULT 5', 'lease_token TEXT', 'depends_on JSONB NOT NULL DEFAULT \'[]\'::jsonb', 'dedupe_key TEXT']) {
       this._run(`ALTER TABLE ${this._qualified('jobs')} ADD COLUMN IF NOT EXISTS ${column}`);
     }
 
@@ -1013,15 +1023,16 @@ class PostgresStore {
     )`);
   }
 
-  async enqueueJobAsync({ kind, payload = {}, availableAt = new Date(), orgId = null, projectId = null, workId = null, maxAttempts = 5, maxQueueDepth = null, dedupeKey = null }) {
+  async enqueueJobAsync({ kind, payload = {}, availableAt = new Date(), orgId = null, projectId = null, workId = null, maxAttempts = 5, maxQueueDepth = null, dedupeKey = null, dependsOn = [] }) {
     if (!kind || typeof kind !== 'string') throw new Error('job kind is required');
     const safeAttempts = Math.min(100, Math.max(1, Math.trunc(maxAttempts)));
     const id = await this.nextIdAsync('job', 'J');
     const at = new Date(availableAt).toISOString();
     const safeDepth = maxQueueDepth == null ? null : Math.min(10_000_000, Math.max(1, Math.trunc(maxQueueDepth)));
     const safeDedupeKey = dedupeKey == null ? null : String(dedupeKey).slice(0, 240);
-    const insert = () => this._runAsync(`INSERT INTO ${this._qualified('jobs')} (id, kind, payload, org_id, project_id, work_id, status, available_at, max_attempts, dedupe_key)
-      VALUES (${escapeSqlLiteral(id)}, ${escapeSqlLiteral(kind)}, ${toJson(payload)}, ${escapeSqlLiteral(orgId)}, ${escapeSqlLiteral(projectId)}, ${escapeSqlLiteral(workId)}, 'queued', ${escapeSqlLiteral(at)}, ${safeAttempts}, ${escapeSqlLiteral(safeDedupeKey)})
+    const safeDependsOn = normalizeJobDependencies(dependsOn);
+    const insert = () => this._runAsync(`INSERT INTO ${this._qualified('jobs')} (id, kind, payload, org_id, project_id, work_id, status, available_at, max_attempts, dedupe_key, depends_on)
+      VALUES (${escapeSqlLiteral(id)}, ${escapeSqlLiteral(kind)}, ${toJson(payload)}, ${escapeSqlLiteral(orgId)}, ${escapeSqlLiteral(projectId)}, ${escapeSqlLiteral(workId)}, 'queued', ${escapeSqlLiteral(at)}, ${safeAttempts}, ${escapeSqlLiteral(safeDedupeKey)}, ${toJson(safeDependsOn)})
       ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING
       RETURNING id`);
     let inserted;
@@ -1045,12 +1056,12 @@ class PostgresStore {
       inserted = await insert();
     }
     if (typeof inserted === 'string' && inserted.startsWith('dedupe:')) {
-      return { id: inserted.slice('dedupe:'.length), kind, payload, orgId, projectId, workId, status: 'deduplicated', attempts: 0, maxAttempts: safeAttempts, availableAt: at, dedupeKey: safeDedupeKey };
+      return { id: inserted.slice('dedupe:'.length), kind, payload, orgId, projectId, workId, status: 'deduplicated', attempts: 0, maxAttempts: safeAttempts, availableAt: at, dedupeKey: safeDedupeKey, dependsOn: safeDependsOn };
     }
     if (!inserted && safeDedupeKey) {
       const existing = await this._runAsync(`SELECT id FROM ${this._qualified('jobs')} WHERE dedupe_key = ${escapeSqlLiteral(safeDedupeKey)} LIMIT 1`);
       if (existing) {
-        return { id: existing, kind, payload, orgId, projectId, workId, status: 'deduplicated', attempts: 0, maxAttempts: safeAttempts, availableAt: at, dedupeKey: safeDedupeKey };
+        return { id: existing, kind, payload, orgId, projectId, workId, status: 'deduplicated', attempts: 0, maxAttempts: safeAttempts, availableAt: at, dedupeKey: safeDedupeKey, dependsOn: safeDependsOn };
       }
     }
     if (safeDepth != null && orgId && projectId && !inserted) {
@@ -1058,7 +1069,7 @@ class PostgresStore {
     }
     this._jobMaintenanceOps += 1;
     if (this._jobMaintenanceOps % 1_000 === 0) await this.pruneJobsAsync({ limit: 1_000 });
-    return { id, kind, payload, orgId, projectId, workId, status: 'queued', attempts: 0, maxAttempts: safeAttempts, availableAt: at, dedupeKey: safeDedupeKey };
+    return { id, kind, payload, orgId, projectId, workId, status: 'queued', attempts: 0, maxAttempts: safeAttempts, availableAt: at, dedupeKey: safeDedupeKey, dependsOn: safeDependsOn };
   }
 
   async enqueueJobsAsync({ jobs, maxQueueDepth = null } = {}) {
@@ -1072,6 +1083,7 @@ class PostgresStore {
         payload: job.payload ?? {},
         availableAt,
         dedupeKey,
+        dependsOn: normalizeJobDependencies(job.dependsOn),
         maxAttempts: Math.min(100, Math.max(1, Math.trunc(job.maxAttempts ?? 5))),
       };
     });
@@ -1103,9 +1115,9 @@ class PostgresStore {
         if (Number(current || 0) + newCount > safeDepth) throw new Error('job queue depth exceeded');
       }
       const ids = await this.nextIdsAsync('job', 'J', normalized.length);
-      const values = normalized.map((job, index) => `(${escapeSqlLiteral(ids[index])}, ${escapeSqlLiteral(job.kind)}, ${toJson(job.payload)}, ${escapeSqlLiteral(job.orgId || null)}, ${escapeSqlLiteral(job.projectId || null)}, ${escapeSqlLiteral(job.workId || null)}, 'queued', ${escapeSqlLiteral(job.availableAt)}, ${job.maxAttempts}, ${escapeSqlLiteral(job.dedupeKey)})`).join(',');
+      const values = normalized.map((job, index) => `(${escapeSqlLiteral(ids[index])}, ${escapeSqlLiteral(job.kind)}, ${toJson(job.payload)}, ${escapeSqlLiteral(job.orgId || null)}, ${escapeSqlLiteral(job.projectId || null)}, ${escapeSqlLiteral(job.workId || null)}, 'queued', ${escapeSqlLiteral(job.availableAt)}, ${job.maxAttempts}, ${escapeSqlLiteral(job.dedupeKey)}, ${toJson(job.dependsOn)})`).join(',');
       const inserted = await this._runJsonCommandAsync(`WITH inserted AS (
-        INSERT INTO ${this._qualified('jobs')} (id, kind, payload, org_id, project_id, work_id, status, available_at, max_attempts, dedupe_key)
+        INSERT INTO ${this._qualified('jobs')} (id, kind, payload, org_id, project_id, work_id, status, available_at, max_attempts, dedupe_key, depends_on)
           VALUES ${values}
           ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING
           RETURNING id, dedupe_key AS key
@@ -1118,7 +1130,7 @@ class PostgresStore {
       const resolvedByKey = new Map(resolved.map((row) => [row.key, row.id]));
       return normalized.map((job, index) => {
         const id = insertedIds.has(ids[index]) ? ids[index] : resolvedByKey.get(job.dedupeKey) || existing.find((row) => row.key === job.dedupeKey)?.id || insertedByKey.get(job.dedupeKey);
-        return { id, kind: job.kind, payload: job.payload, orgId: job.orgId || null, projectId: job.projectId || null, workId: job.workId || null, status: insertedIds.has(ids[index]) ? 'queued' : 'deduplicated', attempts: 0, maxAttempts: job.maxAttempts, availableAt: job.availableAt, dedupeKey: job.dedupeKey };
+        return { id, kind: job.kind, payload: job.payload, orgId: job.orgId || null, projectId: job.projectId || null, workId: job.workId || null, status: insertedIds.has(ids[index]) ? 'queued' : 'deduplicated', attempts: 0, maxAttempts: job.maxAttempts, availableAt: job.availableAt, dedupeKey: job.dedupeKey, dependsOn: job.dependsOn };
       });
     });
   }
@@ -1140,7 +1152,7 @@ class PostgresStore {
     const cursorClause = cursor ? `AND id > ${escapeSqlLiteral(cursor)}` : '';
     const workClause = workId ? `AND work_id = ${escapeSqlLiteral(workId)}` : '';
     return this._fetchJsonRowsAsync(`
-      SELECT id, kind, payload, org_id, project_id, work_id, status, attempts, max_attempts,
+      SELECT id, kind, payload, org_id, project_id, work_id, status, attempts, max_attempts, depends_on AS "dependsOn",
              dedupe_key AS "dedupeKey", available_at, leased_until, worker_id, result, last_error, created_at, updated_at
       FROM ${this._qualified('jobs')}
       WHERE org_id = ${escapeSqlLiteral(orgId)} AND project_id = ${escapeSqlLiteral(projectId)}
@@ -1180,13 +1192,33 @@ class PostgresStore {
         FROM expired
         WHERE j.id = expired.id
         RETURNING j.id
+      ), blocked AS (
+        UPDATE ${this._qualified('jobs')} AS j
+        SET status = 'failed', leased_until = NULL, worker_id = NULL, lease_token = NULL,
+            last_error = 'dependency failed', updated_at = NOW()
+        WHERE j.status = 'queued'
+          AND EXISTS (
+            SELECT 1
+            FROM jsonb_array_elements_text(COALESCE(j.depends_on, '[]'::jsonb)) AS dependency(reference)
+            JOIN ${this._qualified('jobs')} AS dependency_job
+              ON dependency_job.id = dependency.reference OR dependency_job.dedupe_key = dependency.reference
+            WHERE dependency_job.status = 'failed'
+          )
+        RETURNING j.id
       ), ranked AS (
         SELECT id, row_number() OVER (
           PARTITION BY org_id, project_id ORDER BY created_at, id
         ) AS project_rank
-        FROM ${this._qualified('jobs')}
-        WHERE (status = 'queued' AND available_at <= NOW())
-           OR (status = 'leased' AND leased_until < NOW() AND attempts < max_attempts)
+        FROM ${this._qualified('jobs')} AS j
+        WHERE ((status = 'queued' AND available_at <= NOW())
+           OR (status = 'leased' AND leased_until < NOW() AND attempts < max_attempts))
+          AND NOT EXISTS (
+            SELECT 1
+            FROM jsonb_array_elements_text(COALESCE(j.depends_on, '[]'::jsonb)) AS dependency(reference)
+            LEFT JOIN ${this._qualified('jobs')} AS dependency_job
+              ON dependency_job.id = dependency.reference OR dependency_job.dedupe_key = dependency.reference
+            WHERE dependency_job.id IS NULL OR dependency_job.status <> 'completed'
+          )
       ), scope_count AS (
         SELECT COUNT(*) AS scopes FROM ranked WHERE project_rank = 1
       ), candidates AS (
@@ -1209,7 +1241,7 @@ class PostgresStore {
         WHERE j.id = candidates.id
         RETURNING j.id, j.kind, j.payload, j.org_id AS "orgId", j.project_id AS "projectId", j.work_id AS "workId", j.status, j.attempts,
                   j.available_at AS "availableAt", j.leased_until AS "leasedUntil",
-                  j.worker_id AS "workerId", j.lease_token AS "leaseToken", j.max_attempts AS "maxAttempts"
+                  j.worker_id AS "workerId", j.lease_token AS "leaseToken", j.max_attempts AS "maxAttempts", j.depends_on AS "dependsOn"
       )
       SELECT COALESCE(json_agg(row_to_json(updated)), '[]'::json)::text AS rows FROM updated
     `);

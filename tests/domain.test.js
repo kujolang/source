@@ -67,6 +67,20 @@ test('workflow dispatch enforces a bounded fanout', async () => {
   );
 });
 
+test('workflow dependencies are validated as an acyclic graph', async () => {
+  const { src, org, project } = freshSource();
+  await assert.rejects(src.createWorkflowAsync({
+    orgId: org.id,
+    projectId: project.id,
+    name: 'cyclic checks',
+    triggers: ['push'],
+    jobs: [
+      { kind: 'agent.check.one', payload: { jobId: 'one', needs: ['two'] } },
+      { kind: 'agent.check.two', payload: { jobId: 'two', needs: ['one'] } },
+    ],
+  }), /cycle/);
+});
+
 test('a change can be submitted and is tied to an exact base state', () => {
   const { src, org, project, agent } = freshSource();
   const w = src.createWork({ orgId: org.id, projectId: project.id, intent: 'change', requester: 'U1' });

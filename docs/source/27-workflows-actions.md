@@ -32,10 +32,12 @@ Agents or trusted services use the capability-gated endpoints:
 
 Dispatch is durable and multi-node safe. Each step becomes a Postgres queue job
 with the workflow version, event ID, event input, and step number in its
-payload. The event ID is the idempotency key: repeated webhook or agent
-delivery returns the original job instead of creating duplicate work. Queue
-depth, payload, attempts, leases, and worker concurrency remain bounded by the
-same controls as direct jobs.
+payload. GitHub `needs` dependencies are validated as an acyclic graph and are
+stored as durable job dependencies; a dependent job cannot be claimed until
+every prerequisite completes. The event ID is the idempotency key: repeated
+webhook or agent delivery returns the original job instead of creating duplicate
+work. Queue depth, payload, attempts, leases, and worker concurrency remain
+bounded by the same controls as direct jobs.
 
 Execution is deliberately separated from dispatch. Operators register safe
 handlers in `SourceWorker`; workflow content is untrusted data and never

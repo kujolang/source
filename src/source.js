@@ -1365,10 +1365,30 @@ export class Source {
       throw new Error('workflow triggers must contain 1-32 safe event names');
     }
     if (!Array.isArray(jobs) || jobs.length < 1 || jobs.length > 100) throw new Error('workflow jobs must contain 1-100 steps');
-    for (const job of jobs) {
+    const jobIdList = jobs.map((job, index) => job?.payload?.jobId || String(index));
+    const jobIds = new Set(jobIdList);
+    if (jobIds.size !== jobIdList.length) throw new Error('workflow job IDs must be unique');
+    const edges = new Map();
+    for (const [index, job] of jobs.entries()) {
       if (!job || typeof job.kind !== 'string' || !/^[A-Za-z0-9_.:-]{1,120}$/.test(job.kind)) throw new Error('workflow job kinds must be safe event names');
       if (Buffer.byteLength(JSON.stringify(job.payload ?? {})) > 16 * 1024) throw new Error('workflow job payload too large');
+      const needs = job.payload?.needs == null ? [] : Array.isArray(job.payload.needs) ? job.payload.needs : [job.payload.needs];
+      if (needs.length > 100 || needs.some((dependency) => typeof dependency !== 'string' || !jobIds.has(dependency))) {
+        throw new Error(`workflow job dependencies are invalid at index ${index}`);
+      }
+      edges.set(jobIdList[index], needs);
     }
+    const visiting = new Set();
+    const visited = new Set();
+    const visit = (id) => {
+      if (visiting.has(id)) throw new Error('workflow job dependencies contain a cycle');
+      if (visited.has(id)) return;
+      visiting.add(id);
+      for (const dependency of edges.get(id) || []) visit(dependency);
+      visiting.delete(id);
+      visited.add(id);
+    };
+    for (const id of jobIds) visit(id);
   }
 
   async createWorkflowAsync({ orgId, projectId, name, triggers, jobs, enabled = true, source = null }) {
@@ -1427,6 +1447,7 @@ export class Source {
     for (const workflow of workflows.filter((candidate) => (!workflowId || candidate.id === workflowId) && candidate.enabled && candidate.triggers.includes(event))) {
       if (dispatchedJobCount + workflow.jobs.length > safeMaxWorkflowJobs) throw new Error('workflow dispatch fanout exceeds configured limit');
       dispatchedJobCount += workflow.jobs.length;
+      const jobKeys = new Map(workflow.jobs.map((definition, step) => [definition.payload?.jobId || String(step), `${orgId}:${projectId}:${workflow.id}:${resolvedEventId}:${step}`]));
       const definitions = workflow.jobs.map((definition, step) => ({
           kind: definition.kind,
           payload: { workflowId: workflow.id, workflowVersion: workflow.version, event, eventId: resolvedEventId, step, input: payload, parameters: definition.payload },
@@ -1434,6 +1455,7 @@ export class Source {
           projectId,
           maxQueueDepth,
           dedupeKey: `${orgId}:${projectId}:${workflow.id}:${resolvedEventId}:${step}`,
+          dependsOn: (Array.isArray(definition.payload?.needs) ? definition.payload.needs : definition.payload?.needs ? [definition.payload.needs] : []).map((dependency) => jobKeys.get(dependency)).filter(Boolean),
       }));
       const jobs = typeof this.store.enqueueJobsAsync === 'function'
         ? await this.jobs.enqueueBatch({ jobs: definitions, maxQueueDepth })
