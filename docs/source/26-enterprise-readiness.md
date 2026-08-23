@@ -60,7 +60,10 @@ The JSON compatibility backend also exposes asynchronous filesystem methods for
 API callers. These are not a multi-process durability substitute for Postgres,
 but they avoid synchronous filesystem calls in the async request path and
 serialize in-process writes and counter allocation. Production multi-node
-deployments must still use Postgres and shared durable Git storage.
+deployments must still use Postgres and shared durable Git storage. Postgres
+schema bootstrap also takes a transaction-scoped advisory lock for each
+compatibility-DDL statement, so concurrent serving-node startups do not race
+table, column, or index creation.
 Git repository resolution on Postgres uses tenant-scoped indexed ID/name lookup,
 avoiding a scan of every repository in a large project.
 Multi-repository canonical promotion also uses bounded Git update concurrency

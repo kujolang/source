@@ -8,6 +8,8 @@ All notable changes to Source are recorded here.
   access, and counter allocation so compatibility deployments do not block the
   API event loop; async writes are serialized in-process to preserve atomic
   temp-file and counter behavior.
+- Serialized Postgres schema bootstrap statements across serving nodes with a
+  transaction-scoped advisory lock, preventing concurrent startup DDL races.
 - Made the default Node test command deterministic by serializing test files;
   the dedicated scale suite still exercises the 1,000-connection burst while
   avoiding host TCP backlog contention from unrelated test servers.

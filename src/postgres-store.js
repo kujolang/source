@@ -115,7 +115,16 @@ class PostgresStore {
     this._txDepth = 0;
     this._rateLimitOps = 0;
 
-    this._initSchema();
+    // Schema creation is intentionally serialized across serving nodes. The
+    // legacy psql bootstrap uses one short-lived session per statement, so the
+    // advisory transaction lock is applied by _run while initialization is in
+    // progress rather than held by a separate session.
+    this._schemaInitializing = true;
+    try {
+      this._initSchema();
+    } finally {
+      this._schemaInitializing = false;
+    }
   }
 
   _qualified(name) {
@@ -124,6 +133,11 @@ class PostgresStore {
 
   _run(sql) {
     const args = this._psqlArgs(sql);
+
+    const statement = this._schemaInitializing
+      ? `SELECT pg_advisory_xact_lock(hashtext(${escapeSqlLiteral(`source-schema:${this.schema}`)}));\n${String(sql).trim()}`
+      : String(sql).trim();
+    args[args.length - 1] = statement;
 
     const result = execFileSync(this.psqlPath, args, {
       encoding: 'utf8',
