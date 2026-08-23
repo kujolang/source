@@ -23,6 +23,7 @@
 
 import http from 'node:http';
 import https from 'node:https';
+import { readFileSync } from 'node:fs';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { Source } from './source.js';
 import { renderOrgIndexAsync, renderIndexAsync, renderProjectAsync, renderWorkAsync, renderChangeAsync, renderLogin, renderRepositoryAsync, renderBlobAsync, renderCommitAsync, renderRepositorySettingsAsync, renderActionsAsync, renderActionDetailAsync, renderSettingsAsync, managementPage, esc } from './web.js';
@@ -188,6 +189,24 @@ function html(res, status, body) {
 function redirect(res, location) {
   res.writeHead(303, { Location: location });
   res.end();
+}
+
+const STATIC_ASSETS = new Map([
+  ['/assets/source.css', { body: readFileSync(new URL('../assets/source.css', import.meta.url)), type: 'text/css; charset=utf-8' }],
+  ['/assets/sitekit/sitekit.css', { body: readFileSync(new URL('../assets/sitekit/sitekit.css', import.meta.url)), type: 'text/css; charset=utf-8' }],
+  ['/assets/sitekit/sitekit.js', { body: readFileSync(new URL('../assets/sitekit/sitekit.js', import.meta.url)), type: 'application/javascript; charset=utf-8' }],
+  ['/assets/sitekit/sitekit-manifest.json', { body: readFileSync(new URL('../assets/sitekit/sitekit-manifest.json', import.meta.url)), type: 'application/json; charset=utf-8' }],
+  ['/assets/sitekit/fonts/DepartureMono-Regular.woff', { body: readFileSync(new URL('../assets/sitekit/fonts/DepartureMono-Regular.woff', import.meta.url)), type: 'font/woff' }],
+  ['/assets/sitekit/fonts/DepartureMono-Regular.woff2', { body: readFileSync(new URL('../assets/sitekit/fonts/DepartureMono-Regular.woff2', import.meta.url)), type: 'font/woff2' }],
+]);
+
+function staticAsset(res, pathname, method) {
+  const asset = STATIC_ASSETS.get(pathname);
+  if (!asset) return false;
+  res.writeHead(200, { 'Content-Type': asset.type, 'Content-Length': asset.body.length, 'Cache-Control': 'public, max-age=3600' });
+  if (method === 'HEAD') res.end();
+  else res.end(asset.body);
+  return true;
 }
 
 function isRetryableStoreError(error) {
@@ -504,6 +523,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
     const fields = url.searchParams.get('fields') || undefined;
 
     try {
+      if ((req.method === 'GET' || req.method === 'HEAD') && staticAsset(res, pathname, req.method)) return;
       if (req.method === 'GET' && pathname === '/metrics') return metrics(res, state, src, gitSlots, gitTenantSlots, artifactSlots, requestSlots, server.secretBroker, server.writerLease);
       if (server.draining && pathname !== '/healthz' && pathname !== '/readyz') {
         return json(res, 503, { error: 'server is draining' });

@@ -21,6 +21,7 @@ scanning).
 ## Status
 
 - **199/199 non-skipped default tests pass** (one documented opt-in skip), including a dogfood test against the real `spec` Kujo
+- The local human-facing UI is vendored against Kujo SiteKit 1.0 (`assets/sitekit/`) with SiteKit tokens, components, theme behavior, and Departure Mono assets; Source-specific composition lives in `assets/source.css`.
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
@@ -322,7 +323,7 @@ src/
   ratelimit.js   — fixed-window rate limiter for anonymous paths
   scan.js        — deterministic credential scanning (redacted findings)
   api.js         — HTTP API + /.well-known/source discovery + /git/ transport + TLS
-  web.js         — minimal human-facing HTML views (org/project/work/change)
+  web.js         — SiteKit-backed human-facing HTML views (org/project/work/change)
   cli.js         — CLI (same services as the API)
   submit.js      — `source submit` contribution client
   integrations/

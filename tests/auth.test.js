@@ -200,6 +200,19 @@ test('human HTML login lands on the scoped project and root redirects back to it
   });
 });
 
+test('login page uses the vendored Kujo SiteKit shell', async () => {
+  const { src } = freshSource();
+  await withServer(src, async (base) => {
+    const login = await fetch(`${base}/login`);
+    assert.equal(login.status, 200);
+    const html = await login.text();
+    assert.match(html, /data-theme="kujo-light"/);
+    assert.match(html, /\/assets\/sitekit\/sitekit\.css/);
+    assert.match(html, /class="sk-form"/);
+    assert.match(html, /class="sk-button"/);
+  });
+});
+
 test('human login cannot self-select privileged actions or an unscoped session', async () => {
   const { src, org, project, human } = freshSource();
   await withServer(src, async (base) => {
