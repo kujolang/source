@@ -4,6 +4,10 @@ All notable changes to Source are recorded here.
 
 ## [Unreleased]
 
+- Added asynchronous JSON-store reads, writes, listings, artifacts, audit
+  access, and counter allocation so compatibility deployments do not block the
+  API event loop; async writes are serialized in-process to preserve atomic
+  temp-file and counter behavior.
 - Made the default Node test command deterministic by serializing test files;
   the dedicated scale suite still exercises the 1,000-connection burst while
   avoiding host TCP backlog contention from unrelated test servers.

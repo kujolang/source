@@ -131,6 +131,21 @@ test('JSON store transaction is a no-op wrapper (documented limitation)', () => 
   assert.equal(store.readJson('b.json').v, 2);
 });
 
+test('JSON store async contract avoids synchronous file I/O and serializes counters', async () => {
+  const store = new Store(tmp());
+  const originalRead = store.readJson;
+  const originalWrite = store.writeJson;
+  store.readJson = () => { throw new Error('sync read used'); };
+  store.writeJson = () => { throw new Error('sync write used'); };
+  await Promise.all(Array.from({ length: 100 }, () => store.nextIdAsync('work', 'W')));
+  await store.writeJsonAsync('records/W1.json', { id: 'W1' });
+  assert.deepEqual(await store.readJsonAsync('records/W1.json'), { id: 'W1' });
+  assert.equal((await store.listJsonAsync('records')).length, 1);
+  store.readJson = originalRead;
+  store.writeJson = originalWrite;
+  assert.equal((await store.getMetaAsync('counter:work')), 100);
+});
+
 // --- interface contract ----------------------------------------------------
 
 test('SqliteStore listJson returns direct children only', () => {
