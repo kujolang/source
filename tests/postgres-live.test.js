@@ -37,6 +37,22 @@ test('Postgres async lifecycle and HTTP burst remain correct under a configurabl
     const principal = await src.createPrincipalAsync({ type: 'agent', name: 'load-agent' });
     peerStore = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 32, maxDbQueue: dbQueue } });
     const peerSrc = new Source(dataRoot, { store: peerStore, gitRoot });
+    const leaseName = `live-${process.pid}`;
+    const leaseA = await store.acquireWriterLeaseAsync({ name: leaseName, owner: 'live-a', leaseMs: 5_000 });
+    await assert.rejects(
+      () => peerStore.acquireWriterLeaseAsync({ name: leaseName, owner: 'live-b', leaseMs: 5_000 }),
+      { code: 'WRITER_LEASE_HELD' },
+    );
+    assert.ok(await store.renewWriterLeaseAsync({ name: leaseName, owner: 'live-a', fencingToken: leaseA.fencingToken, leaseMs: 5_000 }));
+    assert.equal(await peerStore.releaseWriterLeaseAsync({ name: leaseName, owner: 'live-b', fencingToken: leaseA.fencingToken }), false);
+    assert.equal(await store.releaseWriterLeaseAsync({ name: leaseName, owner: 'live-a', fencingToken: leaseA.fencingToken }), true);
+    const leaseB = await peerStore.acquireWriterLeaseAsync({ name: leaseName, owner: 'live-b', leaseMs: 5_000 });
+    await assert.rejects(
+      () => store.assertWriterLeaseAsync({ name: leaseName, owner: 'live-a', fencingToken: leaseA.fencingToken }),
+      { code: 'WRITER_LEASE_LOST' },
+    );
+    assert.ok(await peerStore.assertWriterLeaseAsync({ name: leaseName, owner: 'live-b', fencingToken: leaseB.fencingToken }));
+    await peerStore.releaseWriterLeaseAsync({ name: leaseName, owner: 'live-b', fencingToken: leaseB.fencingToken });
     assert.equal((await peerSrc.getProjectAsync(org.id, project.id)).id, project.id);
     const peerRepo = src.createRepository({ orgId: org.id, projectId: project.id, name: 'shared-main' });
     assert.equal((await peerSrc.getRepositoryAsync(org.id, project.id, peerRepo.id)).barePath, peerRepo.barePath);
