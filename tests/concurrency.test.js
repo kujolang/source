@@ -131,7 +131,7 @@ test('Postgres worker claims bound expired-attempt cleanup', async () => {
   store._runJsonCommandAsync = async (sql) => { query = sql; return []; };
   const jobs = await store.claimJobsAsync({ workerId: 'bounded-worker', limit: 10 });
   assert.deepEqual(jobs, []);
-  assert.match(query, /FROM "source"\."jobs"[\s\S]*LIMIT 1_000/);
+  assert.match(query, /FROM "source"\."jobs"[\s\S]*LIMIT 1000/);
   assert.match(query, /UPDATE "source"\."jobs" AS j/);
   assert.match(query, /FOR UPDATE SKIP LOCKED/);
 });

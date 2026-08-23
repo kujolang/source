@@ -20,7 +20,7 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
   let server;
   let peerServer;
   try {
-    store = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 16 } });
+    store = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 32, maxDbQueue: 4_096 } });
     const dataRoot = mkdtempSync(path.join(tmpdir(), 'source-pg-live-'));
     const gitRoot = mkdtempSync(path.join(tmpdir(), 'source-pg-git-'));
     src = new Source(dataRoot, { store, gitRoot });
@@ -29,7 +29,7 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     const project = await src.createProjectAsync({ orgId: org.id, name: 'load-project', slug: 'load-project' });
     const quotaProject = await src.createProjectAsync({ orgId: org.id, name: 'quota-project', slug: 'quota-project' });
     const principal = await src.createPrincipalAsync({ type: 'agent', name: 'load-agent' });
-    peerStore = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 16 } });
+    peerStore = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 32, maxDbQueue: 4_096 } });
     const peerSrc = new Source(dataRoot, { store: peerStore, gitRoot });
     assert.equal((await peerSrc.getProjectAsync(org.id, project.id)).id, project.id);
     const peerRepo = src.createRepository({ orgId: org.id, projectId: project.id, name: 'shared-main' });
@@ -140,7 +140,7 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     const restartLease = (await src.jobs.claim({ workerId: 'terminated-worker', limit: 1, leaseMs: 1 }))[0];
     assert.equal(restartLease.id, restartJob.id);
     await store.closeAsync();
-    store = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 16 } });
+    store = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 32, maxDbQueue: 4_096 } });
     src = new Source(dataRoot, { store, gitRoot });
     await new Promise((resolve) => setTimeout(resolve, 20));
     const afterRestart = (await src.jobs.claim({ workerId: 'restarted-worker', limit: 1, leaseMs: 5_000 }))[0];

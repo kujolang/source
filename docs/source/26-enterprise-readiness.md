@@ -22,7 +22,8 @@ fallback `psql` processes have a four-process budget and a ten-second timeout
 by default.
 
 Every asynchronous Postgres operation also passes through a bounded admission
-queue (eight waiters per pool connection by default). Once that queue is full,
+queue (eight waiters per pool connection by default; the live 1,000-agent gate
+uses a 4,096-operation deployment budget). Once that queue is full,
 the operation is rejected rather than retained indefinitely in the database
 driver's internal wait list. Admission activity and rejections are exposed
 through `/metrics` for capacity planning.

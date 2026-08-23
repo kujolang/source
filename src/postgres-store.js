@@ -1165,7 +1165,7 @@ class PostgresStore {
         WHERE status = 'leased' AND leased_until < NOW() AND attempts >= max_attempts
         ORDER BY leased_until, id
         FOR UPDATE SKIP LOCKED
-        LIMIT 1_000
+        LIMIT 1000
       ), exhausted AS (
         UPDATE ${this._qualified('jobs')} AS j
         SET status = 'failed', leased_until = NULL, worker_id = NULL, lease_token = NULL,
