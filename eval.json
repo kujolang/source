@@ -8,29 +8,29 @@
     {
       "name": "JavaScript syntax lint",
       "check": "command_succeeds",
-      "params": { "command": "npm run lint" }
+      "params": { "command": "env PATH=\"${PATH:-}:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin\" npm run lint" }
     },
     {
       "name": "Formatting hygiene",
       "check": "command_succeeds",
-      "params": { "command": "npm run format:check" }
+      "params": { "command": "env PATH=\"${PATH:-}:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin\" npm run format:check" }
     },
     {
       "name": "Node test suite",
       "check": "command_succeeds",
-      "params": { "command": "npm test" },
+      "params": { "command": "env PATH=\"${PATH:-}:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin\" npm test" },
       "timeout_seconds": 300
     },
     {
       "name": "Concurrency regression suite",
       "check": "command_succeeds",
-      "params": { "command": "npm run test:scale" },
+      "params": { "command": "env PATH=\"${PATH:-}:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin\" npm run test:scale" },
       "timeout_seconds": 120
     },
     {
       "name": "CLI help remains available",
       "check": "command_succeeds",
-      "params": { "command": "node bin/source.js help" }
+      "params": { "command": "env PATH=\"${PATH:-}:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin\" node bin/source.js help" }
     },
     {
       "name": "Working tree diff is whitespace-clean",
@@ -40,7 +40,7 @@
     {
       "name": "Production dependency audit is clean",
       "check": "command_succeeds",
-      "params": { "command": "npm audit --omit=dev --audit-level=high" },
+      "params": { "command": "env PATH=\"${PATH:-}:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin\" npm audit --omit=dev --audit-level=high" },
       "timeout_seconds": 120
     },
     {
