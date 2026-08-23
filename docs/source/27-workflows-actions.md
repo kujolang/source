@@ -61,3 +61,8 @@ remain deployment-specific work required before advertising drop-in
 webhook endpoint itself is provider-neutral: it uses the delivery ID as the
 idempotency key and maps `X-GitHub-Event` plus the JSON payload into the Source
 workflow event contract.
+
+`IsolatedActionRunner` also has its own bounded container admission budget (256
+active and 512 queued by default), independent of workspace admission. This
+prevents multiple worker handlers sharing one runner from overwhelming the
+container host; tune `maxActive` and `queue` for the deployment.

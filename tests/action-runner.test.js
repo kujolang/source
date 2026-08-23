@@ -24,6 +24,16 @@ test('isolated runner rejects composite actions and workspace escapes', () => {
   assert.throws(() => runner.buildArgs({ steps: [{ run: 'echo unsafe' }] }, '/srv/other'), /workspace root/);
 });
 
+test('isolated runner bounds container admission independently of workspaces', async () => {
+  const runner = new IsolatedActionRunner({ image: 'kujo/runner:latest', workspaceRoot: '/srv/workspaces', maxActive: 1, queue: 0 });
+  const release = await runner.slots.acquire();
+  await assert.rejects(
+    runner.run({ steps: [{ run: 'kujo check' }] }, { workspace: '/srv/workspaces/job-1' }),
+    /capacity exhausted/,
+  );
+  release();
+});
+
 test('GitHub handler resolves an isolated workspace and passes brokered secrets by name', async () => {
   const calls = [];
   const handler = createGitHubActionsHandler({

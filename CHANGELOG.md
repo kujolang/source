@@ -35,6 +35,8 @@ All notable changes to Source are recorded here.
   listings over compatibility records.
 - Aborted JSON and raw request bodies now reject immediately instead of leaving
   disconnected-agent promises pending.
+- Added independent bounded admission to isolated action runners so shared
+  worker processes cannot spawn unbounded containers.
 
 ## [0.1.0]
 

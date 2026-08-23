@@ -58,7 +58,7 @@ export class EphemeralWorkspaceManager {
   }
 
   async acquire(job) {
-    const releaseSlot = await this.slots.acquire();
+    let releaseSlot = await this.slots.acquire();
     if (!releaseSlot) throw new Error('workflow workspace capacity exhausted');
     try {
       await mkdir(this.root, { recursive: true });
@@ -84,7 +84,7 @@ export class EphemeralWorkspaceManager {
 }
 
 export class IsolatedActionRunner {
-  constructor({ runtime = 'podman', image, workspaceRoot, timeoutMs = 15 * 60_000, maxOutputBytes = 8 * 1024 * 1024, memory = '1g', cpus = 2, pidsLimit = 256, allowNetwork = false, user = '65532:65532' } = {}) {
+  constructor({ runtime = 'podman', image, workspaceRoot, timeoutMs = 15 * 60_000, maxOutputBytes = 8 * 1024 * 1024, memory = '1g', cpus = 2, pidsLimit = 256, allowNetwork = false, user = '65532:65532', maxActive = 256, queue = 512 } = {}) {
     if (runtime !== 'podman' && runtime !== 'docker') throw new Error('isolated runner runtime must be podman or docker');
     this.runtime = runtime;
     this.image = safeImage(image);
@@ -96,6 +96,7 @@ export class IsolatedActionRunner {
     this.pidsLimit = boundedInteger(pidsLimit, 256, 16, 10_000);
     this.allowNetwork = allowNetwork === true;
     this.user = safeImage(user);
+    this.slots = new Semaphore({ capacity: boundedInteger(maxActive, 256, 1, 10_000), queue: boundedInteger(queue, 512, 0, 100_000) });
   }
 
   buildArgs({ steps, envKeys = [] }, workspace) {
@@ -109,24 +110,39 @@ export class IsolatedActionRunner {
   }
 
   async run({ steps }, { workspace, env = {} } = {}) {
+    const releaseSlot = await this.slots.acquire();
+    if (!releaseSlot) throw new Error('isolated runner capacity exhausted');
     const safeEnv = safeEnvironment(env);
-    const args = this.buildArgs({ steps, envKeys: Object.keys(safeEnv) }, workspace);
-    const child = spawn(this.runtime, args, {
+    let child;
+    try {
+      const args = this.buildArgs({ steps, envKeys: Object.keys(safeEnv) }, workspace);
+      child = spawn(this.runtime, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {
         PATH: process.env.PATH || '/usr/bin:/bin',
         ...safeEnv,
       },
-    });
+      });
+    } catch (error) {
+      releaseSlot();
+      throw error;
+    }
     return new Promise((resolve, reject) => {
       let outputBytes = 0;
       const stdout = [];
       const stderr = [];
       let settled = false;
+      const release = () => {
+        if (releaseSlot) {
+          releaseSlot();
+          releaseSlot = null;
+        }
+      };
       const timer = setTimeout(() => {
         if (settled) return;
         child.kill('SIGKILL');
         settled = true;
+        release();
         reject(new Error('isolated workflow timed out'));
       }, this.timeoutMs);
       timer.unref?.();
@@ -136,6 +152,7 @@ export class IsolatedActionRunner {
           settled = true;
           child.kill('SIGKILL');
           clearTimeout(timer);
+          release();
           reject(new Error('isolated workflow output exceeded configured limit'));
           return;
         }
@@ -147,12 +164,14 @@ export class IsolatedActionRunner {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        release();
         reject(error);
       });
       child.once('close', (code, signal) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        release();
         resolve({ ok: code === 0, code, signal, stdout: Buffer.concat(stdout).toString('utf8'), stderr: Buffer.concat(stderr).toString('utf8') });
       });
     });
