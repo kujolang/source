@@ -33,7 +33,7 @@ scanning).
   (`node:sqlite`); the JSON store works on Node ≥ 18.
 - Deterministic-first: no LLM is required for any operation in the slice.
 - The live Postgres profile has been verified at 5,000 concurrent agents locally;
-  CI continuously certifies the 1,000-agent gate and two-container writer
+  CI continuously certifies the 5,000-agent gate and two-container writer
   failover gate on every release-gate run.
 
 ## Quick start

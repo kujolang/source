@@ -33,7 +33,7 @@ likely_files:
 acceptance_criteria:
   - "The default Node test suite passes with no failures and only documented opt-in skips."
   - "The scale suite proves bounded admission and 1,000 concurrent discovery requests."
-  - "The live Postgres gate proves a 1,000-agent lifecycle in CI and a verified 5,000-agent local profile, including queue fan-out and peer-node failover."
+  - "The live Postgres gate proves a 5,000-agent lifecycle in CI, including queue fan-out and peer-node failover."
   - "The repeatable container gate proves two non-root serving nodes share Git storage and survive one-node loss."
   - "Git smart-HTTP request bodies, responses, subprocesses, and per-project concurrency are bounded."
   - "Artifact retrieval has bounded admission, retryable backpressure, and observable metrics."

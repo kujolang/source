@@ -54,7 +54,7 @@ jobs:
       - name: Live Postgres fleet gate
         env:
           SOURCE_TEST_DATABASE_URL: postgresql://source:sourcepass@127.0.0.1:5432/source
-          SOURCE_LIVE_AGENTS: 1000
+          SOURCE_LIVE_AGENTS: 5000
         run: npm run test:postgres
       - name: Two-container writer failover gate
         env:
