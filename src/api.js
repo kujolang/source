@@ -101,6 +101,20 @@ function metrics(res, state, src, gitSlots, gitTenantSlots, artifactSlots) {
       `source_artifact_admission_active ${artifactSlots.active || 0}`,
     );
   }
+  const canonicalSlots = src?.canonicalGlobalSlots;
+  if (canonicalSlots) {
+    lines.push(
+      '# HELP source_canonical_admission_active Current canonical promotions admitted globally.',
+      '# TYPE source_canonical_admission_active gauge',
+      `source_canonical_admission_active ${canonicalSlots.active || 0}`,
+      '# HELP source_canonical_admission_waiting Current canonical promotions waiting globally.',
+      '# TYPE source_canonical_admission_waiting gauge',
+      `source_canonical_admission_waiting ${canonicalSlots.waiters?.length || 0}`,
+      '# HELP source_canonical_admission_rejected_total Canonical promotions rejected by the global admission gate.',
+      '# TYPE source_canonical_admission_rejected_total counter',
+      `source_canonical_admission_rejected_total ${canonicalSlots.rejected || 0}`,
+    );
+  }
   for (const [status, count] of state.statuses) lines.push(`source_responses_by_status_total{status="${status}"} ${count}`);
   const body = `${lines.join('\n')}\n`;
   res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4', 'Content-Length': Buffer.byteLength(body) });

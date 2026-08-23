@@ -60,6 +60,8 @@ Canonical promotions additionally pass through a process-wide bounded gate
 (8 concurrent projects by default, 64 maximum) before acquiring the Postgres
 project-row lock. This limits the number of database connections held while
 Git subprocesses perform promotion work.
+The gate exposes active, waiting, and rejected counts through `/metrics`, making
+promotion pressure visible to operators.
 
 Chunked Git uploads use a separate four-slot admission budget and a 16 MiB
 buffer limit by default. Known-length uploads remain streamed directly to

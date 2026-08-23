@@ -29,6 +29,8 @@ All notable changes to Source are recorded here.
   fan-out, and Change evidence relationships.
 - Added a bounded global canonical-promotion admission gate so long-running Git
   promotions cannot exhaust the Postgres connection pool across projects.
+- Exposed canonical-promotion admission depth and rejection metrics for
+  capacity planning and alerting.
 
 ## [0.1.0]
 
