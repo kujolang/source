@@ -80,17 +80,22 @@ mounts, and exposes a container health check:
 
 ```bash
 docker build -t source:local .
+docker volume create source-git
+docker run --rm --user root -v source-git:/var/lib/source/git \
+  source:local chown 1000:1000 /var/lib/source/git
 docker run --read-only --tmpfs /tmp --cap-drop=ALL \
   -p 8787:8787 \
   -e SOURCE_DATABASE_URL='postgresql://source:password@db/source' \
   -v source-data:/var/lib/source/data \
-  -v source-git:/var/lib/source/git \
+  -v source-git:/var/lib/source/git:rw \
   source:local
 ```
 
 Use a private network, inject the DSN through the orchestrator's secret
 facility, and place the Git volume on storage with documented snapshot and
-restore semantics. The image is a serving node; action workers remain separate
+restore semantics. Initialize shared-volume ownership for the image's numeric
+runtime user (`1000`) before starting non-root nodes. The image is a serving
+node; action workers remain separate
 processes so container execution capacity can be scaled independently.
 
 ## Certificate management
