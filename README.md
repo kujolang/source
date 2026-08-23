@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **132/132 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
+- **133/133 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
@@ -134,7 +134,9 @@ for batch workflows that should not run inside request handlers.
 Workers back off and report transient queue/database failures instead of
 terminating, while leases allow abandoned jobs to be recovered by another
 worker. Shutdown drains for 30 seconds by default; a hung handler then leaves
-its lease to expire so another worker can recover the job.
+its lease to expire so another worker can recover the job. Handlers also have a
+15-minute execution timeout by default and receive an `AbortSignal`; tune it
+with `--worker-handler-timeout-ms`.
 
 Workers register handlers by job kind and can run as separate processes:
 

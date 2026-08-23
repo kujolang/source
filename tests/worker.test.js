@@ -120,3 +120,32 @@ test('worker shutdown has a bounded drain and leaves hung leases recoverable', a
   release();
   await waitFor(() => worker.running === null);
 });
+
+test('worker times out a hung handler and aborts its signal before retry routing', async () => {
+  let failure;
+  let observedSignal;
+  const queue = {
+    async claim() {
+      if (failure) return [];
+      return [{ id: 'J-timeout', kind: 'timeout', payload: {}, leaseToken: 'lease-timeout', maxAttempts: 2 }];
+    },
+    async extend() {},
+    async complete() { assert.fail('timed out handler must not complete'); },
+    async fail(args) { failure = args; },
+  };
+  const worker = new SourceWorker({
+    queue,
+    workerId: 'timeout-test',
+    pollMs: 1,
+    handlerTimeoutMs: 10,
+    handlers: { timeout: async (_payload, _job, { signal }) => {
+      observedSignal = signal;
+      await new Promise(() => {});
+    } },
+  });
+  worker.start();
+  await waitFor(() => Boolean(failure));
+  await worker.stop();
+  assert.match(failure.error, /handler exceeded 10ms/);
+  assert.equal(observedSignal.aborted, true);
+});

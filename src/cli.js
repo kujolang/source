@@ -360,6 +360,7 @@ export async function run(argv) {
           errorBackoffMs: numberFlag('--worker-error-backoff-ms', 1_000),
           retryDelayMs: numberFlag('--worker-retry-ms', 1_000),
           maxAttempts: numberFlag('--worker-max-attempts', 5),
+          handlerTimeoutMs: numberFlag('--worker-handler-timeout-ms', 15 * 60_000),
           shutdownTimeoutMs: numberFlag('--worker-shutdown-timeout-ms', 30_000),
           onError: (error) => process.stderr.write(`worker ${flag('--worker-id') || process.pid}: ${error.message}\n`),
         });
@@ -423,7 +424,7 @@ export async function run(argv) {
           '  policy show --org <o> --project <p>',
           '  audit',
           '  serve --port <n> [--host <addr>] [--git-concurrency <n>] [--git-queue <n>] [--git-timeout-ms <n>] [--max-connections <n>] [--max-git-response <bytes>]',
-          '  worker --store postgres --handler-module <path> [--worker-id <id> --worker-concurrency <n> --worker-shutdown-timeout-ms <n>]',
+          '  worker --store postgres --handler-module <path> [--worker-id <id> --worker-concurrency <n> --worker-handler-timeout-ms <n> --worker-shutdown-timeout-ms <n>]',
           '  submit [--intent <s>] [--url <base>] [--credential <c>] [--cwd <dir>]',
           '',
           'Env: SOURCE_DATA (default .source), SOURCE_STORE (json|sqlite|postgres)',

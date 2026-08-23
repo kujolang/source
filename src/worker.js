@@ -3,7 +3,7 @@
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class SourceWorker {
-  constructor({ queue, handlers = {}, workerId, concurrency = 8, leaseMs = 30_000, pollMs = 1_000, retryDelayMs = 1_000, maxAttempts = 5, errorBackoffMs = 1_000, shutdownTimeoutMs = 30_000, onError = null } = {}) {
+  constructor({ queue, handlers = {}, workerId, concurrency = 8, leaseMs = 30_000, pollMs = 1_000, retryDelayMs = 1_000, maxAttempts = 5, errorBackoffMs = 1_000, handlerTimeoutMs = 15 * 60_000, shutdownTimeoutMs = 30_000, onError = null } = {}) {
     if (!queue) throw new Error('queue is required');
     if (!workerId) throw new Error('workerId is required');
     this.queue = queue;
@@ -15,6 +15,7 @@ export class SourceWorker {
     this.retryDelayMs = Math.max(0, Math.trunc(retryDelayMs));
     this.maxAttempts = Math.max(1, Math.trunc(maxAttempts));
     this.errorBackoffMs = Math.max(1, Math.trunc(errorBackoffMs));
+    this.handlerTimeoutMs = Math.min(24 * 60 * 60_000, Math.max(0, Math.trunc(handlerTimeoutMs)));
     this.shutdownTimeoutMs = Math.min(300_000, Math.max(0, Math.trunc(shutdownTimeoutMs)));
     this.onError = typeof onError === 'function' ? onError : () => {};
     this.lastError = null;
@@ -76,13 +77,27 @@ export class SourceWorker {
   async _runJob(job) {
     const handler = this.handlers[job.kind];
     let heartbeat;
+    let timeout;
+    const controller = new AbortController();
     try {
       if (typeof handler !== 'function') throw new Error(`no handler registered for job kind: ${job.kind}`);
       const heartbeatMs = Math.max(1, Math.floor(this.leaseMs / 3));
       heartbeat = setInterval(() => {
         this.queue.extend({ id: job.id, workerId: this.workerId, leaseToken: job.leaseToken, leaseMs: this.leaseMs }).catch(() => {});
       }, heartbeatMs);
-      const result = await handler(job.payload, job);
+      const resultPromise = Promise.resolve().then(() => handler(job.payload, job, { signal: controller.signal }));
+      const result = this.handlerTimeoutMs
+        ? await Promise.race([
+          resultPromise,
+          new Promise((resolve, reject) => {
+            timeout = setTimeout(() => {
+              controller.abort(new Error('worker handler timeout'));
+              reject(new Error(`worker handler exceeded ${this.handlerTimeoutMs}ms`));
+            }, this.handlerTimeoutMs);
+            timeout.unref?.();
+          }),
+        ])
+        : await resultPromise;
       await this.queue.complete({ id: job.id, workerId: this.workerId, leaseToken: job.leaseToken, result });
     } catch (error) {
       this._reportError(error);
@@ -102,6 +117,7 @@ export class SourceWorker {
       }
     } finally {
       if (heartbeat) clearInterval(heartbeat);
+      if (timeout) clearTimeout(timeout);
     }
   }
 
