@@ -124,6 +124,18 @@ test('Postgres admission queue rejects excess work instead of buffering it unbou
   await first;
 });
 
+test('Postgres worker claims bound expired-attempt cleanup', async () => {
+  const store = Object.create(PostgresStore.prototype);
+  let query = '';
+  store._qualified = (name) => `"source"."${name}"`;
+  store._runJsonCommandAsync = async (sql) => { query = sql; return []; };
+  const jobs = await store.claimJobsAsync({ workerId: 'bounded-worker', limit: 10 });
+  assert.deepEqual(jobs, []);
+  assert.match(query, /FROM "source"\."jobs"[\s\S]*LIMIT 1_000/);
+  assert.match(query, /UPDATE "source"\."jobs" AS j/);
+  assert.match(query, /FOR UPDATE SKIP LOCKED/);
+});
+
 test('SQLite counter allocation returns unique monotonic IDs', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'source-counter-'));
   const store = new SqliteStore(root);

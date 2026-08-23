@@ -1159,12 +1159,20 @@ class PostgresStore {
     const attemptAssignment = safeAttempts == null ? 'j.max_attempts' : String(safeAttempts);
     const leaseToken = randomBytes(24).toString('hex');
     return this._runJsonCommandAsync(`
-      WITH exhausted AS (
-        UPDATE ${this._qualified('jobs')}
+      WITH expired AS (
+        SELECT id
+        FROM ${this._qualified('jobs')}
+        WHERE status = 'leased' AND leased_until < NOW() AND attempts >= max_attempts
+        ORDER BY leased_until, id
+        FOR UPDATE SKIP LOCKED
+        LIMIT 1_000
+      ), exhausted AS (
+        UPDATE ${this._qualified('jobs')} AS j
         SET status = 'failed', leased_until = NULL, worker_id = NULL, lease_token = NULL,
             last_error = 'maximum attempts exceeded', updated_at = NOW()
-        WHERE status = 'leased' AND leased_until < NOW() AND attempts >= max_attempts
-        RETURNING id
+        FROM expired
+        WHERE j.id = expired.id
+        RETURNING j.id
       ), candidates AS (
         SELECT id
         FROM ${this._qualified('jobs')}

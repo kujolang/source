@@ -32,7 +32,9 @@ complete, and fail operations require that token, so a stale worker cannot
 mutate a lease reclaimed by another node. Expired jobs are atomically moved to
 failed state once their persisted attempt limit is reached.
 The queue has dedicated partial indexes for ready and expired leases so worker
-claim scans remain bounded as completed history grows.
+claim scans remain bounded as completed history grows. Each claim also caps
+expired-attempt cleanup at 1,000 rows, preventing a recovery storm from
+rewriting an unbounded backlog in one transaction.
 
 Chunked Git uploads use a separate four-slot admission budget and a 16 MiB
 buffer limit by default. Known-length uploads remain streamed directly to
