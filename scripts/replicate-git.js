@@ -38,13 +38,50 @@ async function findGitRepos(root) {
   return repos.sort();
 }
 
+async function listRefs(repository, timeoutMs) {
+  const { stdout } = await execFileAsync('git', ['--git-dir', repository, 'for-each-ref', '--format=%(refname) %(objectname)'], { timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024 });
+  return new Map(String(stdout).split('\n').filter(Boolean).map((line) => {
+    const separator = line.indexOf(' ');
+    return [line.slice(0, separator), line.slice(separator + 1)];
+  }));
+}
+
+async function isAncestor(repository, ancestor, descendant, timeoutMs) {
+  try {
+    await execFileAsync('git', ['--git-dir', repository, 'merge-base', '--is-ancestor', ancestor, descendant], { timeout: timeoutMs, maxBuffer: 2 * 1024 * 1024 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function checkPeerSafety(source, destination, timeoutMs, { force, allowDeletions }) {
+  const [sourceRefs, targetRefs] = await Promise.all([listRefs(source, timeoutMs), listRefs(destination, timeoutMs)]);
+  const conflicts = [];
+  for (const [ref, targetHash] of targetRefs) {
+    const sourceHash = sourceRefs.get(ref);
+    if (!sourceHash) {
+      if (!allowDeletions && !force) conflicts.push(`${ref}: target-only ref would be deleted`);
+      continue;
+    }
+    if (sourceHash === targetHash || force) continue;
+    if (ref.startsWith('refs/heads/') && await isAncestor(destination, targetHash, sourceHash, timeoutMs)) continue;
+    conflicts.push(`${ref}: peer histories diverge or source rewrites target history`);
+  }
+  if (conflicts.length) {
+    const error = new Error(`replication refused ${conflicts.length} conflicting ref(s): ${conflicts.slice(0, 5).join('; ')}`);
+    error.code = 'REPLICATION_CONFLICT';
+    throw error;
+  }
+}
+
 function relativeRepoPath(root, repo) {
   const relative = path.relative(path.resolve(root), path.resolve(repo));
   if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) throw new Error('repository is outside source root');
   return relative;
 }
 
-async function ensureMirror(destination, source, timeoutMs) {
+async function ensureMirror(destination, source, timeoutMs, options) {
   await mkdir(path.dirname(destination), { recursive: true });
   try {
     await access(path.join(destination, 'HEAD'), fsConstants.R_OK);
@@ -57,6 +94,7 @@ async function ensureMirror(destination, source, timeoutMs) {
   } else {
     await execFileAsync('git', ['--git-dir', destination, 'remote', 'set-url', 'source', source], { timeout: timeoutMs, maxBuffer: 2 * 1024 * 1024 });
   }
+  await checkPeerSafety(source, destination, timeoutMs, options);
   await execFileAsync('git', ['--git-dir', destination, 'fetch', '--prune', 'source'], { timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024 });
   await execFileAsync('git', ['--git-dir', destination, 'fsck', '--full', '--no-reflogs'], { timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024 });
 }
@@ -74,6 +112,7 @@ async function main() {
   }
   const concurrency = bounded(flag(args, '--concurrency'), 4, 1, 64);
   const timeoutMs = bounded(flag(args, '--timeout-ms'), 10 * 60_000, 1_000, 60 * 60_000);
+  const options = { force: args.includes('--force'), allowDeletions: args.includes('--allow-deletions') };
   await access(sourceRoot, fsConstants.R_OK);
   await mkdir(targetRoot, { recursive: true });
   const repositories = await findGitRepos(sourceRoot);
@@ -85,7 +124,7 @@ async function main() {
       const source = repositories[index];
       const relative = relativeRepoPath(sourceRoot, source);
       const destination = path.join(targetRoot, relative);
-      await ensureMirror(destination, source, timeoutMs);
+      await ensureMirror(destination, source, timeoutMs, options);
       results[index] = { repository: relative, status: 'replicated' };
     }
   }

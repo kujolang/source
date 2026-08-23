@@ -199,8 +199,11 @@ npm run replicate:git -- \
 
 Replication is resumable per repository and uses Git's mirror refspec, so
 branches, tags, deletions, and objects are reconciled without loading packfiles
-into Node memory. This replicates Git source state; Postgres metadata still
-requires its own native replication/consensus deployment.
+into Node memory. The job refuses target-only or divergent refs by default,
+which prevents a one-way mirror from silently destroying a peer's write; use
+`--allow-deletions` or `--force` only for an intentional reconciliation.
+This replicates Git source state; Postgres metadata still requires its own
+native replication/consensus deployment.
 
 Before declaring a multi-node deployment ready, verify the database side of the
 topology as well:

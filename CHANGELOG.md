@@ -22,6 +22,9 @@ All notable changes to Source are recorded here.
   supplied.
 - Added optional fail-closed `/readyz` enforcement with `--require-replication`,
   minimum standby, and replication-lag settings.
+- Hardened Git peer replication to refuse target-only, divergent, or rewritten
+  refs by default, preventing a mirror retry from silently destroying peer
+  writes.
 - Made the default Node test command deterministic by serializing test files;
   the dedicated scale suite still exercises the 1,000-connection burst while
   avoiding host TCP backlog contention from unrelated test servers.

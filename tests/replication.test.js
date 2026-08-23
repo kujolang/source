@@ -31,4 +31,7 @@ test('Git replication mirrors multiple repositories and is safely repeatable', a
   assert.equal(execFileSync('git', ['--git-dir', path.join(targetRoot, 'orgs/O1/projects/P1/repos/R1.git'), 'rev-parse', 'refs/heads/main'], { encoding: 'utf8' }).trim().length, 40);
   const second = JSON.parse((await run()).stdout);
   assert.equal(second.repositories[0].status, 'replicated');
+  const mainHash = execFileSync('git', ['--git-dir', repo, 'rev-parse', 'refs/heads/main'], { encoding: 'utf8' }).trim();
+  execFileSync('git', ['--git-dir', path.join(targetRoot, 'orgs/O1/projects/P1/repos/R1.git'), 'update-ref', 'refs/heads/peer-only', mainHash]);
+  await assert.rejects(run(), /REPLICATION_CONFLICT|target-only ref would be deleted/);
 });

@@ -261,7 +261,10 @@ Git roots can be replicated to an independent peer with bounded, resumable
 mirror jobs: `npm run replicate:git -- --source-root "$SOURCE_GIT_ROOT"
 --target-root /srv/source-peer/git --concurrency 8`. Each repository is
 replicated independently with Git's mirror refspec, pruning deleted refs and
-running `git fsck`; rerunning after a peer outage is safe.
+running `git fsck`; rerunning after a peer outage is safe. Replication refuses
+target-only or divergent refs by default so a peer write cannot be silently
+destroyed; use `--allow-deletions` or `--force` only during an intentional
+reconciliation operation.
 
 Postgres metadata replication remains a deployment responsibility. Verify the
 configured primary/standby contract with
