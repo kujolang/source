@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **199/199 non-skipped default tests pass** (one documented opt-in skip), including a dogfood test against the real `spec` Kujo
+- **200/200 non-skipped default tests pass** (one documented opt-in skip), including a dogfood test against the real `spec` Kujo
 - The local human-facing UI is vendored against Kujo SiteKit 1.0 (`assets/sitekit/`) with SiteKit tokens, components, theme behavior, and Departure Mono assets; Source-specific composition lives in `assets/source.css`.
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
