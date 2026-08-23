@@ -835,6 +835,14 @@ export class Source {
     return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.getEvidence(orgId, projectId, evidenceId);
   }
 
+  async getEvidenceManyAsync(orgId, projectId, evidenceIds) {
+    if (typeof this.store.readJsonManyAsync === 'function') {
+      const rows = await this.store.readJsonManyAsync(evidenceIds.map((id) => `${this._projectRel(orgId, projectId)}/evidence/${id}.json`));
+      return rows.map((row) => row.json).filter(Boolean);
+    }
+    return (await Promise.all(evidenceIds.map((id) => this.getEvidenceAsync(orgId, projectId, id)))).filter(Boolean);
+  }
+
   listEvidence(orgId, projectId) {
     const ids = this.store.listJson(`${this._projectRel(orgId, projectId)}/evidence`);
     return ids.map((id) => this.getEvidence(orgId, projectId, id)).filter(Boolean);
@@ -915,7 +923,7 @@ export class Source {
     const change = await this.getChangeAsync(orgId, projectId, changeId);
     if (!change) throw new Error(`change not found: ${changeId}`);
     const policy = await this.getPolicyAsync(orgId, projectId);
-    const evidenceList = (await Promise.all(change.evidence.map((id) => this.getEvidenceAsync(orgId, projectId, id)))).filter(Boolean);
+    const evidenceList = await this.getEvidenceManyAsync(orgId, projectId, change.evidence);
     const evaluation = evaluateEvidence(policy, evidenceList);
     const interpretation = interpret(evaluation);
     if (change.reviewState === 'pending') {
@@ -1010,7 +1018,7 @@ export class Source {
     if (decision === 'accepted' && !canApprove(policy, deciderPrincipal.type)) {
       throw new Error(`principal type ${deciderPrincipal.type} may not accept (policy requires human)`);
     }
-    const evidenceList = (await Promise.all(change.evidence.map((id) => this.getEvidenceAsync(orgId, projectId, id)))).filter(Boolean);
+    const evidenceList = await this.getEvidenceManyAsync(orgId, projectId, change.evidence);
     if (decision === 'accepted') {
       const evaluation = evaluateEvidence(policy, evidenceList);
       if (!evaluation.ok) throw new Error(`cannot accept: missing evidence (${evaluation.missing.map((m) => m.type).join(', ')})`);
@@ -1267,18 +1275,25 @@ export class Source {
   }
 
   async scanChangeSecretsAsync({ orgId, projectId, changeId }) {
-    const change = this.getChange(orgId, projectId, changeId);
+    const change = await this.getChangeAsync(orgId, projectId, changeId);
     if (!change) throw new Error(`change not found: ${changeId}`);
-    const findings = [];
-    for (const repositoryChange of change.repositoryChanges) {
-      const git = this.gitRepo(orgId, projectId, repositoryChange.repoId);
-      findings.push(...scanSecrets(await git.diffAsync(repositoryChange.baseCommit, repositoryChange.headCommit)));
-    }
-    return findings;
+    const findingsByTarget = new Array(change.repositoryChanges.length);
+    let nextTarget = 0;
+    const scanTarget = async () => {
+      while (true) {
+        const index = nextTarget++;
+        if (index >= change.repositoryChanges.length) return;
+        const repositoryChange = change.repositoryChanges[index];
+        const git = this.gitRepo(orgId, projectId, repositoryChange.repoId);
+        findingsByTarget[index] = scanSecrets(await git.diffAsync(repositoryChange.baseCommit, repositoryChange.headCommit));
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(this.canonicalRepoConcurrency, change.repositoryChanges.length) }, () => scanTarget()));
+    return findingsByTarget.flat();
   }
 
   async submitContributionAsync({ orgId, projectId, repoRef, baseCommit, headCommit, intent = '', contributorName = 'contributor', principalId = null }) {
-    const repo = this.resolveRepository(orgId, projectId, repoRef);
+    const repo = await this.resolveRepositoryAsync(orgId, projectId, repoRef);
     if (!repo) throw new Error(`repository not found: ${repoRef}`);
     const git = this.gitRepo(orgId, projectId, repo.id);
     if (!(await git.hasCommitAsync(headCommit))) throw new Error('head commit not present in repository');

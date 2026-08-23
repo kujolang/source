@@ -23,6 +23,8 @@ All notable changes to Source are recorded here.
   does not scan a project’s repository list.
 - Bounded multi-repository canonical promotion to eight concurrent Git updates
   per project by default, with a safe operator limit of 64.
+- Removed synchronous repository resolution from async contribution submission,
+  batched async evidence reads, and bounded multi-repository secret scans.
 
 ## [0.1.0]
 

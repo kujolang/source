@@ -50,6 +50,9 @@ avoiding a scan of every repository in a large project.
 Multi-repository canonical promotion also uses bounded Git update concurrency
 (8 by default, capped at 64), preventing a large Change from spawning an
 unbounded subprocess burst while preserving parallelism.
+Async contribution submission and secret scanning stay on the non-blocking
+Postgres/Git paths; evidence reads are bulk-loaded and repository scans share
+the same bounded concurrency.
 
 Chunked Git uploads use a separate four-slot admission budget and a 16 MiB
 buffer limit by default. Known-length uploads remain streamed directly to

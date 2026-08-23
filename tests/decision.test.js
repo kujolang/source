@@ -119,3 +119,25 @@ test('concurrent canonical updates are serialized per project', async () => {
   assert.ok(maximum <= src.canonicalRepoConcurrency);
   assert.ok(results.every((result) => result.ok));
 });
+
+test('async secret scans bound multi-repository Git work', async () => {
+  const { src, org, project, agent, service } = freshSource();
+  const { c } = fullChange(src, org, project, agent, service);
+  const change = src.getChange(org.id, project.id, c.id);
+  change.repositoryChanges = Array.from({ length: 20 }, (_, index) => ({ repoId: `R${index + 1}`, baseCommit: 'base', headCommit: 'head' }));
+  src.store.writeJson(`${src._projectRel(org.id, project.id)}/changes/${c.id}.json`, change);
+  let active = 0;
+  let maximum = 0;
+  src.gitRepo = () => ({
+    async diffAsync() {
+      active += 1;
+      maximum = Math.max(maximum, active);
+      await new Promise((resolve) => setImmediate(resolve));
+      active -= 1;
+      return 'clean diff';
+    },
+  });
+  assert.deepEqual(await src.scanChangeSecretsAsync({ orgId: org.id, projectId: project.id, changeId: c.id }), []);
+  assert.ok(maximum > 1);
+  assert.ok(maximum <= src.canonicalRepoConcurrency);
+});
