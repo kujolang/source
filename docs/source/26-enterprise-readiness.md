@@ -36,6 +36,11 @@ The queue has dedicated partial indexes for ready and expired leases so worker
 claim scans remain bounded as completed history grows. Each claim also caps
 expired-attempt cleanup at 1,000 rows, preventing a recovery storm from
 rewriting an unbounded backlog in one transaction.
+Claims apply a bounded per-project burst (8 by default) when multiple projects
+are eligible, while allowing a single eligible project to fill the requested
+batch. This provides fair progress across tenants without reducing throughput
+for a worker fleet serving one project; tune the limit with
+`--worker-project-burst`.
 
 Chunked Git uploads use a separate four-slot admission budget and a 16 MiB
 buffer limit by default. Known-length uploads remain streamed directly to

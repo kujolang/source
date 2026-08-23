@@ -9,6 +9,8 @@ All notable changes to Source are recorded here.
 - Added repeatable Postgres-backed container failover and shared Git-volume
   smoke gates.
 - Added Kujo Eval, dependency-audit, and Kujo Doctor release checks.
+- Added bounded per-project worker claim bursts so a noisy project cannot starve
+  other eligible projects in a shared Postgres worker fleet.
 
 ## [0.1.0]
 

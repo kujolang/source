@@ -161,8 +161,11 @@ requests; Source hashes that scoped key into the durable job dedupe key so
 agent retries do not create duplicate work.
 
 Postgres-backed workers can claim deferred jobs through `src/job-queue.js`.
-Claims use row locking with `SKIP LOCKED`; expired leases are reclaimable and
-failed jobs can be retried with bounded attempts. This is the worker-plane seam
+Claims use row locking with `SKIP LOCKED` and a bounded per-project burst (8 by
+default), so a noisy project cannot starve other eligible projects; a single
+eligible project can still use the full batch. Tune it with
+`--worker-project-burst`. Expired leases are reclaimable and failed jobs can be
+retried with bounded attempts. This is the worker-plane seam
 for batch workflows that should not run inside request handlers.
 Workers back off and report transient queue/database failures instead of
 terminating, while leases allow abandoned jobs to be recovered by another

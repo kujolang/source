@@ -61,6 +61,19 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     const claims = (await Promise.all(Array.from({ length: 8 }, (_, i) => src.jobs.claim({ workerId: `worker-${i}`, limit: 20 })))).flat();
     assert.equal(new Set(claims.map((job) => job.id)).size, queued.length);
   await Promise.all(claims.map((job) => src.jobs.complete({ id: job.id, workerId: job.workerId, leaseToken: job.leaseToken, result: { ok: true } })));
+    await Promise.all([
+      ...Array.from({ length: 20 }, (_, i) => src.jobs.enqueue({ kind: 'agent.fair.project', payload: { index: i }, orgId: org.id, projectId: project.id })),
+      ...Array.from({ length: 20 }, (_, i) => src.jobs.enqueue({ kind: 'agent.fair.quota', payload: { index: i }, orgId: org.id, projectId: quotaProject.id })),
+    ]);
+    const fairClaims = await src.jobs.claim({ workerId: 'fair-worker', limit: 16, projectBurst: 2 });
+    const fairByProject = new Map();
+    for (const job of fairClaims) fairByProject.set(job.projectId, (fairByProject.get(job.projectId) || 0) + 1);
+    assert.equal(fairByProject.get(project.id), 2);
+    assert.equal(fairByProject.get(quotaProject.id), 2);
+    assert.ok([...fairByProject.values()].every((count) => count <= 2));
+    await Promise.all(fairClaims.map((job) => src.jobs.complete({ id: job.id, workerId: 'fair-worker', leaseToken: job.leaseToken, result: { fair: true } })));
+    const fairRemainder = await src.jobs.claim({ workerId: 'fair-drain', limit: 100, projectBurst: 1_000 });
+    await Promise.all(fairRemainder.map((job) => src.jobs.complete({ id: job.id, workerId: 'fair-drain', leaseToken: job.leaseToken, result: { fair: true } })));
     const batch = await src.jobs.enqueueBatch({
       jobs: [
         { kind: 'agent.batch.bulk', payload: { index: 1 }, orgId: org.id, projectId: project.id, dedupeKey: 'batch-event-1' },

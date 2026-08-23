@@ -3,7 +3,7 @@
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class SourceWorker {
-  constructor({ queue, handlers = {}, workerId, concurrency = 8, leaseMs = 30_000, pollMs = 1_000, retryDelayMs = 1_000, maxAttempts = 5, errorBackoffMs = 1_000, handlerTimeoutMs = 15 * 60_000, shutdownTimeoutMs = 30_000, onError = null } = {}) {
+  constructor({ queue, handlers = {}, workerId, concurrency = 8, leaseMs = 30_000, pollMs = 1_000, retryDelayMs = 1_000, maxAttempts = 5, projectBurst = 8, errorBackoffMs = 1_000, handlerTimeoutMs = 15 * 60_000, shutdownTimeoutMs = 30_000, onError = null } = {}) {
     if (!queue) throw new Error('queue is required');
     if (!workerId) throw new Error('workerId is required');
     this.queue = queue;
@@ -14,6 +14,7 @@ export class SourceWorker {
     this.pollMs = Math.max(1, Math.trunc(pollMs));
     this.retryDelayMs = Math.max(0, Math.trunc(retryDelayMs));
     this.maxAttempts = Math.max(1, Math.trunc(maxAttempts));
+    this.projectBurst = Math.min(1_000, Math.max(1, Math.trunc(projectBurst)));
     this.errorBackoffMs = Math.max(1, Math.trunc(errorBackoffMs));
     this.handlerTimeoutMs = Math.min(24 * 60 * 60_000, Math.max(0, Math.trunc(handlerTimeoutMs)));
     this.shutdownTimeoutMs = Math.min(300_000, Math.max(0, Math.trunc(shutdownTimeoutMs)));
@@ -58,7 +59,7 @@ export class SourceWorker {
     while (!this.stopping) {
       let jobs;
       try {
-        jobs = await this.queue.claim({ workerId: this.workerId, limit: this.concurrency, leaseMs: this.leaseMs });
+        jobs = await this.queue.claim({ workerId: this.workerId, limit: this.concurrency, leaseMs: this.leaseMs, projectBurst: this.projectBurst });
         failures = 0;
       } catch (error) {
         failures += 1;

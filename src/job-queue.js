@@ -18,11 +18,11 @@ export class JobQueue {
     return this.store.enqueueJobsAsync({ jobs, maxQueueDepth });
   }
 
-  async claim({ workerId, limit = 10, leaseMs = 30_000, maxAttempts = null }) {
+  async claim({ workerId, limit = 10, leaseMs = 30_000, maxAttempts = null, projectBurst = 8 }) {
     if (typeof this.store.claimJobsAsync !== 'function') {
       throw new Error('durable job queue requires a Postgres-backed store');
     }
-    return this.store.claimJobsAsync({ workerId, limit, leaseMs, maxAttempts });
+    return this.store.claimJobsAsync({ workerId, limit, leaseMs, maxAttempts, projectBurst });
   }
 
   async complete({ id, workerId, leaseToken, result = null }) {

@@ -144,6 +144,9 @@ test('Postgres worker claims bound expired-attempt cleanup', async () => {
   assert.match(query, /FROM "source"\."jobs"[\s\S]*LIMIT 1000/);
   assert.match(query, /UPDATE "source"\."jobs" AS j/);
   assert.match(query, /FOR UPDATE SKIP LOCKED/);
+  assert.match(query, /row_number\(\) OVER/);
+  assert.match(query, /PARTITION BY org_id, project_id/);
+  assert.match(query, /project_rank <= 8/);
 });
 
 test('SQLite counter allocation returns unique monotonic IDs', () => {

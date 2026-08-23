@@ -1157,11 +1157,12 @@ class PostgresStore {
     return Number(out || 0);
   }
 
-  async claimJobsAsync({ workerId, limit = 10, leaseMs = 30_000, maxAttempts = null }) {
+  async claimJobsAsync({ workerId, limit = 10, leaseMs = 30_000, maxAttempts = null, projectBurst = 8 }) {
     if (!workerId || typeof workerId !== 'string') throw new Error('workerId is required');
     const safeLimit = Math.min(1000, Math.max(1, Math.trunc(limit)));
     const safeLease = Math.min(86_400_000, Math.max(1, Math.trunc(leaseMs)));
     const safeAttempts = maxAttempts == null ? null : Math.min(100, Math.max(1, Math.trunc(maxAttempts)));
+    const safeProjectBurst = Math.min(1_000, Math.max(1, Math.trunc(projectBurst)));
     const attemptAssignment = safeAttempts == null ? 'j.max_attempts' : String(safeAttempts);
     const leaseToken = randomBytes(24).toString('hex');
     return this._runJsonCommandAsync(`
@@ -1179,13 +1180,23 @@ class PostgresStore {
         FROM expired
         WHERE j.id = expired.id
         RETURNING j.id
-      ), candidates AS (
-        SELECT id
+      ), ranked AS (
+        SELECT id, row_number() OVER (
+          PARTITION BY org_id, project_id ORDER BY created_at, id
+        ) AS project_rank
         FROM ${this._qualified('jobs')}
         WHERE (status = 'queued' AND available_at <= NOW())
            OR (status = 'leased' AND leased_until < NOW() AND attempts < max_attempts)
-        ORDER BY created_at, id
-        FOR UPDATE SKIP LOCKED
+      ), scope_count AS (
+        SELECT COUNT(*) AS scopes FROM ranked WHERE project_rank = 1
+      ), candidates AS (
+        SELECT j.id
+        FROM ${this._qualified('jobs')} j
+        JOIN ranked r ON r.id = j.id
+        CROSS JOIN scope_count s
+        WHERE r.project_rank <= ${safeProjectBurst} OR s.scopes <= 1
+        ORDER BY j.created_at, j.id
+        FOR UPDATE OF j SKIP LOCKED
         LIMIT ${safeLimit}
       )
       , updated AS (
@@ -1196,7 +1207,7 @@ class PostgresStore {
             leased_until = NOW() + (${safeLease} * INTERVAL '1 millisecond'), updated_at = NOW()
         FROM candidates
         WHERE j.id = candidates.id
-        RETURNING j.id, j.kind, j.payload, j.status, j.attempts,
+        RETURNING j.id, j.kind, j.payload, j.org_id AS "orgId", j.project_id AS "projectId", j.work_id AS "workId", j.status, j.attempts,
                   j.available_at AS "availableAt", j.leased_until AS "leasedUntil",
                   j.worker_id AS "workerId", j.lease_token AS "leaseToken", j.max_attempts AS "maxAttempts"
       )
