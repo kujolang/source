@@ -74,7 +74,10 @@ server {
 ## Container deployment
 
 The repository includes a non-root, Node 20.19.5 production image for the Postgres-backed
-server. It contains Git and the Postgres client required by the storage
+server. Its default command enables the durable writer lease required for
+multi-node exposed serving; the owner defaults to the container hostname and
+process ID and can be made stable with `SOURCE_INSTANCE_ID`. It contains Git
+and the Postgres client required by the storage
 bootstrap/fallback paths, keeps metadata and bare Git objects in separate
 mounts, and exposes a container health check:
 
