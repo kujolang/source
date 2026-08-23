@@ -2,6 +2,7 @@
 
 // Verify a Source backup without mutating the source deployment.
 
+import { createReadStream } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -12,7 +13,7 @@ const execFileAsync = promisify(execFile);
 
 async function sha256(file) {
   const hash = createHash('sha256');
-  hash.update(await readFile(file));
+  for await (const chunk of createReadStream(file)) hash.update(chunk);
   return hash.digest('hex');
 }
 

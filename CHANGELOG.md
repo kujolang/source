@@ -38,6 +38,8 @@ All notable changes to Source are recorded here.
 - Added independent bounded admission to isolated action runners so shared
   worker processes cannot spawn unbounded containers.
 - Added a tenant/status/time index aligned with fair Postgres worker claims.
+- Backup and backup verification now hash archives through streaming reads,
+  avoiding whole-archive memory amplification.
 
 ## [0.1.0]
 

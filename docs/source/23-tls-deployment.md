@@ -166,8 +166,10 @@ The backup command runs `git fsck` on every bare repository, archives both
 filesystem roots, uses `pg_dump` custom format for Postgres, writes SHA-256
 checksums, and promotes the staging directory only after all artifacts finish.
 Verification checks every checksum, lists every tar archive, and validates the
-Postgres dump with `pg_restore --list`. Operators must schedule the command,
-replicate completed backup directories off-host, and periodically perform a
+Postgres dump with `pg_restore --list`; checksum generation and verification
+stream archive bytes to avoid loading large backups into process memory.
+Operators must schedule the command, replicate completed backup directories
+off-host, and periodically perform a
 restore drill into an isolated Postgres schema and filesystem root before
 declaring recovery readiness.
 

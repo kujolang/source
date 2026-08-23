@@ -4,6 +4,7 @@
 // tar; Postgres is captured with pg_dump when a DSN is supplied. The staging
 // directory is promoted only after every archive and checksum is complete.
 
+import { createReadStream } from 'node:fs';
 import { access, mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
 import path from 'node:path';
@@ -30,7 +31,7 @@ function isoPart() {
 
 async function sha256(file) {
   const hash = createHash('sha256');
-  hash.update(await readFile(file));
+  for await (const chunk of createReadStream(file)) hash.update(chunk);
   return hash.digest('hex');
 }
 
