@@ -445,6 +445,7 @@ test('required replication keeps a node out of readiness without a durable gate'
 
 test('standby replicas fence all mutating HTTP and Git requests', async () => {
   const { src } = freshSource();
+  src.store.checkReplicationAsync = async () => ({ role: 'standby', observed: { inRecovery: true, receiverStatus: 'streaming' } });
   const server = await startServer(src, { port: 0, replicationRole: 'standby' });
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
@@ -455,6 +456,18 @@ test('standby replicas fence all mutating HTTP and Git requests', async () => {
     assert.equal(response.headers.get('retry-after'), '5');
     assert.equal((await fetch(`${base}/git/O1/P1/R1.git/git-receive-pack`, { method: 'POST', body: Buffer.from('push') })).status, 503);
     assert.equal(server.readOnly, true);
+    assert.equal(server.requireReplication, true);
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});
+
+test('standby replicas are not ready without a durable receiver check', async () => {
+  const { src } = freshSource();
+  const server = await startServer(src, { port: 0, replicationRole: 'standby' });
+  try {
+    assert.equal((await fetch(`http://127.0.0.1:${server.address().port}/readyz`)).status, 503);
   } finally {
     server.closeAllConnections?.();
     server.close();

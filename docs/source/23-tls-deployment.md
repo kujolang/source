@@ -249,6 +249,9 @@ When `--replication-role standby` is used, the application node also fences
 all mutating HTTP and Git requests while continuing to serve liveness,
 readiness, metrics, and read traffic. This prevents an accidentally writable
 standby from becoming a split-brain writer during promotion.
+The standby role also implicitly enables replication readiness checks, so a
+node without a healthy streaming receiver is not advertised as ready even if
+`--require-replication` was omitted.
 
 ## Security notes
 

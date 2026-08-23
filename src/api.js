@@ -1226,7 +1226,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
   server.headersTimeout = 15_000;
   server.keepAliveTimeout = 5_000;
   server.maxConnections = maxConnections;
-  server.requireReplication = requireReplication === true;
+  server.requireReplication = requireReplication === true || replicationRole === 'standby';
   server.replicationRole = replicationRole;
   server.replicationMinStandbys = Math.max(0, Math.trunc(replicationMinStandbys));
   server.replicationMaxLagBytes = Math.max(0, Math.trunc(replicationMaxLagBytes));
