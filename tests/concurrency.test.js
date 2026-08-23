@@ -87,6 +87,26 @@ test('Postgres async transactions keep all statements on one pooled client', asy
   assert.deepEqual(calls, ['BEGIN', 'SELECT 1', 'COMMIT', 'RELEASE']);
 });
 
+test('async change submission does not fall back to synchronous reads for missing sessions', async () => {
+  const { src, org, project, agent } = freshSource();
+  const work = await src.createWorkAsync({ orgId: org.id, projectId: project.id, intent: 'async change', requester: agent.id });
+  await src.claimWorkAsync({ orgId: org.id, projectId: project.id, workId: work.id, principalId: agent.id });
+  await src.startSessionAsync({ orgId: org.id, projectId: project.id, workId: work.id, principalId: agent.id });
+  const readJson = src.store.readJson.bind(src.store);
+  src.store.readJsonAsync = async (rel) => readJson(rel);
+  src.store.nextIdAsync = async () => 'C1';
+  src.store.readJson = () => { throw new Error('sync store path used'); };
+  const change = await src.submitChangeAsync({
+    orgId: org.id,
+    projectId: project.id,
+    workId: work.id,
+    sessionId: 'S-missing',
+    baseCommit: 'base',
+    headCommit: 'head',
+  });
+  assert.equal(change.sessionId, 'S-missing');
+});
+
 test('Postgres canonical promotion lock uses the project row', async () => {
   const calls = [];
   const store = Object.create(PostgresStore.prototype);

@@ -769,7 +769,11 @@ export class Source {
     const id = await nextIdAsync(this.store, 'change');
     const change = createChange({ id, workId, sessionId, baseCommit, headCommit, repositories, repositoryChanges });
     work.changes.push(id);
-    const session = sessionId ? await this.store.readJsonAsync?.(`${this._projectRel(orgId, projectId)}/sessions/${sessionId}.json`) ?? this.getSession(orgId, projectId, sessionId) : null;
+    const session = sessionId
+      ? (typeof this.store.readJsonAsync === 'function'
+        ? await this.store.readJsonAsync(`${this._projectRel(orgId, projectId)}/sessions/${sessionId}.json`)
+        : this.getSession(orgId, projectId, sessionId))
+      : null;
     if (session) session.changes.push(id);
     await this._asyncTransaction(async () => {
       await this._asyncWrite(`${this._projectRel(orgId, projectId)}/changes/${id}.json`, change);
