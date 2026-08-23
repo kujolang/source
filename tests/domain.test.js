@@ -81,6 +81,27 @@ test('workflow dependencies are validated as an acyclic graph', async () => {
   }), /cycle/);
 });
 
+test('workflow dependency identifiers remain bounded and unique', async () => {
+  const { src, org, project } = freshSource();
+  await assert.rejects(src.createWorkflowAsync({
+    orgId: org.id,
+    projectId: project.id,
+    name: 'invalid checks',
+    triggers: ['push'],
+    jobs: [
+      { kind: 'agent.check.one', payload: { jobId: 'same' } },
+      { kind: 'agent.check.two', payload: { jobId: 'same' } },
+    ],
+  }), /unique/);
+  await assert.rejects(src.createWorkflowAsync({
+    orgId: org.id,
+    projectId: project.id,
+    name: 'oversized checks',
+    triggers: ['push'],
+    jobs: [{ kind: 'agent.check.one', payload: { jobId: 'x'.repeat(121) } }],
+  }), /safe event names/);
+});
+
 test('a change can be submitted and is tied to an exact base state', () => {
   const { src, org, project, agent } = freshSource();
   const w = src.createWork({ orgId: org.id, projectId: project.id, intent: 'change', requester: 'U1' });

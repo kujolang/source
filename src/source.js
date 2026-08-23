@@ -1371,6 +1371,7 @@ export class Source {
     const edges = new Map();
     for (const [index, job] of jobs.entries()) {
       if (!job || typeof job.kind !== 'string' || !/^[A-Za-z0-9_.:-]{1,120}$/.test(job.kind)) throw new Error('workflow job kinds must be safe event names');
+      if (!/^[A-Za-z0-9_.:-]{1,120}$/.test(jobIdList[index])) throw new Error('workflow job IDs must be safe event names');
       if (Buffer.byteLength(JSON.stringify(job.payload ?? {})) > 16 * 1024) throw new Error('workflow job payload too large');
       const needs = job.payload?.needs == null ? [] : Array.isArray(job.payload.needs) ? job.payload.needs : [job.payload.needs];
       if (needs.length > 100 || needs.some((dependency) => typeof dependency !== 'string' || !jobIds.has(dependency))) {
