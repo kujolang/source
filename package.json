@@ -21,6 +21,7 @@
     "backup:restore-drill": "node scripts/restore-drill.js",
     "replicate:git": "node scripts/replicate-git.js",
     "replicate:postgres": "node scripts/replicate-postgres.js",
+    "drill:failover": "node scripts/failover-drill.js",
     "check:postgres-replication": "node scripts/check-postgres-replication.js"
   },
   "engines": {

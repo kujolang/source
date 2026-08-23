@@ -253,6 +253,22 @@ The standby role also implicitly enables replication readiness checks, so a
 node without a healthy streaming receiver is not advertised as ready even if
 `--require-replication` was omitted.
 
+Run the staging failover drill against a real primary/standby or metadata-peer
+pair to measure recovery time:
+
+```bash
+npm run drill:failover -- \
+  --source-url "$SOURCE_DATABASE_URL" \
+  --target-url "$SOURCE_PEER_DATABASE_URL" \
+  --source-id primary-a \
+  --timeout-ms 60000
+```
+
+The drill writes a unique sentinel under `replication-drills/`, replays the
+transactional feed, verifies the peer can read it, and reports `rtoMs` and the
+source sequence. It is intentionally staging-only because it creates a
+durable sentinel record; it does not claim consensus or failover promotion.
+
 ## Security notes
 
 - TLS resolves the "no TLS" remaining risk in `12-threat-model.md` T4
