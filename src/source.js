@@ -258,6 +258,22 @@ export class Source {
     return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.getProject(orgId, projectId);
   }
 
+  async updateProjectAsync({ orgId, projectId, name, description = '', visibility = 'private' }) {
+    if (!['private', 'public'].includes(visibility)) throw new Error('invalid project visibility');
+    const project = await this.getProjectAsync(orgId, projectId);
+    if (!project) throw new Error(`project not found: ${projectId}`);
+    project.name = String(name || project.name).slice(0, 200);
+    project.description = String(description || '').slice(0, 10_000);
+    project.visibility = visibility;
+    if (Array.isArray(project.repositories)) {
+      const repos = await Promise.all(project.repositories.map((id) => this.getRepositoryAsync(orgId, projectId, id)));
+      await Promise.all(repos.filter(Boolean).map((repo) => this._asyncWrite(`${this._projectRel(orgId, projectId)}/repos/${repo.id}.json`, { ...repo, visibility })));
+    }
+    await this._asyncWrite(`${this._projectRel(orgId, projectId)}/project.json`, project);
+    await this._asyncAudit({ event: 'project.update', orgId, projectId, visibility });
+    return project;
+  }
+
   listProjects(orgId, { cursor, limit } = {}) {
     const ids = this.store.listJson(`${this._orgRel(orgId)}/projects`, { cursor, limit, includeDirs: true });
     return ids.map((id) => this.getProject(orgId, id)).filter(Boolean);
@@ -324,6 +340,17 @@ export class Source {
   async getRepositoryAsync(orgId, projectId, repoId) {
     const rel = `${this._projectRel(orgId, projectId)}/repos/${repoId}.json`;
     return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.getRepository(orgId, projectId, repoId);
+  }
+
+  async updateRepositoryAsync({ orgId, projectId, repoId, name, defaultBranch }) {
+    const repo = await this.getRepositoryAsync(orgId, projectId, repoId);
+    if (!repo) throw new Error(`repository not found: ${repoId}`);
+    if (name != null && !/^[A-Za-z0-9._-]{1,120}$/.test(String(name))) throw new Error('invalid repository name');
+    if (defaultBranch != null && !/^[A-Za-z0-9._/-]{1,200}$/.test(String(defaultBranch))) throw new Error('invalid default branch');
+    const updated = { ...repo, ...(name == null ? {} : { name: String(name) }), ...(defaultBranch == null ? {} : { defaultBranch: String(defaultBranch) }) };
+    await this._asyncWrite(`${this._projectRel(orgId, projectId)}/repos/${repoId}.json`, updated);
+    await this._asyncAudit({ event: 'repository.update', orgId, projectId, repoId });
+    return updated;
   }
 
   async getArtifactAsync(hash) {

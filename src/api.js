@@ -25,7 +25,7 @@ import http from 'node:http';
 import https from 'node:https';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { Source } from './source.js';
-import { renderOrgIndexAsync, renderIndexAsync, renderProjectAsync, renderWorkAsync, renderChangeAsync, renderLogin, renderRepositoryAsync, renderBlobAsync, renderCommitAsync, renderActionsAsync, renderActionDetailAsync, renderSettingsAsync, managementPage, esc } from './web.js';
+import { renderOrgIndexAsync, renderIndexAsync, renderProjectAsync, renderWorkAsync, renderChangeAsync, renderLogin, renderRepositoryAsync, renderBlobAsync, renderCommitAsync, renderRepositorySettingsAsync, renderActionsAsync, renderActionDetailAsync, renderSettingsAsync, managementPage, esc } from './web.js';
 import { gitHttpBackend } from './git-http.js';
 import { ACTIONS, authorizeRequest, authorizeRequestAsync, authorizeGit, authorizeGitAsync, bearerCredential } from './auth.js';
 import { RateLimiter } from './ratelimit.js';
@@ -672,6 +672,13 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           if (g) return loginPage(res, g.status, g.body.error);
           return html(res, 200, await renderSettingsAsync(src, orgId, projectId));
         }
+        if (req.method === 'POST' && managementPath === 'settings/project') {
+          const g = await guard(src, req, ACTIONS.manage_project, { org: orgId, project: projectId });
+          if (g) return loginPage(res, g.status, g.body.error);
+          const body = await readLoginBody(req);
+          await src.updateProjectAsync({ orgId, projectId, name: body.name, description: body.description || '', visibility: body.visibility || 'private' });
+          return redirect(res, `/o/${encodeURIComponent(orgId)}/p/${encodeURIComponent(projectId)}/settings`);
+        }
         const repoTree = managementPath.match(/^r\/([^/]+)\/tree\/([^/]+)(?:\/(.*))?$/);
         if (req.method === 'GET' && repoTree) {
           const g = await guard(src, req, ACTIONS.read_source, { org: orgId, project: projectId });
@@ -679,6 +686,19 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           const ref = decodeURIComponent(repoTree[2]);
           const directory = (repoTree[3] || '').split('/').filter(Boolean).map(decodeURIComponent).join('/');
           return html(res, 200, await renderRepositoryAsync(src, orgId, projectId, repoTree[1], ref, directory));
+        }
+        const repoSettings = managementPath.match(/^r\/([^/]+)\/settings$/);
+        if (req.method === 'GET' && repoSettings) {
+          const g = await guard(src, req, ACTIONS.read_source, { org: orgId, project: projectId });
+          if (g) return loginPage(res, g.status, g.body.error);
+          return html(res, 200, await renderRepositorySettingsAsync(src, orgId, projectId, repoSettings[1]));
+        }
+        if (req.method === 'POST' && repoSettings) {
+          const g = await guard(src, req, ACTIONS.manage_repository, { org: orgId, project: projectId });
+          if (g) return loginPage(res, g.status, g.body.error);
+          const body = await readLoginBody(req);
+          await src.updateRepositoryAsync({ orgId, projectId, repoId: repoSettings[1], name: body.name, defaultBranch: body.defaultBranch });
+          return redirect(res, `/o/${encodeURIComponent(orgId)}/p/${encodeURIComponent(projectId)}/r/${encodeURIComponent(repoSettings[1])}/tree/${encodeURIComponent(body.defaultBranch || 'main')}`);
         }
         const repoBlob = managementPath.match(/^r\/([^/]+)\/blob\/([^/]+)\/(.+)$/);
         if (req.method === 'GET' && repoBlob) {
