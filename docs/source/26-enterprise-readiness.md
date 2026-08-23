@@ -46,6 +46,12 @@ Git requests also use a per-project admission budget (eight active requests and
 single noisy tenant from consuming every Git subprocess slot; both budgets are
 configurable through `createServer`/`startServer` or the CLI.
 
+Canonical Git promotion is serialized per project in-process and, for
+Postgres-backed nodes, under a transactional project-row lock held across the
+fast-forward check and ref update. This closes the cross-node check-then-update
+race while retaining Git's non-fast-forward refusal as the final integrity
+guard.
+
 Action handlers can use `EphemeralWorkspaceManager` to apply a separate bounded
 workspace budget and automatically remove temporary workspaces on success or
 failure. This prevents abandoned action directories from consuming shared

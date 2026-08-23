@@ -87,6 +87,16 @@ test('Postgres async transactions keep all statements on one pooled client', asy
   assert.deepEqual(calls, ['BEGIN', 'SELECT 1', 'COMMIT', 'RELEASE']);
 });
 
+test('Postgres canonical promotion lock uses the project row', async () => {
+  const calls = [];
+  const store = Object.create(PostgresStore.prototype);
+  store._qualified = (name) => `"source"."${name}"`;
+  store._runAsync = async (sql) => { calls.push(sql); return ''; };
+  await store.lockProjectAsync('O1', 'P1');
+  assert.match(calls[0], /WHERE org_id = 'O1' AND id = 'P1'/);
+  assert.match(calls[0], /FOR UPDATE/);
+});
+
 test('Postgres async transactions roll back relational record fan-out on failure', async () => {
   const calls = [];
   const client = {

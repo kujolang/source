@@ -231,8 +231,9 @@ never a control.
 - **Asset:** canonical state. **Attacker:** concurrent actor.
 - **Path:** state moves between evaluation and merge.
 - **Impact:** merge on stale base.
-- **Preventive:** pin base/head hashes; fast-forward check at update; refuse
-  non-fast-forward (per repository).
+- **Preventive:** pin base/head hashes; serialize canonical promotion per
+  project; hold the Postgres project-row lock across the fast-forward check and
+  ref update; refuse non-fast-forward (per repository).
 - **Detective:** update refusal logged.
 - **Recovery:** re-evaluate.
 - **Remaining risk:** none (deterministic check).

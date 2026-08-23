@@ -31,6 +31,7 @@ import { normalizeEvalSummary, normalizeEvalManifest, normalizeEvalRun, readEval
 import { scanSecrets } from './scan.js';
 import { JobQueue } from './job-queue.js';
 import { translateGitHubActions } from './integrations/github-actions.js';
+import { KeyedSemaphore } from './concurrency.js';
 
 const DEFAULT_HUMAN_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_HUMAN_SESSION_ACTIONS = ['read_source', 'read_context', 'accept_change'];
@@ -46,6 +47,7 @@ export class Source {
     this.store = store ?? new Store(dataRoot);
     this.capabilities = new CapabilityService(this.store);
     this.jobs = new JobQueue(this.store);
+    this.canonicalLocks = new KeyedSemaphore({ capacity: 1, queue: 256, maxKeys: 100_000 });
   }
 
   _artifactBytes(artifact) {
@@ -1196,26 +1198,44 @@ export class Source {
       targets = match ? [match] : (change.repositoryChanges.length === 0 ? [{ repoId, baseCommit: change.baseCommit, headCommit: change.headCommit }] : []);
     } else targets = change.repositoryChanges;
     if (targets.length === 0) throw new Error('no repository changes to update');
-
-    const results = await Promise.all(targets.map(async (target) => {
-      const git = this.gitRepo(orgId, projectId, target.repoId);
-      if (!(await git.hasCommitAsync(target.headCommit))) {
-        return { repoId: target.repoId, ok: false, reason: 'head commit not present in repository' };
-      }
-      const branch = await git.defaultBranchAsync();
-      const result = await git.fastForwardAsync(target.baseCommit, target.headCommit, branch);
-      await this._asyncAudit({ event: 'canonical.update', orgId, projectId, changeId, repoId: target.repoId, branch, ...result });
-      return { repoId: target.repoId, ...result };
-    }));
-    const ok = results.every((result) => result.ok);
-    if (ok) {
-      const work = await this.getWorkAsync(orgId, projectId, change.workId);
-      if (work && work.status === 'accepted') {
-        transitionWork(work, 'closed');
-        await this._asyncTransaction(() => this._asyncWrite(`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work));
-      }
+    const release = await this.canonicalLocks.acquire(`${orgId}:${projectId}`);
+    if (!release) {
+      const error = new Error('canonical update admission exhausted');
+      error.code = 'CANONICAL_ADMISSION_EXHAUSTED';
+      throw error;
     }
-    return repoId ? results[0] : { ok, results };
+    try {
+      const apply = async () => {
+        const results = await Promise.all(targets.map(async (target) => {
+          const git = this.gitRepo(orgId, projectId, target.repoId);
+          if (!(await git.hasCommitAsync(target.headCommit))) {
+            return { repoId: target.repoId, ok: false, reason: 'head commit not present in repository' };
+          }
+          const branch = await git.defaultBranchAsync();
+          const result = await git.fastForwardAsync(target.baseCommit, target.headCommit, branch);
+          await this._asyncAudit({ event: 'canonical.update', orgId, projectId, changeId, repoId: target.repoId, branch, ...result });
+          return { repoId: target.repoId, ...result };
+        }));
+        const ok = results.every((result) => result.ok);
+        if (ok) {
+          const work = await this.getWorkAsync(orgId, projectId, change.workId);
+          if (work && work.status === 'accepted') {
+            transitionWork(work, 'closed');
+            await this._asyncTransaction(() => this._asyncWrite(`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work));
+          }
+        }
+        return repoId ? results[0] : { ok, results };
+      };
+      if (typeof this.store.lockProjectAsync === 'function' && typeof this.store.transactionAsync === 'function') {
+        return await this.store.transactionAsync(async () => {
+          await this.store.lockProjectAsync(orgId, projectId);
+          return apply();
+        });
+      }
+      return await apply();
+    } finally {
+      release();
+    }
   }
 
   async scanChangeSecretsAsync({ orgId, projectId, changeId }) {

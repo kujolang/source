@@ -914,6 +914,12 @@ class PostgresStore {
     return rows[0]?.json || null;
   }
 
+  async lockProjectAsync(orgId, projectId) {
+    await this._runAsync(`SELECT id FROM ${this._qualified('projects')}
+      WHERE org_id = ${escapeSqlLiteral(orgId)} AND id = ${escapeSqlLiteral(projectId)}
+      FOR UPDATE`);
+  }
+
   getMeta(key) {
     const rows = this._fetchJsonRows(`SELECT value FROM ${this._qualified('meta')} WHERE key = ${escapeSqlLiteral(key)}`);
     return rows[0] ? rows[0].value : undefined;

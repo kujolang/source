@@ -91,3 +91,28 @@ test('TOCTOU: non-fast-forward update is refused', () => {
   assert.equal(result.ok, false);
   assert.ok(result.reason.includes('descend') || result.reason.includes('non-fast-forward'));
 });
+
+test('concurrent canonical updates are serialized per project', async () => {
+  const { src, org, project, agent, service, human } = freshSource();
+  const { c } = fullChange(src, org, project, agent, service);
+  src.makeDecision({ orgId: org.id, projectId: project.id, changeId: c.id, decision: 'accepted', decider: human.id });
+  let active = 0;
+  let maximum = 0;
+  src.gitRepo = () => ({
+    async hasCommitAsync() { return true; },
+    async defaultBranchAsync() { return 'main'; },
+    async fastForwardAsync() {
+      active += 1;
+      maximum = Math.max(maximum, active);
+      await new Promise((resolve) => setImmediate(resolve));
+      active -= 1;
+      return { ok: true, reason: 'fast-forwarded' };
+    },
+  });
+  const results = await Promise.all([
+    src.updateCanonicalStateAsync({ orgId: org.id, projectId: project.id, changeId: c.id, repoId: 'R1' }),
+    src.updateCanonicalStateAsync({ orgId: org.id, projectId: project.id, changeId: c.id, repoId: 'R1' }),
+  ]);
+  assert.equal(maximum, 1);
+  assert.ok(results.every((result) => result.ok));
+});
