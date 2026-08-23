@@ -946,6 +946,19 @@ class PostgresStore {
     return `${prefix}${Number(JSON.parse(value))}`;
   }
 
+  async nextIdsAsync(kind, prefix, count) {
+    const safeCount = Math.min(1000, Math.max(1, Math.trunc(count)));
+    const key = `counter:${kind}`;
+    const value = await this._runAsync(`
+      INSERT INTO ${this._qualified('meta')} (key, value)
+      VALUES (${escapeSqlLiteral(key)}, to_jsonb(${safeCount}::bigint))
+      ON CONFLICT (key) DO UPDATE SET value = to_jsonb(((${this._qualified('meta')}.value)::text)::bigint + ${safeCount})
+      RETURNING value
+    `);
+    const end = Number(JSON.parse(value));
+    return Array.from({ length: safeCount }, (_, index) => `${prefix}${end - safeCount + index + 1}`);
+  }
+
   allowRateLimit(key, limit, windowMs, now = Date.now()) {
     this._cleanupRateLimits(now);
     const out = this._run(`
@@ -1036,6 +1049,64 @@ class PostgresStore {
     this._jobMaintenanceOps += 1;
     if (this._jobMaintenanceOps % 1_000 === 0) await this.pruneJobsAsync({ limit: 1_000 });
     return { id, kind, payload, orgId, projectId, workId, status: 'queued', attempts: 0, maxAttempts: safeAttempts, availableAt: at, dedupeKey: safeDedupeKey };
+  }
+
+  async enqueueJobsAsync({ jobs, maxQueueDepth = null } = {}) {
+    if (!Array.isArray(jobs) || jobs.length < 1 || jobs.length > 100) throw new Error('job batch must contain 1-100 jobs');
+    const normalized = jobs.map((job) => {
+      if (!job || typeof job.kind !== 'string' || !job.kind) throw new Error('job kind is required');
+      const availableAt = new Date(job.availableAt || Date.now()).toISOString();
+      const dedupeKey = job.dedupeKey == null ? null : String(job.dedupeKey).slice(0, 240);
+      return {
+        ...job,
+        payload: job.payload ?? {},
+        availableAt,
+        dedupeKey,
+        maxAttempts: Math.min(100, Math.max(1, Math.trunc(job.maxAttempts ?? 5))),
+      };
+    });
+    const scopes = new Set(normalized.map((job) => `${job.orgId || ''}\u0000${job.projectId || ''}`));
+    if (scopes.size > 1) throw new Error('job batch must use one organization and project scope');
+    const orgId = normalized[0].orgId || null;
+    const projectId = normalized[0].projectId || null;
+    const safeDepth = maxQueueDepth == null ? null : Math.min(10_000_000, Math.max(1, Math.trunc(maxQueueDepth)));
+    return this.transactionAsync(async () => {
+      if (safeDepth != null && orgId && projectId) {
+        await this._runAsync(`SELECT id FROM ${this._qualified('projects')} WHERE id = ${escapeSqlLiteral(projectId)} FOR UPDATE`);
+      }
+      const dedupeKeys = normalized.map((job) => job.dedupeKey).filter(Boolean);
+      const existing = dedupeKeys.length
+        ? await this._fetchJsonRowsAsync(`SELECT dedupe_key AS key, id FROM ${this._qualified('jobs')} WHERE dedupe_key IN (${dedupeKeys.map(escapeSqlLiteral).join(',')})`)
+        : [];
+      const existingKeys = new Set(existing.map((row) => row.key));
+      const newKeys = new Set();
+      const newCount = normalized.filter((job) => {
+        if (!job.dedupeKey) return true;
+        if (existingKeys.has(job.dedupeKey) || newKeys.has(job.dedupeKey)) return false;
+        newKeys.add(job.dedupeKey);
+        return true;
+      }).length;
+      if (safeDepth != null && orgId && projectId) {
+        const current = await this._runAsync(`SELECT COUNT(*) FROM ${this._qualified('jobs')}
+          WHERE org_id = ${escapeSqlLiteral(orgId)} AND project_id = ${escapeSqlLiteral(projectId)}
+            AND status IN ('queued', 'leased')`);
+        if (Number(current || 0) + newCount > safeDepth) throw new Error('job queue depth exceeded');
+      }
+      const ids = await this.nextIdsAsync('job', 'J', normalized.length);
+      const values = normalized.map((job, index) => `(${escapeSqlLiteral(ids[index])}, ${escapeSqlLiteral(job.kind)}, ${toJson(job.payload)}, ${escapeSqlLiteral(job.orgId || null)}, ${escapeSqlLiteral(job.projectId || null)}, ${escapeSqlLiteral(job.workId || null)}, 'queued', ${escapeSqlLiteral(job.availableAt)}, ${job.maxAttempts}, ${escapeSqlLiteral(job.dedupeKey)})`).join(',');
+      const inserted = await this._runJsonCommandAsync(`WITH inserted AS (
+        INSERT INTO ${this._qualified('jobs')} (id, kind, payload, org_id, project_id, work_id, status, available_at, max_attempts, dedupe_key)
+          VALUES ${values}
+          ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING
+          RETURNING id, dedupe_key AS key
+      ) SELECT COALESCE(json_agg(row_to_json(inserted)), '[]'::json)::text AS rows FROM inserted`);
+      const insertedIds = new Set(inserted.map((row) => row.id));
+      const insertedByKey = new Map(inserted.filter((row) => row.key).map((row) => [row.key, row.id]));
+      return normalized.map((job, index) => {
+        const id = insertedIds.has(ids[index]) ? ids[index] : existing.find((row) => row.key === job.dedupeKey)?.id || insertedByKey.get(job.dedupeKey);
+        return { id, kind: job.kind, payload: job.payload, orgId: job.orgId || null, projectId: job.projectId || null, workId: job.workId || null, status: insertedIds.has(ids[index]) ? 'queued' : 'deduplicated', attempts: 0, maxAttempts: job.maxAttempts, availableAt: job.availableAt, dedupeKey: job.dedupeKey };
+      });
+    });
   }
 
   async pruneJobsAsync({ limit = 1_000 } = {}) {

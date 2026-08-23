@@ -54,6 +54,27 @@ test('database admission exhaustion returns retryable service backpressure', asy
   });
 });
 
+test('agents can enqueue a bounded job batch through one capability-gated request', async () => {
+  const { src, org, project, agent } = freshSource();
+  const capability = src.capabilities.issue({
+    principalId: agent.id,
+    scope: { org: org.id, project: project.id },
+    allowed: ['enqueue_job'],
+  });
+  src.jobs.enqueueBatch = async ({ jobs }) => jobs.map((job, index) => ({ ...job, id: `J${index + 1}`, status: 'queued' }));
+  await withServer(src, async (base) => {
+    const response = await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/jobs/batch`, {
+      method: 'POST',
+      headers: { ...auth(capability.credential), 'content-type': 'application/json' },
+      body: JSON.stringify({ jobs: [{ kind: 'agent.batch', payload: { index: 1 } }, { kind: 'agent.batch', payload: { index: 2 } }] }),
+    });
+    assert.equal(response.status, 202);
+    const body = await response.json();
+    assert.equal(body.jobs.length, 2);
+    assert.equal(body.jobs[1].id, 'J2');
+  });
+});
+
 test('an agent can complete the workflow without HTML (capability-gated)', async () => {
   const { src, org, project, agent, service, human } = freshSource();
   const w = src.createWork({ orgId: org.id, projectId: project.id, intent: 'fix parser regression', requester: 'U1' });

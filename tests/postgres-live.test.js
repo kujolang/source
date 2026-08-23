@@ -61,6 +61,19 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     const claims = (await Promise.all(Array.from({ length: 8 }, (_, i) => src.jobs.claim({ workerId: `worker-${i}`, limit: 20 })))).flat();
     assert.equal(new Set(claims.map((job) => job.id)).size, queued.length);
   await Promise.all(claims.map((job) => src.jobs.complete({ id: job.id, workerId: job.workerId, leaseToken: job.leaseToken, result: { ok: true } })));
+    const batch = await src.jobs.enqueueBatch({
+      jobs: [
+        { kind: 'agent.batch.bulk', payload: { index: 1 }, orgId: org.id, projectId: project.id, dedupeKey: 'batch-event-1' },
+        { kind: 'agent.batch.bulk', payload: { index: 2 }, orgId: org.id, projectId: project.id, dedupeKey: 'batch-event-2' },
+        { kind: 'agent.batch.bulk', payload: { index: 3 }, orgId: org.id, projectId: project.id, dedupeKey: 'batch-event-1' },
+      ],
+      maxQueueDepth: 100,
+    });
+    assert.equal(batch.length, 3);
+    assert.equal(batch.filter((job) => job.status === 'queued').length, 2);
+    assert.equal(batch[2].id, batch[0].id);
+    const batchClaims = await src.jobs.claim({ workerId: 'batch-worker', limit: 10 });
+    await Promise.all(batchClaims.map((job) => src.jobs.complete({ id: job.id, workerId: 'batch-worker', leaseToken: job.leaseToken, result: { ok: true } })));
     const quotaResults = await Promise.allSettled(Array.from({ length: 20 }, (_, i) => src.jobs.enqueue({
       kind: 'agent.quota', payload: { index: i }, orgId: org.id, projectId: quotaProject.id, maxQueueDepth: 1,
     })));

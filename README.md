@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **137/137 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
+- **138/138 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
@@ -136,6 +136,11 @@ npm run load -- --url https://source.example/.well-known/source \
 It reports success rate, event-loop progress, and p50/p95/p99/max latency.
 Run it against the Postgres-backed deployment from a separate host; local
 tests do not prove database, network, or multi-node capacity.
+
+Agents with `enqueue_job` can submit up to 100 jobs in one request through
+`POST /api/v1/orgs/{org}/projects/{project}/jobs/batch`. The Postgres path uses
+one transactional quota check and bulk insert, with per-job payload bounds and
+deduplication keys, reducing database round trips during workflow fan-out.
 
 Postgres-backed workers can claim deferred jobs through `src/job-queue.js`.
 Claims use row locking with `SKIP LOCKED`; expired leases are reclaimable and

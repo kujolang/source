@@ -40,6 +40,7 @@ discovery manifest):
 | `manage_workflows` | create workflow definitions |
 | `read_workflows` | list or inspect workflow definitions |
 | `dispatch_workflow` | dispatch a workflow event into the durable queue |
+| `enqueue_job` | enqueue one job or a bounded batch of jobs |
 
 ## Endpoint → action mapping
 
