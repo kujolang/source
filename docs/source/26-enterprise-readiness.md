@@ -39,6 +39,9 @@ rewriting an unbounded backlog in one transaction.
 Fair multi-project claims additionally use a tenant/status/time index aligned
 with the partitioned ranking query, reducing unrelated queue-history work as
 the backlog grows.
+Job dependencies are validated at enqueue time against the same batch or an
+existing durable job; cyclic and missing references are rejected, and legacy
+queued rows with missing prerequisites are terminalized during claim recovery.
 Claims apply a bounded per-project burst (8 by default) when multiple projects
 are eligible, while allowing a single eligible project to fill the requested
 batch. This provides fair progress across tenants without reducing throughput
@@ -102,6 +105,10 @@ Postgres-backed nodes, under a transactional project-row lock held across the
 fast-forward check and ref update. This closes the cross-node check-then-update
 race while retaining Git's non-fast-forward refusal as the final integrity
 guard.
+Asynchronous Work claims use the same Postgres project-row lock, preventing
+two authorized agents on different nodes from overwriting the winning
+assignee. Synchronous canonical callers also acquire the durable lock before
+entering the shared update path.
 
 Action handlers can use `EphemeralWorkspaceManager` to apply a separate bounded
 workspace budget and automatically remove temporary workspaces on success or
