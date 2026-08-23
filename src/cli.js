@@ -76,6 +76,44 @@ export async function run(argv) {
 
   try {
     switch (cmd) {
+      case 'demo': {
+        const password = flag('--password');
+        if (!password) fail('demo requires --password <12+ character password>');
+        if (password.length < 12) fail('demo password must be at least 12 characters');
+
+        if (!src.getInstance()) src.initInstance({ name: flag('--name') || 'source-local' });
+        const existingOrg = src.getOrg('O1');
+        const existingProject = src.getProject('O1', 'P1');
+        const existingPrincipal = src.getPrincipal('U1');
+        if (existingOrg || existingProject || existingPrincipal) {
+          if (existingOrg && existingProject && existingPrincipal && src.getOrgMembership('O1', 'U1')) {
+            print({
+              existing: true,
+              login: { principalId: 'U1', orgId: 'O1', projectId: 'P1', management: true },
+              message: 'The local demo tenant already exists; use its existing password.',
+            });
+            return;
+          }
+          fail('local demo setup is partially present; inspect the existing O1/P1/U1 records before retrying');
+        }
+
+        const org = src.createOrg({ name: flag('--org-name') || 'Local Workspace', slug: flag('--org-slug') || 'local' });
+        const project = src.createProject({ orgId: org.id, name: flag('--project-name') || 'Source Demo', slug: flag('--project-slug') || 'source-demo', description: 'Local Source management workspace' });
+        const repository = src.createRepository({ orgId: org.id, projectId: project.id, name: flag('--repo-name') || 'main' });
+        const principal = src.createPrincipal({ type: 'human', name: flag('--principal-name') || 'Local Administrator', password });
+        const membership = src.addOrgMember({ orgId: org.id, principalId: principal.id, role: 'admin' });
+        print({
+          instance: src.getInstance(),
+          organization: org,
+          project,
+          repository,
+          principal,
+          membership,
+          login: { principalId: principal.id, orgId: org.id, projectId: project.id, management: true, url: 'http://localhost:8787/login' },
+          message: 'Use the password supplied to this command. Source does not ship with a default password.',
+        });
+        return;
+      }
       case 'init': {
         const instance = src.initInstance({ name: flag('--name') || 'source', hosted: hasFlag('--hosted') });
         print(instance);
@@ -465,6 +503,7 @@ export async function run(argv) {
           '',
           'Commands:',
           '  init --name <n> [--hosted]',
+          '  demo --password <12+ chars> [--name <instance>]  create a local UI-ready tenant',
           '  org create|list|show [--name <n> --slug <s>]',
           '  org member add --org <o> --principal <id> [--role member|maintainer|admin]',
           '  project create|list|show --org <o> [--name --slug]',
