@@ -520,6 +520,26 @@ test('writer lease controller renews and fails closed when ownership is lost', a
   assert.deepEqual(calls, ['acquire', 'renew', 'release']);
 });
 
+test('writer lease controller keeps a standby process alive until the lease is free', async () => {
+  let available = false;
+  const store = {
+    async acquireWriterLeaseAsync() {
+      if (!available) { const error = new Error('held'); error.code = 'WRITER_LEASE_HELD'; throw error; }
+      return { fencingToken: '9' };
+    },
+    async renewWriterLeaseAsync() { return { fencingToken: '9' }; },
+    async assertWriterLeaseAsync() { return true; },
+    async releaseWriterLeaseAsync() { return true; },
+  };
+  const controller = new WriterLeaseController(store, { owner: 'node-b', leaseMs: 1_000 });
+  await controller.start();
+  await assert.rejects(() => controller.assertAsync(), { code: 'WRITER_LEASE_LOST' });
+  available = true;
+  await controller._renew();
+  assert.equal(await controller.assertAsync(), true);
+  await controller.stop();
+});
+
 test('standby replicas fence all mutating HTTP and Git requests', async () => {
   const { src } = freshSource();
   src.store.checkReplicationAsync = async () => ({ role: 'standby', observed: { inRecovery: true, receiverStatus: 'streaming' } });

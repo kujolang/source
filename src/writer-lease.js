@@ -12,21 +12,43 @@ export class WriterLeaseController {
     this.timer = null;
     this.lost = false;
     this.renewing = false;
+    this.stopped = false;
   }
 
   async start() {
-    this.lease = await this.store.acquireWriterLeaseAsync({ name: this.name, owner: this.owner, leaseMs: this.leaseMs });
-    this.lost = false;
+    this.stopped = false;
+    await this._acquire();
     const intervalMs = Math.max(1_000, Math.floor(this.leaseMs / 3));
     this.timer = setInterval(() => { void this._renew(); }, intervalMs);
     this.timer.unref?.();
     return this;
   }
 
+  async _acquire() {
+    if (this.stopped) return false;
+    try {
+      const lease = await this.store.acquireWriterLeaseAsync({ name: this.name, owner: this.owner, leaseMs: this.leaseMs });
+      if (this.stopped) {
+        await this.store.releaseWriterLeaseAsync({ name: this.name, owner: this.owner, fencingToken: lease.fencingToken });
+        return false;
+      }
+      this.lease = lease;
+      this.lost = false;
+      return true;
+    } catch (error) {
+      if (error?.code === 'WRITER_LEASE_HELD') return false;
+      throw error;
+    }
+  }
+
   async _renew() {
-    if (this.renewing || !this.lease || this.lost) return;
+    if (this.renewing || this.lost) return;
     this.renewing = true;
     try {
+      if (!this.lease) {
+        await this._acquire();
+        return;
+      }
       const renewed = await this.store.renewWriterLeaseAsync({
         name: this.name,
         owner: this.owner,
@@ -69,6 +91,7 @@ export class WriterLeaseController {
   }
 
   async stop() {
+    this.stopped = true;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     const lease = this.lease;

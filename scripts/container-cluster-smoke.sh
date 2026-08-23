@@ -38,11 +38,12 @@ start_node() {
   local name="$1" port="$2"
   docker run --rm --detach --name "$name" \
     --add-host=host.docker.internal:host-gateway \
-    -e SOURCE_DATABASE_URL="$SOURCE_CONTAINER_DATABASE_URL" \
-    -v "$volume":/var/lib/source/git \
-    --tmpfs /var/lib/source/data:uid=1000,gid=1000 \
-    -p "$port":8787 "$image" \
-    node bin/source.js --store postgres --schema "$schema" serve --host 0.0.0.0 --port 8787 >/dev/null
+  -e SOURCE_DATABASE_URL="$SOURCE_CONTAINER_DATABASE_URL" \
+  -v "$volume":/var/lib/source/git \
+  --tmpfs /var/lib/source/data:uid=1000,gid=1000 \
+  -p "$port":8787 "$image" \
+    node bin/source.js --store postgres --schema "$schema" serve --host 0.0.0.0 --port 8787 \
+      --writer-lease --writer-owner "$name" --writer-lease-ms 5000 >/dev/null
 }
 
 start_node "$node_a" "$port_a"
@@ -58,9 +59,15 @@ wait_ready() {
 }
 
 wait_ready "http://127.0.0.1:$port_a"
-wait_ready "http://127.0.0.1:$port_b"
+for _ in {1..10}; do
+  if [[ "$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port_b/readyz" || true)" != 200 ]]; then break; fi
+  sleep 1
+done
+if [[ "$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port_b/readyz" || true)" == 200 ]]; then
+  echo "second writer unexpectedly became ready while the first lease was active" >&2
+  exit 1
+fi
 curl -fsS "http://127.0.0.1:$port_a/.well-known/source" >/dev/null
-curl -fsS "http://127.0.0.1:$port_b/.well-known/source" >/dev/null
 docker stop "$node_a" >/dev/null
 wait_ready "http://127.0.0.1:$port_b"
-printf '{"ok":true,"nodes":2,"failover":"passed","schema":"%s"}\n' "$schema"
+printf '{"ok":true,"nodes":2,"failover":"passed","writer_fencing":"passed","schema":"%s"}\n' "$schema"
