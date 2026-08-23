@@ -576,7 +576,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
         const headers = { 'Set-Cookie': sessionHeaders(session), 'Content-Type': 'application/json' };
 
         if (wantsHtml(req)) {
-          headers.Location = '/';
+          headers.Location = `/o/${encodeURIComponent(orgId)}/p/${encodeURIComponent(projectId)}`;
           res.writeHead(303, headers);
           return res.end();
         }
@@ -648,7 +648,21 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
       // --- human-facing HTML views ---------------------------------------
       if (req.method === 'GET' && pathname === '/') {
         const g = await guard(src, req, ACTIONS.read_source, {});
-        if (g) return loginPage(res, g.status, g.body.error);
+        if (g) {
+          // Human sessions are intentionally project-scoped. Send a valid
+          // session to its project instead of presenting a misleading 403
+          // when the user revisits the instance root.
+          if (g.body.error === 'scope violation') {
+            const sessionId = parseSessionCookie(req.headers.cookie);
+            const session = sessionId
+              ? (typeof src.getHumanSessionAsync === 'function' ? await src.getHumanSessionAsync(sessionId) : src.getHumanSession(sessionId))
+              : null;
+            if (session?.scope?.org && session?.scope?.project) {
+              return redirect(res, `/o/${encodeURIComponent(session.scope.org)}/p/${encodeURIComponent(session.scope.project)}`);
+            }
+          }
+          return loginPage(res, g.status, g.body.error);
+        }
         return html(res, 200, await renderOrgIndexAsync(src));
       }
 

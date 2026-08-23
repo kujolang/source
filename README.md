@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **197/197 non-skipped default tests pass** (one documented opt-in skip), including a dogfood test against the real `spec` Kujo
+- **199/199 non-skipped default tests pass** (one documented opt-in skip), including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
@@ -58,6 +58,11 @@ node bin/source.js org member add --org O1 --principal U1 --role admin
 node bin/source.js work create --org O1 --project P1 --intent "fix parser regression"
 node bin/source.js work claim --org O1 --project P1 W1 --principal U1
 
+# Or bootstrap a complete local management tenant in one command.
+# The command prints the exact IDs to use on the login page and never creates
+# a shared/default password.
+node bin/source.js demo --password '<12+ character local password>'
+
 # Issue a bounded capability for an agent (operator/CLI, out-of-band)
 node bin/source.js cap issue --principal U2 --org O1 --project P1 \
   --allowed read_source,read_context,submit_change,submit_evidence \
@@ -77,7 +82,7 @@ node bin/source.js serve --port 8787
 #   GET /api/v1/orgs/O1/projects/P1/work              (machine interface, requires capability)
 #   git clone http://localhost:8787/git/O1/P1/R1.git (smart-HTTP)
 
-# Open http://localhost:8787, sign in with a human principal, and select
+# Open http://localhost:8787, sign in with the IDs printed by `source demo`, and select
 # “Enable project management controls” to use role-gated create/review/dispatch
 # forms. Production workflow execution still requires a Postgres-backed worker.
 

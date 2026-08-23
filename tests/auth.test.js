@@ -182,6 +182,24 @@ test('human login issues a session and gates HTML/API with session cookies', asy
   });
 });
 
+test('human HTML login lands on the scoped project and root redirects back to it', async () => {
+  const { src, org, project, human } = freshSource();
+  await withServer(src, async (base) => {
+    const login = await fetch(`${base}/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'text/html' },
+      body: new URLSearchParams({ principalId: human.id, password: 'test-password-123', orgId: org.id, projectId: project.id, management: '1' }),
+      redirect: 'manual',
+    });
+    assert.equal(login.status, 303);
+    assert.equal(login.headers.get('location'), `/o/${org.id}/p/${project.id}`);
+    const sessionCookie = parseCookieHeader(login.headers);
+    const root = await fetch(`${base}/`, { headers: { Cookie: sessionCookie }, redirect: 'manual' });
+    assert.equal(root.status, 303);
+    assert.equal(root.headers.get('location'), `/o/${org.id}/p/${project.id}`);
+  });
+});
+
 test('human login cannot self-select privileged actions or an unscoped session', async () => {
   const { src, org, project, human } = freshSource();
   await withServer(src, async (base) => {

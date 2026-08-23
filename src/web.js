@@ -14,12 +14,12 @@ export function esc(s) {
 
 function page(title, body) {
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
-<style>body{font-family:system-ui,sans-serif;max-width:900px;margin:2rem auto;padding:0 1rem;line-height:1.5}
+<style>:root{color-scheme:light}body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:1100px;margin:0 auto;padding:2rem 1.25rem;line-height:1.5;color:#1f2328;background:#fff}
 h1,h2{border-bottom:1px solid #eee;padding-bottom:.25rem}
 table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:.4rem;text-align:left}
 .badge{display:inline-block;padding:.1rem .5rem;border-radius:3px;font-size:.8rem;background:#eee}
 .ok{background:#d4edda;color:#155724}.missing{background:#f8d7da;color:#721c24}
-pre{background:#f6f8fa;padding:.75rem;overflow:auto}</style></head>
+pre{background:#f6f8fa;padding:.75rem;overflow:auto}.auth-shell{min-height:calc(100vh - 4rem);display:grid;place-items:center}.auth-card{width:min(100%,560px);border:1px solid #d0d7de;border-radius:14px;padding:2rem;box-shadow:0 8px 30px #1f232812}.auth-card h1{margin-top:0}.auth-card .brand{font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#57606a;font-size:.8rem}.auth-card form{margin:1.5rem 0 0}.auth-card label{display:block;margin:1rem 0;font-weight:600}.auth-card input:not([type=checkbox]){display:block;width:100%;box-sizing:border-box;margin-top:.35rem;padding:.65rem;border:1px solid #8c959f;border-radius:6px;font:inherit}.auth-card .check{display:flex;gap:.5rem;align-items:flex-start;font-weight:400}.auth-card .check input{margin-top:.35rem}.auth-card button{padding:.6rem 1rem;border:1px solid #1f2328;border-radius:7px;background:#1f2328;color:#fff;cursor:pointer;font:inherit}.auth-card .error{padding:.75rem;border-radius:7px;background:#ffebe9;color:#cf222e}.auth-card .help{padding:1rem;background:#f6f8fa;border-radius:8px;color:#57606a;font-size:.92rem}.auth-card code{word-break:break-word}</style></head>
 <body>${body}</body></html>`;
 }
 
@@ -179,19 +179,21 @@ export async function renderChangeAsync(src, orgId, projectId, changeId) {
 }
 
 export function renderLogin(opts = {}) {
-  const error = opts.error ? `<p style="color:#b00020">Error: ${esc(opts.error)}</p>` : '';
+  const errorText = opts.error === 'missing credential' ? 'Sign in to access this Source instance.' : opts.error;
+  const error = errorText ? `<p class="error" role="alert">${esc(errorText)}</p>` : '';
   return page(
     'Source Login',
-    `<h1>Sign in with a human principal</h1>
+    `<main class="auth-shell"><section class="auth-card" aria-labelledby="login-title"><p class="brand">Source · local control plane</p><h1 id="login-title">Sign in with a human principal</h1>
+<p>Use the principal, organization, and project IDs created for this Source instance.</p>
 ${error}
 <form method="POST" action="/login">
-  <label>Principal ID <input name="principalId" placeholder="human principal id" /></label><br/><br/>
-  <label>Password <input type="password" name="password" autocomplete="current-password" /></label><br/><br/>
-  <label>Org ID <input name="orgId" required /></label><br/><br/>
-  <label>Project ID <input name="projectId" required /></label><br/><br/>
-  <label><input type="checkbox" name="management" value="1" /> Enable project management controls (role-gated)</label><br/>
+  <label for="principal-id">Principal ID <input id="principal-id" name="principalId" placeholder="e.g. U1" autocomplete="username" required /></label>
+  <label for="password">Password <input id="password" type="password" name="password" autocomplete="current-password" required /></label>
+  <label for="org-id">Org ID <input id="org-id" name="orgId" placeholder="e.g. O1" required /></label>
+  <label for="project-id">Project ID <input id="project-id" name="projectId" placeholder="e.g. P1" required /></label>
+  <label class="check"><input type="checkbox" name="management" value="1" /> <span>Enable project management controls (role-gated)</span></label>
   <button type="submit">Sign in</button>
-</form>`,
+</form><div class="help"><strong>Starting a fresh local instance?</strong><br/>Run <code>node bin/source.js demo --password 'choose-a-strong-password'</code>, then use the IDs printed by the command. Source never ships with a default password.</div></section></main>`,
   );
 }
 
@@ -201,7 +203,8 @@ ${error}
 // checks as API clients.
 function nav(orgId, projectId) {
   const project = orgId && projectId ? ` <a href="/o/${esc(orgId)}/p/${esc(projectId)}">Project</a> · <a href="/o/${esc(orgId)}/p/${esc(projectId)}/actions">Actions</a> · <a href="/o/${esc(orgId)}/p/${esc(projectId)}/settings">Settings</a>` : '';
-  return `<nav><a href="/">Source</a>${project} · <form class="inline" method="POST" action="/logout"><button>Sign out</button></form></nav>`;
+  const home = orgId && projectId ? `/o/${esc(orgId)}/p/${esc(projectId)}` : '/';
+  return `<nav><a href="${home}">Source</a>${project} · <form class="inline" method="POST" action="/logout"><button>Sign out</button></form></nav>`;
 }
 
 function input(name, label, value = '', type = 'text') {
