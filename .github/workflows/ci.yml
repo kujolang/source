@@ -4,6 +4,10 @@ on:
   push:
   pull_request:
 
+concurrency:
+  group: source-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -29,7 +33,7 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16@sha256:e17e86066e5ef83e0952a9347f5c792b7ece00972e2aa787a6986f471b3dd3d5 # amd64 Linux image for Postgres 16
         env:
           POSTGRES_USER: source
           POSTGRES_PASSWORD: sourcepass
