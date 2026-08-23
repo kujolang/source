@@ -11,6 +11,7 @@
     "test": "node --test",
     "test:scale": "node --test tests/concurrency.test.js",
     "test:postgres": "node --test tests/postgres-live.test.js",
+    "test:container": "bash scripts/container-cluster-smoke.sh",
     "test:worker": "node --test tests/worker.test.js",
     "load": "node scripts/load.js",
     "backup": "node scripts/backup.js",

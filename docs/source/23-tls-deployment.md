@@ -98,6 +98,12 @@ runtime user (`1000`) before starting non-root nodes. The image is a serving
 node; action workers remain separate
 processes so container execution capacity can be scaled independently.
 
+The repeatable two-node smoke gate is available as `npm run test:container`.
+Set `SOURCE_TEST_DATABASE_URL` for host-side cleanup and
+`SOURCE_CONTAINER_DATABASE_URL` to a Postgres DSN reachable from containers;
+the script verifies both nodes, discovery, shared Git-volume permissions, and
+survival after stopping one node.
+
 ## Certificate management
 
 - **Let's Encrypt** (ACME) is the default recommendation for public domains;

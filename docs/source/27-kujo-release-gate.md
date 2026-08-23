@@ -23,6 +23,19 @@ separately:
 SOURCE_TEST_DATABASE_URL='postgresql://...' npm run test:postgres
 ```
 
+For a real container-cluster smoke test, provide both a host-cleanup DSN and a
+container-reachable DSN:
+
+```sh
+SOURCE_TEST_DATABASE_URL='postgresql:///postgres' \
+SOURCE_CONTAINER_DATABASE_URL='postgresql://source:password@host.docker.internal:5432/source' \
+npm run test:container
+```
+
+This starts two non-root serving nodes against one Postgres schema and named
+Git volume, checks readiness and discovery on both, stops one node, and checks
+that the peer remains ready.
+
 The live gate is intentionally not silently replaced by a local mock: external
 database, shared Git storage, failover, and deployment load remain deployment
 evidence rather than repository-only claims.
