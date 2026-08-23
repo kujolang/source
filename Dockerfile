@@ -1,4 +1,4 @@
-FROM node:20.19.5-bookworm
+FROM node:20.19.5-bookworm@sha256:ba36e9b2705008e63e354214f0e3011c528af9df2ca13ac2bd2c0114650302e6
 
 RUN apt-get update \
   && apt-get install --no-install-recommends -y ca-certificates git postgresql-client \
