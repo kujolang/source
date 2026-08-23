@@ -293,6 +293,8 @@ The full architecture, domain model, threat model, and MVP scope are in
 - `21-multi-tenant-orgs.md` — the org-scoped tenant boundary
 - `22-git-transport-auth.md` — capability-gated Git transport (Basic auth)
 - `23-tls-deployment.md` — TLS termination + self-host deployment path
+- `26-enterprise-readiness.md` — fleet resource controls and operational limits
+- `27-kujo-release-gate.md` — Kujo-backed deterministic release gate
 - `24-multi-repo-changes.md` — multi-repository Changes
 - `25-rate-limiting-scanning.md` — rate limiting + credential scanning
 - `27-workflows-actions.md` — durable workflow/action dispatch and idempotency
