@@ -37,7 +37,7 @@ function json(res, status, obj) {
   res.end(body);
 }
 
-function metrics(res, state, src, gitSlots, gitTenantSlots, artifactSlots, requestSlots, secretBroker) {
+function metrics(res, state, src, gitSlots, gitTenantSlots, artifactSlots, requestSlots, secretBroker, writerLease) {
   const lines = [
     '# HELP source_requests_total Total HTTP requests received.',
     '# TYPE source_requests_total counter',
@@ -135,6 +135,29 @@ function metrics(res, state, src, gitSlots, gitTenantSlots, artifactSlots, reque
       '# HELP source_secret_provider_health_failures_total Secret provider health check failures.',
       '# TYPE source_secret_provider_health_failures_total counter',
       `source_secret_provider_health_failures_total ${secretMetrics.healthFailures || 0}`,
+    );
+  }
+  const writerMetrics = typeof writerLease?.metrics === 'function' ? writerLease.metrics() : null;
+  if (writerMetrics) {
+    lines.push(
+      '# HELP source_writer_lease_active Whether this process currently holds the writer lease.',
+      '# TYPE source_writer_lease_active gauge',
+      `source_writer_lease_active ${writerMetrics.active || 0}`,
+      '# HELP source_writer_lease_acquisitions_total Writer lease acquisitions.',
+      '# TYPE source_writer_lease_acquisitions_total counter',
+      `source_writer_lease_acquisitions_total ${writerMetrics.acquisitions || 0}`,
+      '# HELP source_writer_lease_contention_total Writer lease acquisition contention events.',
+      '# TYPE source_writer_lease_contention_total counter',
+      `source_writer_lease_contention_total ${writerMetrics.contention || 0}`,
+      '# HELP source_writer_lease_renewals_total Writer lease renewals.',
+      '# TYPE source_writer_lease_renewals_total counter',
+      `source_writer_lease_renewals_total ${writerMetrics.renewals || 0}`,
+      '# HELP source_writer_lease_renewal_failures_total Writer lease renewal failures.',
+      '# TYPE source_writer_lease_renewal_failures_total counter',
+      `source_writer_lease_renewal_failures_total ${writerMetrics.renewalFailures || 0}`,
+      '# HELP source_writer_lease_lost_total Writer lease loss events.',
+      '# TYPE source_writer_lease_lost_total counter',
+      `source_writer_lease_lost_total ${writerMetrics.lost || 0}`,
     );
   }
   const canonicalSlots = src?.canonicalGlobalSlots;
@@ -476,7 +499,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
     const fields = url.searchParams.get('fields') || undefined;
 
     try {
-      if (req.method === 'GET' && pathname === '/metrics') return metrics(res, state, src, gitSlots, gitTenantSlots, artifactSlots, requestSlots, server.secretBroker);
+      if (req.method === 'GET' && pathname === '/metrics') return metrics(res, state, src, gitSlots, gitTenantSlots, artifactSlots, requestSlots, server.secretBroker, server.writerLease);
       if (server.draining && pathname !== '/healthz' && pathname !== '/readyz') {
         return json(res, 503, { error: 'server is draining' });
       }

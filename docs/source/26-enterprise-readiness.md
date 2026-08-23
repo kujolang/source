@@ -120,6 +120,9 @@ increasing fencing tokens. Nodes must acquire and renew a lease, pass an
 readiness and all mutating HTTP routes then fail closed with retryable `503`.
 This is split-brain protection for one control plane, not cross-database
 consensus.
+Writer ownership, contention, renewal failures, and lease loss are exposed as
+low-cardinality Prometheus metrics so failover and standby behavior can be
+alerted on rather than inferred from request failures.
 Request-body readers also terminate promptly on client aborts, preventing
 disconnected agent requests from retaining promises and admission state.
 HTTP requests also pass through a bounded process-local admission queue (2,048

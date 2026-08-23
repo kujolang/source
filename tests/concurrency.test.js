@@ -470,6 +470,7 @@ test('writer lease health gates readiness and fences mutating HTTP', async () =>
   const { src } = freshSource();
   const writerLease = {
     active: false,
+    metrics: () => ({ active: 0, acquisitions: 2, contention: 1, renewals: 3, renewalFailures: 1, lost: 1 }),
     async assertAsync() {
       if (!this.active) {
         const error = new Error('writer lease is not valid');
@@ -487,6 +488,9 @@ test('writer lease health gates readiness and fences mutating HTTP', async () =>
     assert.equal(blocked.headers.get('retry-after'), '1');
     writerLease.active = true;
     assert.equal((await fetch(`${base}/readyz`)).status, 200);
+    const metrics = await (await fetch(`${base}/metrics`)).text();
+    assert.match(metrics, /source_writer_lease_contention_total 1/);
+    assert.match(metrics, /source_writer_lease_lost_total 1/);
   } finally {
     server.closeAllConnections?.();
     server.close();

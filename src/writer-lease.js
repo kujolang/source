@@ -13,6 +13,7 @@ export class WriterLeaseController {
     this.lost = false;
     this.renewing = false;
     this.stopped = false;
+    this.counters = { acquisitions: 0, contention: 0, renewals: 0, renewalFailures: 0, lost: 0 };
   }
 
   async start() {
@@ -34,9 +35,13 @@ export class WriterLeaseController {
       }
       this.lease = lease;
       this.lost = false;
+      this.counters.acquisitions += 1;
       return true;
     } catch (error) {
-      if (error?.code === 'WRITER_LEASE_HELD') return false;
+      if (error?.code === 'WRITER_LEASE_HELD') {
+        this.counters.contention += 1;
+        return false;
+      }
       throw error;
     }
   }
@@ -55,9 +60,15 @@ export class WriterLeaseController {
         fencingToken: this.lease.fencingToken,
         leaseMs: this.leaseMs,
       });
-      if (renewed) this.lease = renewed;
-      else await this._markLost();
+      if (renewed) {
+        this.lease = renewed;
+        this.counters.renewals += 1;
+      } else {
+        this.counters.renewalFailures += 1;
+        await this._markLost();
+      }
     } catch {
+      this.counters.renewalFailures += 1;
       await this._markLost();
     } finally {
       this.renewing = false;
@@ -67,6 +78,7 @@ export class WriterLeaseController {
   async _markLost() {
     if (this.lost) return;
     this.lost = true;
+    this.counters.lost += 1;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     await this.onLost?.();
@@ -97,5 +109,12 @@ export class WriterLeaseController {
     const lease = this.lease;
     this.lease = null;
     if (lease) await this.store.releaseWriterLeaseAsync({ name: this.name, owner: this.owner, fencingToken: lease.fencingToken });
+  }
+
+  metrics() {
+    return {
+      active: Number(Boolean(this.lease && !this.lost)),
+      ...this.counters,
+    };
   }
 }
