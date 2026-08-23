@@ -158,3 +158,34 @@ test('worker jitters idle polling and outage backoff to avoid fleet synchronizat
   worker.jitterRatio = 0;
   assert.equal(worker._jitteredDelay(100), 100);
 });
+
+test('worker caps idle polling backoff for large idle fleets and resets after work', async () => {
+  const delays = [];
+  const originalSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (callback, delay) => {
+    delays.push(delay);
+    return originalSetTimeout(callback, 0);
+  };
+  let claims = 0;
+  const queue = {
+    async claim() {
+      claims += 1;
+      if (claims <= 3) return [];
+      if (claims === 4) return [{ id: 'J1', kind: 'work', payload: {} }];
+      return [];
+    },
+    async complete() {},
+    async fail() {},
+    async extend() {},
+  };
+  const worker = new SourceWorker({ queue, workerId: 'backoff-test', pollMs: 10, maxPollMs: 40, jitterRatio: 0, handlers: { work: async () => {} } });
+  try {
+    worker.start();
+    await waitFor(() => claims >= 5);
+    worker.stopping = true;
+    await worker.stop({ timeoutMs: 1_000 });
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+  }
+  assert.deepEqual(delays.filter((delay) => delay >= 10).slice(0, 3), [10, 20, 40]);
+});

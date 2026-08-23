@@ -52,6 +52,12 @@ for a worker fleet serving one project; tune the limit with
 Worker idle polls and transient-error backoff use bounded jitter by default, so
 large fleets do not wake and retry in lockstep after a queue or database event.
 Tune the range with `--worker-jitter-ratio` (default `0.2`, capped at `1`).
+Workers also exponentially back off when the queue is empty (from the configured
+poll interval to a 10-second ceiling by default), then immediately return to the
+base interval after claiming work. This prevents thousands of idle agents from
+generating a fixed-rate database polling storm while preserving prompt wake-up
+once work is available. Set `maxPollMs` on `SourceWorker` when the deployment
+needs a different idle ceiling.
 Workflow, organization, Work listing/dispatch, and repository-resolution paths
 use bounded bulk record reads on Postgres, so large tenants do not fan out into
 one database round trip per returned record. Bulk results preserve path order so

@@ -3,7 +3,7 @@
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class SourceWorker {
-  constructor({ queue, handlers = {}, workerId, concurrency = 8, leaseMs = 30_000, pollMs = 1_000, retryDelayMs = 1_000, maxAttempts = 5, projectBurst = 8, errorBackoffMs = 1_000, jitterRatio = 0.2, random = Math.random, handlerTimeoutMs = 15 * 60_000, shutdownTimeoutMs = 30_000, onError = null } = {}) {
+  constructor({ queue, handlers = {}, workerId, concurrency = 8, leaseMs = 30_000, pollMs = 1_000, maxPollMs = 10_000, retryDelayMs = 1_000, maxAttempts = 5, projectBurst = 8, errorBackoffMs = 1_000, jitterRatio = 0.2, random = Math.random, handlerTimeoutMs = 15 * 60_000, shutdownTimeoutMs = 30_000, onError = null } = {}) {
     if (!queue) throw new Error('queue is required');
     if (!workerId) throw new Error('workerId is required');
     this.queue = queue;
@@ -12,6 +12,8 @@ export class SourceWorker {
     this.concurrency = Math.min(1000, Math.max(1, Math.trunc(concurrency)));
     this.leaseMs = Math.max(1, Math.trunc(leaseMs));
     this.pollMs = Math.max(1, Math.trunc(pollMs));
+    const safeMaxPollMs = Number.isFinite(Number(maxPollMs)) ? Number(maxPollMs) : 10_000;
+    this.maxPollMs = Math.max(this.pollMs, Math.min(300_000, Math.trunc(safeMaxPollMs)));
     this.retryDelayMs = Math.max(0, Math.trunc(retryDelayMs));
     this.maxAttempts = Math.max(1, Math.trunc(maxAttempts));
     this.projectBurst = Math.min(1_000, Math.max(1, Math.trunc(projectBurst)));
@@ -58,6 +60,7 @@ export class SourceWorker {
 
   async _loop() {
     let failures = 0;
+    let idlePollMs = this.pollMs;
     while (!this.stopping) {
       let jobs;
       try {
@@ -70,9 +73,11 @@ export class SourceWorker {
         continue;
       }
       if (!jobs.length) {
-        await sleep(this._jitteredDelay(this.pollMs));
+        await sleep(this._jitteredDelay(idlePollMs));
+        idlePollMs = Math.min(this.maxPollMs, idlePollMs * 2);
         continue;
       }
+      idlePollMs = this.pollMs;
       await Promise.all(jobs.map((job) => this._runJob(job)));
     }
   }
