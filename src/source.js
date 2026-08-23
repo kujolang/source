@@ -73,6 +73,11 @@ export class Source {
     return typeof this.store.writeJsonAsync === 'function' ? this.store.writeJsonAsync(rel, value) : this.store.writeJson(rel, value);
   }
 
+  _asyncWriteMany(entries) {
+    if (typeof this.store.writeJsonManyAsync === 'function') return this.store.writeJsonManyAsync(entries.map(([relPath, obj]) => ({ relPath, obj })));
+    return this._asyncTransaction(() => Promise.all(entries.map(([relPath, obj]) => this._asyncWrite(relPath, obj))));
+  }
+
   _asyncAudit(entry) {
     return typeof this.store.auditAsync === 'function' ? this.store.auditAsync(entry) : this.store.audit(entry);
   }
@@ -224,10 +229,10 @@ export class Source {
     const id = await nextIdAsync(this.store, 'project');
     const project = createProject({ id, slug, name, description, visibility, ownerOrg: orgId });
     const rel = this._projectRel(orgId, id);
-    await this._asyncTransaction(async () => {
-      await this._asyncWrite(`${rel}/project.json`, project);
-      await this._asyncWrite(`${rel}/policy.json`, defaultPolicy());
-    });
+    await this._asyncWriteMany([
+      [`${rel}/project.json`, project],
+      [`${rel}/policy.json`, defaultPolicy()],
+    ]);
     await this._asyncAudit({ event: 'project.create', orgId, projectId: id, name });
     return project;
   }
@@ -741,10 +746,10 @@ export class Source {
     const id = await nextIdAsync(this.store, 'session');
     const session = createSession({ id, workId, principal: principalId, environment, baseCommit });
     work.sessions.push(id);
-    await this._asyncTransaction(async () => {
-      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/sessions/${id}.json`, session);
-      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work);
-    });
+    await this._asyncWriteMany([
+      [`${this._projectRel(orgId, projectId)}/sessions/${id}.json`, session],
+      [`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work],
+    ]);
     await this._asyncAudit({ event: 'session.start', orgId, projectId, workId, sessionId: id, principalId });
     return session;
   }
@@ -797,11 +802,12 @@ export class Source {
         : this.getSession(orgId, projectId, sessionId))
       : null;
     if (session) session.changes.push(id);
-    await this._asyncTransaction(async () => {
-      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/changes/${id}.json`, change);
-      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work);
-      if (session) await this._asyncWrite(`${this._projectRel(orgId, projectId)}/sessions/${sessionId}.json`, session);
-    });
+    const writes = [
+      [`${this._projectRel(orgId, projectId)}/changes/${id}.json`, change],
+      [`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work],
+    ];
+    if (session) writes.push([`${this._projectRel(orgId, projectId)}/sessions/${sessionId}.json`, session]);
+    await this._asyncWriteMany(writes);
     await this._asyncAudit({ event: 'change.submit', orgId, projectId, workId, changeId: id, baseCommit, headCommit });
     return change;
   }
@@ -869,10 +875,10 @@ export class Source {
     }
     const evidence = createEvidence({ id, subject, claim, type, producer, artifactRef, result, provenance, environment, sourceRevision, validity });
     change.evidence.push(id);
-    await this._asyncTransaction(async () => {
-      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/evidence/${id}.json`, evidence);
-      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/changes/${change.id}.json`, change);
-    });
+    await this._asyncWriteMany([
+      [`${this._projectRel(orgId, projectId)}/evidence/${id}.json`, evidence],
+      [`${this._projectRel(orgId, projectId)}/changes/${change.id}.json`, change],
+    ]);
     await this._asyncAudit({ event: 'evidence.add', orgId, projectId, changeId, evidenceId: id, type, claim, validity });
     return evidence;
   }
@@ -1109,11 +1115,12 @@ export class Source {
       else if (decision === 'rejected') transitionWork(work, 'rejected');
       else if (decision === 'revision_requested') transitionWork(work, 'revision_requested');
     }
-    await this._asyncTransaction(async () => {
-      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/decisions/${id}.json`, decisionRecord);
-      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/changes/${change.id}.json`, change);
-      if (work) await this._asyncWrite(`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work);
-    });
+    const writes = [
+      [`${this._projectRel(orgId, projectId)}/decisions/${id}.json`, decisionRecord],
+      [`${this._projectRel(orgId, projectId)}/changes/${change.id}.json`, change],
+    ];
+    if (work) writes.push([`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work]);
+    await this._asyncWriteMany(writes);
     await this._asyncAudit({ event: 'decision.make', orgId, projectId, changeId, decisionId: id, decision, decider });
     return decisionRecord;
   }

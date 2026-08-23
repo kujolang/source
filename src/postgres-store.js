@@ -813,6 +813,23 @@ class PostgresStore {
     return this.transactionAsync(() => this._writeJsonAsync(relPath, obj));
   }
 
+  // Domain mutations commonly update a primary record plus one or more
+  // projections. Keep the whole fan-out on one pooled client and transaction
+  // so bursty agent traffic does not pay one checkout/commit per record.
+  async writeJsonManyAsync(entries) {
+    if (!Array.isArray(entries) || entries.length < 1 || entries.length > MAX_BULK_RECORD_READS) {
+      throw new Error(`bulk record write must contain 1-${MAX_BULK_RECORD_READS} entries`);
+    }
+    for (const entry of entries) {
+      if (!entry || typeof entry.relPath !== 'string' || !entry.relPath || entry.relPath.length > 1_000) {
+        throw new Error('record path is invalid');
+      }
+    }
+    return this.transactionAsync(async () => {
+      for (const { relPath, obj } of entries) await this._writeJsonAsync(relPath, obj);
+    });
+  }
+
   async _writeJsonAsync(relPath, obj) {
     const classified = this._classifyRelPath(relPath);
     await this._runAsync(`INSERT INTO ${this._qualified('records')} (path, kind, org_id, project_id, entity_id, json)

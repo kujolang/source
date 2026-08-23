@@ -87,6 +87,26 @@ test('Postgres async transactions keep all statements on one pooled client', asy
   assert.deepEqual(calls, ['BEGIN', 'SELECT 1', 'COMMIT', 'RELEASE']);
 });
 
+test('Postgres bulk record writes use one transaction for projection fan-out', async () => {
+  const calls = [];
+  const client = {
+    async query(sql) {
+      calls.push(String(sql).trim());
+      return { rows: [] };
+    },
+    release() { calls.push('RELEASE'); },
+  };
+  const store = Object.create(PostgresStore.prototype);
+  store.pool = { connect: async () => client };
+  store._asyncTransaction = new (await import('node:async_hooks')).AsyncLocalStorage();
+  store._writeJsonAsync = async (relPath) => { await store._runAsync(`WRITE ${relPath}`); };
+  await store.writeJsonManyAsync([
+    { relPath: 'a.json', obj: { id: 'A' } },
+    { relPath: 'b.json', obj: { id: 'B' } },
+  ]);
+  assert.deepEqual(calls, ['BEGIN', 'WRITE a.json', 'WRITE b.json', 'COMMIT', 'RELEASE']);
+});
+
 test('async change submission does not fall back to synchronous reads for missing sessions', async () => {
   const { src, org, project, agent } = freshSource();
   const work = await src.createWorkAsync({ orgId: org.id, projectId: project.id, intent: 'async change', requester: agent.id });
