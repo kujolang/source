@@ -108,14 +108,15 @@ export class SqliteStore {
     return `${prefix}${Number(row.value)}`;
   }
 
-  allowRateLimit(key, limit, windowMs, now = Date.now()) {
+  allowRateLimit(key, limit, windowMs, now = Date.now(), cost = 1) {
+    const safeCost = Math.min(1000, Math.max(1, Math.trunc(cost)));
     const row = this.db.prepare(`
-      INSERT INTO rate_limits (key, count, reset_at) VALUES (?, 1, ?)
+      INSERT INTO rate_limits (key, count, reset_at) VALUES (?, ?, ?)
       ON CONFLICT(key) DO UPDATE SET
-        count = CASE WHEN ? >= rate_limits.reset_at THEN 1 ELSE rate_limits.count + 1 END,
+        count = CASE WHEN ? >= rate_limits.reset_at THEN ? ELSE rate_limits.count + ? END,
         reset_at = CASE WHEN ? >= rate_limits.reset_at THEN ? ELSE rate_limits.reset_at END
       RETURNING count
-    `).get(key, now + windowMs, now, now, now + windowMs);
+    `).get(key, safeCost, now + windowMs, now, safeCost, safeCost, now, now + windowMs);
     return Number(row.count) <= limit;
   }
 

@@ -959,13 +959,14 @@ class PostgresStore {
     return Array.from({ length: safeCount }, (_, index) => `${prefix}${end - safeCount + index + 1}`);
   }
 
-  allowRateLimit(key, limit, windowMs, now = Date.now()) {
+  allowRateLimit(key, limit, windowMs, now = Date.now(), cost = 1) {
+    const safeCost = Math.min(1000, Math.max(1, Math.trunc(cost)));
     this._cleanupRateLimits(now);
     const out = this._run(`
       INSERT INTO ${this._qualified('rate_limits')} (key, count, reset_at)
-      VALUES (${escapeSqlLiteral(key)}, 1, ${escapeSqlLiteral(now + windowMs)})
+      VALUES (${escapeSqlLiteral(key)}, ${safeCost}, ${escapeSqlLiteral(now + windowMs)})
       ON CONFLICT (key) DO UPDATE SET
-        count = CASE WHEN ${escapeSqlLiteral(now)} >= ${this._qualified('rate_limits')}.reset_at THEN 1 ELSE ${this._qualified('rate_limits')}.count + 1 END,
+        count = CASE WHEN ${escapeSqlLiteral(now)} >= ${this._qualified('rate_limits')}.reset_at THEN ${safeCost} ELSE ${this._qualified('rate_limits')}.count + ${safeCost} END,
         reset_at = CASE WHEN ${escapeSqlLiteral(now)} >= ${this._qualified('rate_limits')}.reset_at THEN ${escapeSqlLiteral(now + windowMs)} ELSE ${this._qualified('rate_limits')}.reset_at END
       RETURNING count
     `);
@@ -974,13 +975,14 @@ class PostgresStore {
 
   // Async counterpart for request-path throttles. This uses the pooled client
   // when available while preserving the same atomic SQL update.
-  async allowRateLimitAsync(key, limit, windowMs, now = Date.now()) {
+  async allowRateLimitAsync(key, limit, windowMs, now = Date.now(), cost = 1) {
+    const safeCost = Math.min(1000, Math.max(1, Math.trunc(cost)));
     await this._cleanupRateLimitsAsync(now);
     const out = await this._runAsync(`
       INSERT INTO ${this._qualified('rate_limits')} (key, count, reset_at)
-      VALUES (${escapeSqlLiteral(key)}, 1, ${escapeSqlLiteral(now + windowMs)})
+      VALUES (${escapeSqlLiteral(key)}, ${safeCost}, ${escapeSqlLiteral(now + windowMs)})
       ON CONFLICT (key) DO UPDATE SET
-        count = CASE WHEN ${escapeSqlLiteral(now)} >= ${this._qualified('rate_limits')}.reset_at THEN 1 ELSE ${this._qualified('rate_limits')}.count + 1 END,
+        count = CASE WHEN ${escapeSqlLiteral(now)} >= ${this._qualified('rate_limits')}.reset_at THEN ${safeCost} ELSE ${this._qualified('rate_limits')}.count + ${safeCost} END,
         reset_at = CASE WHEN ${escapeSqlLiteral(now)} >= ${this._qualified('rate_limits')}.reset_at THEN ${escapeSqlLiteral(now + windowMs)} ELSE ${this._qualified('rate_limits')}.reset_at END
       RETURNING count
     `);

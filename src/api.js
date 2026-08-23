@@ -826,7 +826,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
         if (rest === '/jobs/batch' && req.method === 'POST') {
           const body = await readBody(req, maxJsonBodyBytes);
           const ip = clientAddress(req, trustProxy);
-          if (!(await limiter.allowAsync(`jobbatch:${ip}:${orgId}:${projectId}`, limits.jobEnqueue))) {
+          if (!(await limiter.allowAsync(`jobbatch:${ip}:${orgId}:${projectId}`, { ...limits.jobEnqueue, cost: Array.isArray(body.jobs) ? body.jobs.length : 1 }))) {
             return json(res, 429, { error: 'rate limit exceeded' });
           }
           if (!Array.isArray(body.jobs) || body.jobs.length < 1 || body.jobs.length > 100) {

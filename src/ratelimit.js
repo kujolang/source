@@ -15,26 +15,27 @@ export class RateLimiter {
 
   // Fixed-window counter. Returns true if the request is allowed, false if the
   // key has exceeded `limit` within the current `windowMs` window.
-  allow(key, { limit, windowMs }) {
+  allow(key, { limit, windowMs, cost = 1 }) {
     const now = Date.now();
     if (this.store && typeof this.store.allowRateLimit === 'function') {
-      return this.store.allowRateLimit(key, limit, windowMs, now);
+      return this.store.allowRateLimit(key, limit, windowMs, now, cost);
     }
-    return this._allowInMemory(key, limit, windowMs, now);
+    return this._allowInMemory(key, limit, windowMs, now, cost);
   }
 
-  async allowAsync(key, { limit, windowMs }) {
+  async allowAsync(key, { limit, windowMs, cost = 1 }) {
     const now = Date.now();
     if (this.store && typeof this.store.allowRateLimitAsync === 'function') {
-      return this.store.allowRateLimitAsync(key, limit, windowMs, now);
+      return this.store.allowRateLimitAsync(key, limit, windowMs, now, cost);
     }
     if (this.store && typeof this.store.allowRateLimit === 'function') {
-      return this.store.allowRateLimit(key, limit, windowMs, now);
+      return this.store.allowRateLimit(key, limit, windowMs, now, cost);
     }
-    return this._allowInMemory(key, limit, windowMs, now);
+    return this._allowInMemory(key, limit, windowMs, now, cost);
   }
 
-  _allowInMemory(key, limit, windowMs, now) {
+  _allowInMemory(key, limit, windowMs, now, cost = 1) {
+    const safeCost = Math.min(1000, Math.max(1, Math.trunc(cost)));
     if (this.buckets.size >= this.maxKeys && !this.buckets.has(key)) {
       for (const [candidate, bucket] of this.buckets) {
         if (now >= bucket.resetAt) this.buckets.delete(candidate);
@@ -47,8 +48,8 @@ export class RateLimiter {
       b = { count: 0, resetAt: now + windowMs };
       this.buckets.set(key, b);
     }
-    if (b.count >= limit) return false;
-    b.count += 1;
+    if (b.count + safeCost > limit) return false;
+    b.count += safeCost;
     return true;
   }
 

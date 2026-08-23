@@ -20,6 +20,13 @@ test('RateLimiter allows up to the limit then rejects', () => {
   assert.equal(rl.allow('other', opts), true);
 });
 
+test('RateLimiter charges batch cost against the fixed window', () => {
+  const rl = new RateLimiter();
+  const opts = { limit: 3, windowMs: 60_000, cost: 2 };
+  assert.equal(rl.allow('batch', opts), true);
+  assert.equal(rl.allow('batch', opts), false);
+});
+
 test('RateLimiter resets after the window elapses', async () => {
   const rl = new RateLimiter();
   const opts = { limit: 1, windowMs: 15 };
