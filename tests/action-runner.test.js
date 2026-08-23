@@ -4,6 +4,8 @@ import { createGitHubActionsHandler, EphemeralWorkspaceManager, IsolatedActionRu
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 
 test('isolated runner builds a bounded no-network container command', () => {
   const runner = new IsolatedActionRunner({ image: 'kujo/runner:latest', workspaceRoot: '/srv/workspaces' });
@@ -32,6 +34,25 @@ test('isolated runner bounds container admission independently of workspaces', a
     /capacity exhausted/,
   );
   release();
+});
+
+test('isolated runner releases admission after a runtime exits', async () => {
+  const child = new EventEmitter();
+  child.pid = 1234;
+  child.killed = false;
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  child.kill = () => { child.killed = true; };
+  const runner = new IsolatedActionRunner({
+    runtime: 'docker', image: 'kujo/runner:latest', workspaceRoot: '/srv/workspaces', maxActive: 1, queue: 0,
+    spawnProcess: () => {
+      setImmediate(() => child.emit('close', 0, null));
+      return child;
+    },
+  });
+  const result = await runner.run({ steps: [{ run: 'printf ok' }] }, { workspace: '/srv/workspaces/job-1' });
+  assert.equal(result.ok, true);
+  assert.equal(runner.slots.active, 0);
 });
 
 test('GitHub handler resolves an isolated workspace and passes brokered secrets by name', async () => {

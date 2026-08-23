@@ -6,6 +6,7 @@
 // by CPU, memory, PIDs, output, and wall-clock limits.
 
 import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { Semaphore } from './concurrency.js';
@@ -57,6 +58,21 @@ function killRuntimeProcess(child) {
   try { child.kill('SIGKILL'); } catch { /* process may have already exited */ }
 }
 
+function removeRuntimeContainer(runtime, name) {
+  return new Promise((resolve) => {
+    if (!name) return resolve();
+    const stopper = spawn(runtime, ['rm', '--force', name], { stdio: 'ignore' });
+    const timer = setTimeout(() => {
+      try { stopper.kill('SIGKILL'); } catch { /* process may have already exited */ }
+      resolve();
+    }, 5_000);
+    timer.unref?.();
+    const finish = () => { clearTimeout(timer); resolve(); };
+    stopper.once('error', finish);
+    stopper.once('close', finish);
+  });
+}
+
 export class EphemeralWorkspaceManager {
   constructor({ root, maxActive = 256, queue = 512 } = {}) {
     if (typeof root !== 'string' || !root) throw new Error('workspace root is required');
@@ -92,7 +108,7 @@ export class EphemeralWorkspaceManager {
 }
 
 export class IsolatedActionRunner {
-  constructor({ runtime = 'podman', image, workspaceRoot, timeoutMs = 15 * 60_000, maxOutputBytes = 8 * 1024 * 1024, memory = '1g', cpus = 2, pidsLimit = 256, allowNetwork = false, user = '65532:65532', maxActive = 256, queue = 512 } = {}) {
+  constructor({ runtime = 'podman', image, workspaceRoot, timeoutMs = 15 * 60_000, maxOutputBytes = 8 * 1024 * 1024, memory = '1g', cpus = 2, pidsLimit = 256, allowNetwork = false, user = '65532:65532', maxActive = 256, queue = 512, spawnProcess = spawn } = {}) {
     if (runtime !== 'podman' && runtime !== 'docker') throw new Error('isolated runner runtime must be podman or docker');
     this.runtime = runtime;
     this.image = safeImage(image);
@@ -104,12 +120,14 @@ export class IsolatedActionRunner {
     this.pidsLimit = boundedInteger(pidsLimit, 256, 16, 10_000);
     this.allowNetwork = allowNetwork === true;
     this.user = safeImage(user);
+    this.spawnProcess = typeof spawnProcess === 'function' ? spawnProcess : spawn;
     this.slots = new Semaphore({ capacity: boundedInteger(maxActive, 256, 1, 10_000), queue: boundedInteger(queue, 512, 0, 100_000) });
   }
 
-  buildArgs({ steps, envKeys = [] }, workspace) {
+  buildArgs({ steps, envKeys = [], containerName = null }, workspace) {
     const workspacePath = safeWorkspace(this.workspaceRoot, workspace);
     const args = ['run', '--rm', '--init', '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges', `--pids-limit=${this.pidsLimit}`, `--memory=${this.memory}`, `--cpus=${this.cpus}`, '--tmpfs', '/tmp:rw,noexec,nosuid,size=64m', '--user', this.user];
+    if (containerName) args.push('--name', containerName);
     if (!this.allowNetwork) args.push('--network=none');
     args.push('--env', 'CI=true', '--env', 'GITHUB_ACTIONS=true', '--env', 'GITHUB_WORKSPACE=/workspace');
     for (const key of envKeys) args.push('--env', key);
@@ -118,13 +136,14 @@ export class IsolatedActionRunner {
   }
 
   async run({ steps }, { workspace, env = {} } = {}) {
-    const releaseSlot = await this.slots.acquire();
+    let releaseSlot = await this.slots.acquire();
     if (!releaseSlot) throw new Error('isolated runner capacity exhausted');
     const safeEnv = safeEnvironment(env);
+    const containerName = `source-action-${process.pid}-${Date.now()}-${randomBytes(6).toString('hex')}`;
     let child;
     try {
-      const args = this.buildArgs({ steps, envKeys: Object.keys(safeEnv) }, workspace);
-      child = spawn(this.runtime, args, {
+      const args = this.buildArgs({ steps, envKeys: Object.keys(safeEnv), containerName }, workspace);
+      child = this.spawnProcess(this.runtime, args, {
         detached: process.platform !== 'win32',
         stdio: ['ignore', 'pipe', 'pipe'],
         env: {
@@ -151,8 +170,10 @@ export class IsolatedActionRunner {
         if (settled) return;
         killRuntimeProcess(child);
         settled = true;
-        release();
-        reject(new Error('isolated workflow timed out'));
+        void removeRuntimeContainer(this.runtime, containerName).finally(() => {
+          release();
+          reject(new Error('isolated workflow timed out'));
+        });
       }, this.timeoutMs);
       timer.unref?.();
       const collect = (target, chunk) => {
@@ -161,8 +182,10 @@ export class IsolatedActionRunner {
           settled = true;
           killRuntimeProcess(child);
           clearTimeout(timer);
-          release();
-          reject(new Error('isolated workflow output exceeded configured limit'));
+          void removeRuntimeContainer(this.runtime, containerName).finally(() => {
+            release();
+            reject(new Error('isolated workflow output exceeded configured limit'));
+          });
           return;
         }
         target.push(chunk);

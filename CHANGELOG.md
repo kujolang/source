@@ -21,7 +21,8 @@ All notable changes to Source are recorded here.
 - Batched Change decision reads and capped decision relationship growth at
   1,000 entries, removing another large-Change query fan-out path.
 - Hardened isolated action timeout/output cleanup to kill the runtime process
-  group, preventing orphaned containers from consuming worker capacity.
+  group and explicitly remove the named runtime container, preventing orphaned
+  containers from consuming worker capacity.
 - Fixed maximum-size Postgres keyset pagination by allowing one bounded
   lookahead row, so 1,000-item pages continue to return a correct next cursor.
 - Added durable workflow job dependencies with cycle validation and

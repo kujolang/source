@@ -67,5 +67,6 @@ active and 512 queued by default), independent of workspace admission. This
 prevents multiple worker handlers sharing one runner from overwhelming the
 container host; tune `maxActive` and `queue` for the deployment.
 Timeout and output-limit cleanup terminates the runtime process group as well
-as the direct runtime process, preventing orphaned containers from consuming
-capacity after a failed or hung action.
+as the direct runtime process and explicitly removes the named runtime
+container, preventing orphaned containers from consuming capacity after a
+failed or hung action.
