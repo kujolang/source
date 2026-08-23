@@ -178,6 +178,12 @@ test('Postgres record directory listings have a prefix-search index', () => {
   assert.match(source, /path text_pattern_ops/);
 });
 
+test('Postgres fair worker claims have a tenant/status/time index', () => {
+  const source = readFileSync(new URL('../src/postgres-store.js', import.meta.url), 'utf8');
+  assert.match(source, /jobs_fair/);
+  assert.match(source, /org_id, project_id, status, available_at, leased_until, created_at, id/);
+});
+
 test('SQLite counter allocation returns unique monotonic IDs', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'source-counter-'));
   const store = new SqliteStore(root);

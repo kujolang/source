@@ -453,6 +453,7 @@ class PostgresStore {
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_ready`)} ON ${this._qualified('jobs')} (available_at, created_at, id) WHERE status = 'queued'`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_expired`)} ON ${this._qualified('jobs')} (leased_until, created_at, id) WHERE status = 'leased'`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_scope`)} ON ${this._qualified('jobs')} (org_id, project_id, work_id, created_at)`);
+    this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_fair`)} ON ${this._qualified('jobs')} (org_id, project_id, status, available_at, leased_until, created_at, id)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_active_scope`)} ON ${this._qualified('jobs')} (org_id, project_id, status, created_at) WHERE status IN ('queued', 'leased')`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_leased`)} ON ${this._qualified('jobs')} (leased_until, created_at) WHERE status = 'leased'`);
     this._run(`CREATE UNIQUE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_dedupe`)} ON ${this._qualified('jobs')} (dedupe_key) WHERE dedupe_key IS NOT NULL`);

@@ -36,6 +36,9 @@ The queue has dedicated partial indexes for ready and expired leases so worker
 claim scans remain bounded as completed history grows. Each claim also caps
 expired-attempt cleanup at 1,000 rows, preventing a recovery storm from
 rewriting an unbounded backlog in one transaction.
+Fair multi-project claims additionally use a tenant/status/time index aligned
+with the partitioned ranking query, reducing unrelated queue-history work as
+the backlog grows.
 Claims apply a bounded per-project burst (8 by default) when multiple projects
 are eligible, while allowing a single eligible project to fill the requested
 batch. This provides fair progress across tenants without reducing throughput

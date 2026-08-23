@@ -37,6 +37,7 @@ All notable changes to Source are recorded here.
   disconnected-agent promises pending.
 - Added independent bounded admission to isolated action runners so shared
   worker processes cannot spawn unbounded containers.
+- Added a tenant/status/time index aligned with fair Postgres worker claims.
 
 ## [0.1.0]
 
