@@ -115,6 +115,10 @@ class PostgresStore {
     this._asyncTransaction = new AsyncLocalStorage();
     this._txDepth = 0;
     this._rateLimitOps = 0;
+    this._jobWakeupChannel = `source_jobs_${createHash('sha256').update(String(schema)).digest('hex').slice(0, 24)}`;
+    this._jobListenerClient = null;
+    this._jobListenerPromise = null;
+    this._jobWaiters = new Set();
 
     // Schema creation is intentionally serialized across serving nodes. The
     // legacy psql bootstrap uses one short-lived session per statement, so the
@@ -240,6 +244,73 @@ class PostgresStore {
   async _runJsonCommandAsync(sql) {
     const out = await this._runAsync(sql);
     return out ? JSON.parse(out) : [];
+  }
+
+  async _notifyJobsAsync() {
+    try {
+      await this._runAsync(`SELECT pg_notify(${escapeSqlLiteral(this._jobWakeupChannel)}, '')`);
+    } catch (error) {
+      // Notifications are an optimization. Polling remains the correctness
+      // fallback when LISTEN/NOTIFY is unavailable or temporarily unhealthy.
+      this.lastPoolError = error;
+    }
+  }
+
+  async _ensureJobListenerAsync() {
+    if (this._jobListenerClient) return true;
+    if (this._jobListenerPromise) return this._jobListenerPromise;
+    this._jobListenerPromise = (async () => {
+      const listenerOptions = { connectionString: this.dsn, ...this.connectionOptions };
+      delete listenerOptions.env;
+      delete listenerOptions.noPassword;
+      delete listenerOptions.maxConnections;
+      delete listenerOptions.fallbackConcurrency;
+      delete listenerOptions.fallbackTimeoutMs;
+      const client = new pg.Client(listenerOptions);
+      try {
+        await client.connect();
+        await client.query(`LISTEN ${escapeSqlIdent(this._jobWakeupChannel)}`);
+      } catch (error) {
+        await client.end().catch(() => {});
+        throw error;
+      }
+      const reset = () => {
+        if (this._jobListenerClient !== client) return;
+        this._jobListenerClient = null;
+        for (const waiter of this._jobWaiters) waiter(false);
+        this._jobWaiters.clear();
+      };
+      client.on('notification', () => {
+        for (const waiter of this._jobWaiters) waiter(true);
+        this._jobWaiters.clear();
+      });
+      client.on('error', reset);
+      this._jobListenerClient = client;
+      return true;
+    })().finally(() => { this._jobListenerPromise = null; });
+    return this._jobListenerPromise;
+  }
+
+  async waitForWorkAsync({ timeoutMs = 10_000 } = {}) {
+    const timeout = Math.min(300_000, Math.max(1, Math.trunc(timeoutMs)));
+    try {
+      await this._ensureJobListenerAsync();
+    } catch {
+      return false;
+    }
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (woken) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        this._jobWaiters.delete(finish);
+        resolve(woken);
+      };
+      const timer = setTimeout(() => finish(false), timeout);
+      timer.unref?.();
+      this._jobWaiters.add(finish);
+    });
   }
 
   _fetchJsonRow(sql) {
@@ -1237,12 +1308,16 @@ class PostgresStore {
           WHERE org_id = ${escapeSqlLiteral(orgId)} AND project_id = ${escapeSqlLiteral(projectId)}
             AND status IN ('queued', 'leased')`);
         if (Number(current || 0) >= safeDepth) return '';
-        return insert();
+        const result = await insert();
+        await this._notifyJobsAsync();
+        return result;
       });
     } else {
       inserted = await this.transactionAsync(async () => {
         await validateDependencies();
-        return insert();
+        const result = await insert();
+        await this._notifyJobsAsync();
+        return result;
       });
     }
     if (typeof inserted === 'string' && inserted.startsWith('dedupe:')) {
@@ -1323,6 +1398,7 @@ class PostgresStore {
           ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING
           RETURNING id, dedupe_key AS key
       ) SELECT COALESCE(json_agg(row_to_json(inserted)), '[]'::json)::text AS rows FROM inserted`);
+      await this._notifyJobsAsync();
       const insertedIds = new Set(inserted.map((row) => row.id));
       const insertedByKey = new Map(inserted.filter((row) => row.key).map((row) => [row.key, row.id]));
       const resolved = dedupeKeys.length
@@ -1586,6 +1662,14 @@ class PostgresStore {
   }
 
   async closeAsync() {
+    for (const waiter of this._jobWaiters) waiter(false);
+    this._jobWaiters.clear();
+    if (this._jobListenerClient) {
+      const client = this._jobListenerClient;
+      this._jobListenerClient = null;
+      await client.query('UNLISTEN *').catch(() => {});
+      await client.end().catch(() => {});
+    }
     await this.pool.end();
   }
 

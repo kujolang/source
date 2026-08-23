@@ -58,6 +58,11 @@ base interval after claiming work. This prevents thousands of idle agents from
 generating a fixed-rate database polling storm while preserving prompt wake-up
 once work is available. Set `maxPollMs` on `SourceWorker` when the deployment
 needs a different idle ceiling.
+Postgres-backed workers additionally use one process-level `LISTEN` connection
+and enqueue-side `NOTIFY` wakeups, so active queue producers wake an idle worker
+fleet without requiring one database connection per worker. Notification failure
+is non-fatal: bounded polling remains the correctness fallback. Worker shutdown
+interrupts outstanding wake waits rather than waiting for the full poll ceiling.
 Workflow, organization, Work listing/dispatch, and repository-resolution paths
 use bounded bulk record reads on Postgres, so large tenants do not fan out into
 one database round trip per returned record. Bulk results preserve path order so

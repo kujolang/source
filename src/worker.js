@@ -26,6 +26,7 @@ export class SourceWorker {
     this.lastError = null;
     this.stopping = false;
     this.running = null;
+    this._idleWaiters = new Set();
   }
 
   start() {
@@ -37,6 +38,8 @@ export class SourceWorker {
 
   async stop({ timeoutMs = this.shutdownTimeoutMs } = {}) {
     this.stopping = true;
+    for (const wake of this._idleWaiters) wake();
+    this._idleWaiters.clear();
     if (!this.running) return true;
     const safeTimeout = Math.min(300_000, Math.max(0, Math.trunc(timeoutMs)));
     if (!safeTimeout) {
@@ -73,7 +76,18 @@ export class SourceWorker {
         continue;
       }
       if (!jobs.length) {
-        await sleep(this._jitteredDelay(idlePollMs));
+        const delay = this._jitteredDelay(idlePollMs);
+        if (typeof this.queue.waitForWork === 'function') {
+          let wakeStopWait;
+          const stopWait = new Promise((resolve) => {
+            wakeStopWait = () => resolve();
+            this._idleWaiters.add(wakeStopWait);
+          });
+          await Promise.race([this.queue.waitForWork({ timeoutMs: delay }), stopWait]).catch(() => {});
+          this._idleWaiters.delete(wakeStopWait);
+        } else {
+          await sleep(delay);
+        }
         idlePollMs = Math.min(this.maxPollMs, idlePollMs * 2);
         continue;
       }

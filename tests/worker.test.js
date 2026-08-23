@@ -189,3 +189,38 @@ test('worker caps idle polling backoff for large idle fleets and resets after wo
   }
   assert.deepEqual(delays.filter((delay) => delay >= 10).slice(0, 3), [10, 20, 40]);
 });
+
+test('worker uses queue wakeups when available and retains polling fallback semantics', async () => {
+  const waits = [];
+  let claims = 0;
+  let worker;
+  const queue = {
+    async claim() {
+      claims += 1;
+      return claims === 2 ? [{ id: 'J1', kind: 'work', payload: {} }] : [];
+    },
+    async waitForWork(options) {
+      waits.push(options.timeoutMs);
+      if (waits.length === 2) worker.stopping = true;
+    },
+    async complete() {},
+    async fail() {},
+    async extend() {},
+  };
+  worker = new SourceWorker({ queue, workerId: 'wakeup-test', pollMs: 10, jitterRatio: 0, handlers: { work: async () => {} } });
+  worker.start();
+  await worker.running;
+  assert.deepEqual(waits, [10, 10]);
+});
+
+test('worker shutdown interrupts an outstanding queue wakeup wait', async () => {
+  let waiting;
+  const queue = {
+    async claim() { return []; },
+    async waitForWork() { await new Promise((resolve) => { waiting = resolve; }); },
+  };
+  const worker = new SourceWorker({ queue, workerId: 'wakeup-stop-test', pollMs: 10_000, handlers: {} });
+  worker.start();
+  await waitFor(() => typeof waiting === 'function');
+  assert.equal(await worker.stop({ timeoutMs: 100 }), true);
+});
