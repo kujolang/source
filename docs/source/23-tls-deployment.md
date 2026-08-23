@@ -245,6 +245,10 @@ provides metadata consensus.
 Pass `--require-replication` to `source serve` to make `/readyz` enforce the
 same requirement continuously. A node whose primary has lost its required
 standby then remains out of service until the deployment recovers replication.
+When `--replication-role standby` is used, the application node also fences
+all mutating HTTP and Git requests while continuing to serve liveness,
+readiness, metrics, and read traffic. This prevents an accidentally writable
+standby from becoming a split-brain writer during promotion.
 
 ## Security notes
 

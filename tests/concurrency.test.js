@@ -443,6 +443,24 @@ test('required replication keeps a node out of readiness without a durable gate'
   }
 });
 
+test('standby replicas fence all mutating HTTP and Git requests', async () => {
+  const { src } = freshSource();
+  const server = await startServer(src, { port: 0, replicationRole: 'standby' });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    assert.equal((await fetch(`${base}/healthz`)).status, 200);
+    assert.equal((await fetch(`${base}/readyz`)).status, 200);
+    const response = await fetch(`${base}/login`, { method: 'POST', body: '{}' });
+    assert.equal(response.status, 503);
+    assert.equal(response.headers.get('retry-after'), '5');
+    assert.equal((await fetch(`${base}/git/O1/P1/R1.git/git-receive-pack`, { method: 'POST', body: Buffer.from('push') })).status, 503);
+    assert.equal(server.readOnly, true);
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});
+
 test('Git-backed scan requests honor the shared concurrency budget', async () => {
   const { src, org, project } = freshSource();
   const cap = src.capabilities.issue({
