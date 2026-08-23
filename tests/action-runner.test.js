@@ -196,8 +196,9 @@ test('secret lease broker binds identity, avoids caching, and audits without val
 test('secret provider module loader enforces the production adapter contract', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'source-secret-provider-'));
   const modulePath = path.join(root, 'provider.mjs');
-  await writeFile(modulePath, `export const resolveIdentity = async () => 'module-agent';\nexport const resolveSecretLease = async () => ({ TOKEN: 'module-secret' });\nexport const auditSecretLease = () => {};\n`, 'utf8');
+  await writeFile(modulePath, `export const resolveIdentity = async () => 'module-agent';\nexport const resolveSecretLease = async () => ({ TOKEN: 'module-secret' });\nexport const auditSecretLease = () => {};\nexport const checkHealth = async () => true;\n`, 'utf8');
   const broker = await loadSecretLeaseBroker({ modulePath, leaseMs: 2_000 });
+  assert.equal(await broker.checkHealth(), true);
   assert.deepEqual(await broker.get({ parameters: { secretRefs: [] } }, { id: 'J-module' }), { TOKEN: 'module-secret' });
   const invalidPath = path.join(root, 'invalid.mjs');
   await writeFile(invalidPath, 'export const resolveSecretLease = async () => ({});\n', 'utf8');
@@ -225,6 +226,9 @@ test('HTTPS secret provider adapter rotates auth and enforces bounded lease resp
   assert.equal(tokenCalls, 1);
   assert.equal(request.url, 'https://secrets.example.test/api/v1/leases');
   assert.match(request.options.headers.authorization, /^Bearer rotated-token-1$/);
+  await provider.checkHealth();
+  assert.equal(tokenCalls, 2);
+  assert.equal(request.url, 'https://secrets.example.test/api/v1/health');
   assert.throws(() => new HttpSecretProvider({ baseUrl: 'http://secrets.example.test', token: 'x' }), /HTTPS/);
   const broker = createHttpSecretBroker({
     baseUrl: 'https://secrets.example.test', token: 'x', identity: 'agent-1', audit: () => {},

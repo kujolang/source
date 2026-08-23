@@ -56,14 +56,22 @@ function safeEnvironment(env) {
 // recording secret values. Providers should implement rotation and revocation
 // behind `resolve` rather than handing Source a long-lived secret store.
 export class SecretLeaseBroker {
-  constructor({ resolve, identity, audit, leaseMs = 15 * 60_000 } = {}) {
+  constructor({ resolve, identity, audit, healthCheck = null, leaseMs = 15 * 60_000 } = {}) {
     if (typeof resolve !== 'function') throw new Error('secret broker resolve function is required');
     if (typeof audit !== 'function') throw new Error('secret broker audit function is required');
     if (typeof identity !== 'string' && typeof identity !== 'function') throw new Error('secret broker identity is required');
     this.resolve = resolve;
     this.identity = identity;
     this.audit = audit;
+    this.healthCheck = typeof healthCheck === 'function' ? healthCheck : null;
     this.leaseMs = Math.min(60 * 60_000, Math.max(1_000, Math.trunc(leaseMs)));
+  }
+
+  async checkHealth() {
+    if (!this.healthCheck) throw new Error('secret broker health check is not configured');
+    const healthy = await this.healthCheck();
+    if (healthy !== true && healthy?.ok !== true) throw new Error('secret broker health check failed');
+    return true;
   }
 
   async get(payload, job) {
@@ -93,7 +101,8 @@ export async function loadSecretLeaseBroker({ modulePath, leaseMs = 15 * 60_000 
   const resolve = provider.resolveSecretLease || provider.resolve;
   const identity = provider.resolveIdentity || provider.identity;
   const audit = provider.auditSecretLease || provider.audit;
-  return new SecretLeaseBroker({ resolve, identity, audit, leaseMs });
+  const healthCheck = provider.checkHealth || provider.healthCheck;
+  return new SecretLeaseBroker({ resolve, identity, audit, healthCheck, leaseMs });
 }
 
 export class HttpSecretProvider {
@@ -106,6 +115,7 @@ export class HttpSecretProvider {
     if (typeof fetchImpl !== 'function') throw new Error('secret provider fetch implementation is required');
     const root = parsed.toString().endsWith('/') ? parsed.toString() : `${parsed}/`;
     this.endpoint = new URL('v1/leases', root);
+    this.healthEndpoint = new URL('v1/health', root);
     this.token = token;
     this.fetchImpl = fetchImpl;
     this.timeoutMs = Math.min(60_000, Math.max(100, Math.trunc(timeoutMs)));
@@ -145,11 +155,32 @@ export class HttpSecretProvider {
     if (!Number.isFinite(providerExpiry) || providerExpiry <= Date.now() || providerExpiry > requestedExpiry) throw new Error('secret provider lease expiry is invalid');
     return { env: body.env };
   }
+
+  async checkHealth() {
+    const token = typeof this.token === 'function' ? await this.token() : this.token;
+    if (typeof token !== 'string' || !token || token.length > 16 * 1024) throw new Error('secret provider token is invalid');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    timer.unref?.();
+    try {
+      const response = await this.fetchImpl(this.healthEndpoint, {
+        method: 'GET',
+        headers: { accept: 'application/json', authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      });
+      if (!response?.ok) throw new Error(`secret provider health rejected (${Number(response?.status) || 0})`);
+      return true;
+    } catch {
+      throw new Error('secret provider health check failed');
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 }
 
 export function createHttpSecretBroker({ identity, audit, leaseMs, ...providerOptions } = {}) {
   const provider = new HttpSecretProvider(providerOptions);
-  return new SecretLeaseBroker({ identity, audit, leaseMs, resolve: provider.resolve.bind(provider) });
+  return new SecretLeaseBroker({ identity, audit, leaseMs, resolve: provider.resolve.bind(provider), healthCheck: provider.checkHealth.bind(provider) });
 }
 
 function redactSecretOutput(result, env) {
