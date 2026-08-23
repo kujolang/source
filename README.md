@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **139/139 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
+- **140/140 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,

@@ -1396,17 +1396,17 @@ export class Source {
     const workflows = await this.listWorkflowsAsync(orgId, projectId, { limit: 1000 });
     const runs = [];
     for (const workflow of workflows.filter((candidate) => (!workflowId || candidate.id === workflowId) && candidate.enabled && candidate.triggers.includes(event))) {
-      const jobs = [];
-      for (const [step, definition] of workflow.jobs.entries()) {
-        jobs.push(await this.jobs.enqueue({
+      const definitions = workflow.jobs.map((definition, step) => ({
           kind: definition.kind,
           payload: { workflowId: workflow.id, workflowVersion: workflow.version, event, eventId: resolvedEventId, step, input: payload, parameters: definition.payload },
           orgId,
           projectId,
           maxQueueDepth,
           dedupeKey: `${orgId}:${projectId}:${workflow.id}:${resolvedEventId}:${step}`,
-        }));
-      }
+      }));
+      const jobs = typeof this.store.enqueueJobsAsync === 'function'
+        ? await this.jobs.enqueueBatch({ jobs: definitions, maxQueueDepth })
+        : await Promise.all(definitions.map((definition) => this.jobs.enqueue(definition)));
       runs.push({ workflowId: workflow.id, version: workflow.version, jobs });
     }
     await this._asyncAudit({ event: 'workflow.dispatch', orgId, projectId, workflowEvent: event, eventId: resolvedEventId, workflowCount: runs.length });

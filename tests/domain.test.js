@@ -30,6 +30,28 @@ test('a session can be started and completed', () => {
   assert.ok(done.endedAt);
 });
 
+test('workflow fan-out uses the batch queue seam when the store supports it', async () => {
+  const { src, org, project } = freshSource();
+  const workflow = await src.createWorkflowAsync({
+    orgId: org.id,
+    projectId: project.id,
+    name: 'batch checks',
+    triggers: ['push'],
+    jobs: [
+      { kind: 'agent.check.one', payload: {} },
+      { kind: 'agent.check.two', payload: {} },
+    ],
+  });
+  let calls = 0;
+  src.store.enqueueJobsAsync = async ({ jobs }) => {
+    calls += 1;
+    return jobs.map((job, index) => ({ ...job, id: `J${index + 1}`, status: 'queued' }));
+  };
+  const dispatch = await src.dispatchWorkflowAsync({ orgId: org.id, projectId: project.id, workflowId: workflow.id, event: 'push', eventId: 'push-batch' });
+  assert.equal(calls, 1);
+  assert.equal(dispatch.workflows[0].jobs.length, 2);
+});
+
 test('a change can be submitted and is tied to an exact base state', () => {
   const { src, org, project, agent } = freshSource();
   const w = src.createWork({ orgId: org.id, projectId: project.id, intent: 'change', requester: 'U1' });
