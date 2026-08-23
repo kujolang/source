@@ -20,6 +20,8 @@ All notable changes to Source are recorded here.
   optional session record is absent, preserving nonblocking Postgres behavior.
 - Batched Change decision reads and capped decision relationship growth at
   1,000 entries, removing another large-Change query fan-out path.
+- Hardened isolated action timeout/output cleanup to kill the runtime process
+  group, preventing orphaned containers from consuming worker capacity.
 - Added durable workflow job dependencies with cycle validation and
   dependency-aware claims for GitHub Actions `needs` semantics.
 - Batched Postgres workflow record reads to avoid one database round trip per

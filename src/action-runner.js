@@ -49,6 +49,14 @@ function safeEnvironment(env) {
   )));
 }
 
+function killRuntimeProcess(child) {
+  if (!child || child.killed) return;
+  if (process.platform !== 'win32' && child.pid) {
+    try { process.kill(-child.pid, 'SIGKILL'); } catch { /* process may have already exited */ }
+  }
+  try { child.kill('SIGKILL'); } catch { /* process may have already exited */ }
+}
+
 export class EphemeralWorkspaceManager {
   constructor({ root, maxActive = 256, queue = 512 } = {}) {
     if (typeof root !== 'string' || !root) throw new Error('workspace root is required');
@@ -117,11 +125,12 @@ export class IsolatedActionRunner {
     try {
       const args = this.buildArgs({ steps, envKeys: Object.keys(safeEnv) }, workspace);
       child = spawn(this.runtime, args, {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: {
-        PATH: process.env.PATH || '/usr/bin:/bin',
-        ...safeEnv,
-      },
+        detached: process.platform !== 'win32',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: {
+          PATH: process.env.PATH || '/usr/bin:/bin',
+          ...safeEnv,
+        },
       });
     } catch (error) {
       releaseSlot();
@@ -140,7 +149,7 @@ export class IsolatedActionRunner {
       };
       const timer = setTimeout(() => {
         if (settled) return;
-        child.kill('SIGKILL');
+        killRuntimeProcess(child);
         settled = true;
         release();
         reject(new Error('isolated workflow timed out'));
@@ -150,7 +159,7 @@ export class IsolatedActionRunner {
         outputBytes += chunk.length;
         if (outputBytes > this.maxOutputBytes && !settled) {
           settled = true;
-          child.kill('SIGKILL');
+          killRuntimeProcess(child);
           clearTimeout(timer);
           release();
           reject(new Error('isolated workflow output exceeded configured limit'));
