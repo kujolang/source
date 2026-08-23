@@ -40,7 +40,7 @@ const scryptAsync = promisify(scrypt);
 export class Source {
   // `store` is optional; defaults to the JSON-file store. Pass a SqliteStore
   // (see sqlite-store.js) for ACID transactions across records.
-  constructor(dataRoot, { store, gitRoot = process.env.SOURCE_GIT_ROOT || dataRoot, maxArtifactBytes = 64 * 1024 * 1024 } = {}) {
+  constructor(dataRoot, { store, gitRoot = process.env.SOURCE_GIT_ROOT || dataRoot, maxArtifactBytes = 64 * 1024 * 1024, canonicalRepoConcurrency = 8 } = {}) {
     this.dataRoot = dataRoot;
     this.gitRoot = gitRoot;
     this.maxArtifactBytes = Math.min(512 * 1024 * 1024, Math.max(1, Math.trunc(maxArtifactBytes)));
@@ -48,6 +48,10 @@ export class Source {
     this.capabilities = new CapabilityService(this.store);
     this.jobs = new JobQueue(this.store);
     this.canonicalLocks = new KeyedSemaphore({ capacity: 1, queue: 256, maxKeys: 100_000 });
+    const requestedCanonicalConcurrency = Number(canonicalRepoConcurrency);
+    this.canonicalRepoConcurrency = Number.isFinite(requestedCanonicalConcurrency)
+      ? Math.min(64, Math.max(1, Math.trunc(requestedCanonicalConcurrency)))
+      : 8;
   }
 
   _artifactBytes(artifact) {
@@ -1221,16 +1225,25 @@ export class Source {
     }
     try {
       const apply = async () => {
-        const results = await Promise.all(targets.map(async (target) => {
-          const git = this.gitRepo(orgId, projectId, target.repoId);
-          if (!(await git.hasCommitAsync(target.headCommit))) {
-            return { repoId: target.repoId, ok: false, reason: 'head commit not present in repository' };
+        const results = new Array(targets.length);
+        let nextTarget = 0;
+        const applyTarget = async () => {
+          while (true) {
+            const index = nextTarget++;
+            if (index >= targets.length) return;
+            const target = targets[index];
+            const git = this.gitRepo(orgId, projectId, target.repoId);
+            if (!(await git.hasCommitAsync(target.headCommit))) {
+              results[index] = { repoId: target.repoId, ok: false, reason: 'head commit not present in repository' };
+              continue;
+            }
+            const branch = await git.defaultBranchAsync();
+            const result = await git.fastForwardAsync(target.baseCommit, target.headCommit, branch);
+            await this._asyncAudit({ event: 'canonical.update', orgId, projectId, changeId, repoId: target.repoId, branch, ...result });
+            results[index] = { repoId: target.repoId, ...result };
           }
-          const branch = await git.defaultBranchAsync();
-          const result = await git.fastForwardAsync(target.baseCommit, target.headCommit, branch);
-          await this._asyncAudit({ event: 'canonical.update', orgId, projectId, changeId, repoId: target.repoId, branch, ...result });
-          return { repoId: target.repoId, ...result };
-        }));
+        };
+        await Promise.all(Array.from({ length: Math.min(this.canonicalRepoConcurrency, targets.length) }, () => applyTarget()));
         const ok = results.every((result) => result.ok);
         if (ok) {
           const work = await this.getWorkAsync(orgId, projectId, change.workId);

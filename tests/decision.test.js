@@ -59,7 +59,6 @@ test('accepted work updates canonical git state safely (fast-forward)', () => {
   src.addEvidence({ orgId: org.id, projectId: project.id, changeId: c.id, subject: 'tests', claim: 'tests pass', type: 'test', producer: service.id, result: { status: 'pass' } });
   src.addEvidence({ orgId: org.id, projectId: project.id, changeId: c.id, subject: 'eval', claim: 'deterministic checks pass', type: 'eval', producer: service.id, result: { status: 'pass' } });
   src.makeDecision({ orgId: org.id, projectId: project.id, changeId: c.id, decision: 'accepted', decider: human.id });
-
   const result = src.updateCanonicalState({ orgId: org.id, projectId: project.id, changeId: c.id, repoId: repo.id });
   assert.equal(result.ok, true);
   const git = src.gitRepo(org.id, project.id, repo.id);
@@ -96,6 +95,9 @@ test('concurrent canonical updates are serialized per project', async () => {
   const { src, org, project, agent, service, human } = freshSource();
   const { c } = fullChange(src, org, project, agent, service);
   src.makeDecision({ orgId: org.id, projectId: project.id, changeId: c.id, decision: 'accepted', decider: human.id });
+  const acceptedChange = src.getChange(org.id, project.id, c.id);
+  acceptedChange.repositoryChanges = Array.from({ length: 20 }, (_, index) => ({ repoId: `R${index + 1}`, baseCommit: 'base', headCommit: 'head' }));
+  src.store.writeJson(`${src._projectRel(org.id, project.id)}/changes/${c.id}.json`, acceptedChange);
   let active = 0;
   let maximum = 0;
   src.gitRepo = () => ({
@@ -110,9 +112,10 @@ test('concurrent canonical updates are serialized per project', async () => {
     },
   });
   const results = await Promise.all([
-    src.updateCanonicalStateAsync({ orgId: org.id, projectId: project.id, changeId: c.id, repoId: 'R1' }),
-    src.updateCanonicalStateAsync({ orgId: org.id, projectId: project.id, changeId: c.id, repoId: 'R1' }),
+    src.updateCanonicalStateAsync({ orgId: org.id, projectId: project.id, changeId: c.id }),
+    src.updateCanonicalStateAsync({ orgId: org.id, projectId: project.id, changeId: c.id }),
   ]);
-  assert.equal(maximum, 1);
+  assert.ok(maximum > 1);
+  assert.ok(maximum <= src.canonicalRepoConcurrency);
   assert.ok(results.every((result) => result.ok));
 });

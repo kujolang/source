@@ -47,6 +47,9 @@ one database round trip per returned record. Bulk results preserve path order so
 keyset pagination remains correct.
 Git repository resolution on Postgres uses tenant-scoped indexed ID/name lookup,
 avoiding a scan of every repository in a large project.
+Multi-repository canonical promotion also uses bounded Git update concurrency
+(8 by default, capped at 64), preventing a large Change from spawning an
+unbounded subprocess burst while preserving parallelism.
 
 Chunked Git uploads use a separate four-slot admission budget and a 16 MiB
 buffer limit by default. Known-length uploads remain streamed directly to

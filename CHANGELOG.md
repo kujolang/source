@@ -21,6 +21,8 @@ All notable changes to Source are recorded here.
   repository lookup bounded for projects with many repositories.
 - Added tenant-scoped Postgres repository lookup indexes so name/ID resolution
   does not scan a project’s repository list.
+- Bounded multi-repository canonical promotion to eight concurrent Git updates
+  per project by default, with a safe operator limit of 64.
 
 ## [0.1.0]
 
