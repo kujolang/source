@@ -1021,6 +1021,10 @@ export function createServer(src, { port = 8787, tls, host, webhookSecret = proc
         if (!res.writableEnded) res.destroy(e);
         return;
       }
+      if (e?.code === 'DB_ADMISSION_EXHAUSTED') {
+        res.setHeader('Retry-After', '1');
+        return json(res, 503, { error: 'database admission capacity exhausted', retryable: true });
+      }
       return json(res, 400, { error: e.message });
     }
   };

@@ -34,6 +34,26 @@ test('discovery endpoint returns a compact machine manifest', async () => {
   });
 });
 
+test('database admission exhaustion returns retryable service backpressure', async () => {
+  const { src, org, project, agent } = freshSource();
+  const capability = src.capabilities.issue({
+    principalId: agent.id,
+    scope: { org: org.id, project: project.id },
+    allowed: ['read_source'],
+  });
+  src.getProjectAsync = async () => {
+    const error = new Error('Postgres query admission queue exhausted');
+    error.code = 'DB_ADMISSION_EXHAUSTED';
+    throw error;
+  };
+  await withServer(src, async (base) => {
+    const response = await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}`, { headers: auth(capability.credential) });
+    assert.equal(response.status, 503);
+    assert.equal(response.headers.get('retry-after'), '1');
+    assert.deepEqual(await response.json(), { error: 'database admission capacity exhausted', retryable: true });
+  });
+});
+
 test('an agent can complete the workflow without HTML (capability-gated)', async () => {
   const { src, org, project, agent, service, human } = freshSource();
   const w = src.createWork({ orgId: org.id, projectId: project.id, intent: 'fix parser regression', requester: 'U1' });

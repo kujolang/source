@@ -172,7 +172,9 @@ class PostgresStore {
     const release = await this.dbAdmission.acquire();
     if (release) return release;
     this.dbAdmissionRejected += 1;
-    throw new Error('Postgres query admission queue exhausted');
+    const error = new Error('Postgres query admission queue exhausted');
+    error.code = 'DB_ADMISSION_EXHAUSTED';
+    throw error;
   }
 
   _formatAsyncRows(rows) {
