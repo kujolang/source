@@ -6,7 +6,7 @@
 // by CPU, memory, PIDs, output, and wall-clock limits.
 
 import { spawn } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, verify as verifySignature } from 'node:crypto';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { Semaphore } from './concurrency.js';
@@ -86,6 +86,23 @@ function removeRuntimeContainer(runtime, name) {
 
 const IMMUTABLE_ACTION_REF = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[0-9a-fA-F]{40}$/;
 
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+  const serialized = JSON.stringify(value);
+  if (serialized === undefined) throw new Error('action manifest contains an unsupported value');
+  return serialized;
+}
+
+function signedManifestPayload(manifest) {
+  const { signature: _signature, ...payload } = manifest;
+  return Buffer.from(canonicalJson(payload));
+}
+
+export function canonicalActionManifestPayload(manifest) {
+  return signedManifestPayload(manifest);
+}
+
 // A deployment-owned action catalog. Source never downloads or evaluates an
 // action reference implicitly; operators bind immutable references to steps
 // already present in the runner image (or to a resolver function they own).
@@ -100,6 +117,23 @@ export class StaticActionRegistry {
       if (typeof action !== 'function' && !Array.isArray(action)) throw new Error(`action registry entry is invalid: ${reference}`);
       this.actions.set(reference, action);
     }
+  }
+
+  static fromSignedManifest(manifest, { publicKey, allowMutableRefs = false, maxActions = 10_000, now = Date.now() } = {}) {
+    if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) throw new Error('action manifest is invalid');
+    const fields = Object.keys(manifest).sort();
+    if (fields.join(',') !== 'actions,expiresAt,issuedAt,keyId,signature,version') throw new Error('action manifest fields are invalid');
+    if (manifest.version !== 1 || typeof manifest.keyId !== 'string' || !/^[A-Za-z0-9_.:-]{1,120}$/.test(manifest.keyId)) throw new Error('action manifest metadata is invalid');
+    if (!Array.isArray(manifest.actions) && (!manifest.actions || typeof manifest.actions !== 'object')) throw new Error('action manifest actions are invalid');
+    const issuedAt = Date.parse(manifest.issuedAt);
+    const expiresAt = Date.parse(manifest.expiresAt);
+    if (!Number.isFinite(issuedAt) || !Number.isFinite(expiresAt) || expiresAt <= issuedAt || expiresAt <= now) throw new Error('action manifest is expired or has invalid validity');
+    if (typeof manifest.signature !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(manifest.signature)) throw new Error('action manifest signature is invalid');
+    if (!publicKey) throw new Error('action manifest public key is required');
+    let signature;
+    try { signature = Buffer.from(manifest.signature, 'base64'); } catch { throw new Error('action manifest signature is invalid'); }
+    if (signature.length !== 64 || !verifySignature(null, signedManifestPayload(manifest), publicKey, signature)) throw new Error('action manifest signature verification failed');
+    return new StaticActionRegistry({ actions: manifest.actions, allowMutableRefs, maxActions });
   }
 
   _validateReference(reference) {

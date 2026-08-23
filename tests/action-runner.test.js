@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGitHubActionsHandler, EphemeralWorkspaceManager, IsolatedActionRunner, StaticActionRegistry } from '../src/action-runner.js';
+import { generateKeyPairSync, sign } from 'node:crypto';
+import { canonicalActionManifestPayload, createGitHubActionsHandler, EphemeralWorkspaceManager, IsolatedActionRunner, StaticActionRegistry } from '../src/action-runner.js';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -54,6 +55,25 @@ test('static action registry requires immutable allowlisted references', async (
   await assert.rejects(registry.resolve({ uses: 'kujo/setup@v1' }), /immutable/);
   await assert.rejects(registry.resolve({ uses: reference.replace(/a+$/, 'b'.repeat(40)) }), /not allowlisted/);
   assert.throws(() => new StaticActionRegistry({ actions: { 'kujo/setup@v1': [] } }), /immutable/);
+});
+
+test('signed action manifests require valid Ed25519 signatures and expiry', async () => {
+  const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+  const reference = `kujo/setup@${'c'.repeat(40)}`;
+  const manifest = {
+    version: 1,
+    keyId: 'runner-key-1',
+    issuedAt: new Date(Date.now() - 1_000).toISOString(),
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    actions: { [reference]: [{ run: 'kujo setup source' }] },
+  };
+  manifest.signature = sign(null, canonicalActionManifestPayload(manifest), privateKey).toString('base64');
+  const registry = StaticActionRegistry.fromSignedManifest(manifest, { publicKey });
+  assert.deepEqual(await registry.resolve({ uses: reference }), [{ run: 'kujo setup source' }]);
+  const tampered = { ...manifest, actions: { [reference]: [{ run: 'kujo setup tampered' }] } };
+  await assert.rejects(Promise.resolve().then(() => StaticActionRegistry.fromSignedManifest(tampered, { publicKey })), /signature verification failed/);
+  const expired = { ...manifest, expiresAt: new Date(Date.now() - 1).toISOString() };
+  await assert.rejects(Promise.resolve().then(() => StaticActionRegistry.fromSignedManifest(expired, { publicKey })), /expired/);
 });
 
 test('isolated runner bounds container admission independently of workspaces', async () => {

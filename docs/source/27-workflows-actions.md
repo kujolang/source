@@ -61,7 +61,10 @@ compatibility boundary and must not fetch or execute remote action code
 implicitly. `StaticActionRegistry` is provided for this deployment boundary;
 its default policy accepts only 40-character commit-pinned references and
 allowlists each action before resolving it. Mutable tags require an explicit
-development-only opt-in. Container
+development-only opt-in. `StaticActionRegistry.fromSignedManifest` additionally
+verifies an expiring Ed25519-signed manifest before accepting the catalog, so
+action allowlists can be rotated without trusting the workflow repository.
+Container
 runtime provisioning, secrets brokering, and per-provider secret rotation
 remain deployment-specific work required before advertising drop-in
 `.github/workflows` compatibility. The
