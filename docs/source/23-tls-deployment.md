@@ -203,7 +203,11 @@ into Node memory. The job refuses target-only or divergent refs by default,
 which prevents a one-way mirror from silently destroying a peer's write; use
 `--allow-deletions` or `--force` only for an intentional reconciliation.
 This replicates Git source state; Postgres metadata still requires its own
-native replication/consensus deployment.
+Async Postgres writes additionally publish an ordered transactional CDC feed
+through `PostgresStore.listReplicationEventsAsync({ afterSeq, limit })`. Use
+that feed when a deployment needs to project metadata into a separate
+consensus or replication service; it does not by itself provide multi-writer
+conflict resolution.
 
 Before declaring a multi-node deployment ready, verify the database side of the
 topology as well:

@@ -93,6 +93,13 @@ promotion pressure visible to operators.
 Postgres compatibility-record directory listings use a `text_pattern_ops`
 prefix index, keeping keyset listing scans indexable as total tenant records
 grow.
+Async Postgres mutations also append an ordered row to `replication_events` in
+the same transaction as the compatibility record and normalized projections.
+Deployment-specific CDC, consensus, or standby consumers can consume
+`PostgresStore.listReplicationEventsAsync({ afterSeq, limit })` with a bounded
+cursor page; a committed cursor therefore never points at a partial domain
+mutation. This is a replication seam, not application-level multi-writer
+consensus, which remains a deployment responsibility.
 Request-body readers also terminate promptly on client aborts, preventing
 disconnected agent requests from retaining promises and admission state.
 HTTP requests also pass through a bounded process-local admission queue (2,048

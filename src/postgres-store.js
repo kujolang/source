@@ -438,6 +438,20 @@ class PostgresStore {
     `);
 
     this._run(`
+      CREATE TABLE IF NOT EXISTS ${this._qualified('replication_events')} (
+        seq BIGSERIAL PRIMARY KEY,
+        operation TEXT NOT NULL CHECK (operation IN ('upsert')),
+        path TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        org_id TEXT,
+        project_id TEXT,
+        entity_id TEXT,
+        json JSONB NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    this._run(`
       CREATE TABLE IF NOT EXISTS ${this._qualified('rate_limits')} (
         key TEXT PRIMARY KEY,
         count BIGINT NOT NULL,
@@ -488,6 +502,7 @@ class PostgresStore {
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_leased`)} ON ${this._qualified('jobs')} (leased_until, created_at) WHERE status = 'leased'`);
     this._run(`CREATE UNIQUE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_dedupe`)} ON ${this._qualified('jobs')} (dedupe_key) WHERE dedupe_key IS NOT NULL`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_rate_limits_reset`)} ON ${this._qualified('rate_limits')} (reset_at)`);
+    this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_replication_events_seq`)} ON ${this._qualified('replication_events')} (seq)`);
   }
 
   _queryPathRow(relPath) {
@@ -918,6 +933,30 @@ class PostgresStore {
         VALUES (${escapeSqlLiteral(obj.principalId)}, 'human', 'capability principal', ${toJson({ id: obj.principalId })})
         ON CONFLICT (id) DO NOTHING`);
     }
+    await this._runAsync(`INSERT INTO ${this._qualified('replication_events')} (operation, path, kind, org_id, project_id, entity_id, json)
+      VALUES ('upsert', ${escapeSqlLiteral(relPath)}, ${escapeSqlLiteral(classified.kind)}, ${escapeSqlLiteral(classified.orgId || null)},
+        ${escapeSqlLiteral(classified.projectId || null)}, ${escapeSqlLiteral(classified.id || null)}, ${toJson(obj)})`);
+  }
+
+  // Ordered, transactional CDC seam for a deployment's native replication or
+  // consensus consumer. The event is committed with the compatibility record
+  // and normalized projections, so a cursor never observes a partial write.
+  async listReplicationEventsAsync({ afterSeq = 0, limit = 1_000 } = {}) {
+    const cursor = Math.max(0, Math.trunc(Number(afterSeq) || 0));
+    const pageSize = Math.min(1_000, Math.max(1, Math.trunc(Number(limit) || 1)));
+    const rows = await this._fetchJsonRowsAsync(`
+      SELECT seq, operation, path, kind, org_id AS "orgId", project_id AS "projectId", entity_id AS "entityId", json, created_at AS "createdAt"
+      FROM ${this._qualified('replication_events')}
+      WHERE seq > ${cursor}
+      ORDER BY seq
+      LIMIT ${pageSize + 1}
+    `);
+    const events = rows.slice(0, pageSize);
+    return {
+      events,
+      nextCursor: events.length ? Number(events.at(-1).seq) : cursor,
+      hasMore: rows.length > pageSize,
+    };
   }
 
   listJson(dirRel, { cursor, limit, includeDirs = false } = {}) {

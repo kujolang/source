@@ -107,6 +107,24 @@ test('Postgres bulk record writes use one transaction for projection fan-out', a
   assert.deepEqual(calls, ['BEGIN', 'WRITE a.json', 'WRITE b.json', 'COMMIT', 'RELEASE']);
 });
 
+test('Postgres replication event reads use a bounded cursor page', async () => {
+  const store = Object.create(PostgresStore.prototype);
+  let query = '';
+  store._qualified = (name) => `"source"."${name}"`;
+  store._fetchJsonRowsAsync = async (sql) => {
+    query = sql;
+    return [{ seq: 7, path: 'a.json' }, { seq: 8, path: 'b.json' }, { seq: 9, path: 'c.json' }];
+  };
+  const page = await store.listReplicationEventsAsync({ afterSeq: 6, limit: 2 });
+  assert.deepEqual(page, {
+    events: [{ seq: 7, path: 'a.json' }, { seq: 8, path: 'b.json' }],
+    nextCursor: 8,
+    hasMore: true,
+  });
+  assert.match(query, /seq > 6/);
+  assert.match(query, /LIMIT 3/);
+});
+
 test('async change submission does not fall back to synchronous reads for missing sessions', async () => {
   const { src, org, project, agent } = freshSource();
   const work = await src.createWorkAsync({ orgId: org.id, projectId: project.id, intent: 'async change', requester: agent.id });

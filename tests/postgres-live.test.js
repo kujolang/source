@@ -28,6 +28,9 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     const org = await src.createOrgAsync({ name: 'load-org', slug: 'load-org' });
     const project = await src.createProjectAsync({ orgId: org.id, name: 'load-project', slug: 'load-project' });
     const quotaProject = await src.createProjectAsync({ orgId: org.id, name: 'quota-project', slug: 'quota-project' });
+    const replicationPage = await store.listReplicationEventsAsync({ limit: 10 });
+    assert.equal(replicationPage.hasMore, false);
+    assert.ok(replicationPage.events.some((event) => event.path.endsWith('/project.json')));
     const principal = await src.createPrincipalAsync({ type: 'agent', name: 'load-agent' });
     peerStore = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 32, maxDbQueue: 4_096 } });
     const peerSrc = new Source(dataRoot, { store: peerStore, gitRoot });
