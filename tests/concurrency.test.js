@@ -267,6 +267,25 @@ test('HTTP discovery withstands a thousand concurrent agent connections', async 
   }
 });
 
+test('HTTP request admission rejects excess in-flight work with retryable backpressure', async () => {
+  const { src } = freshSource();
+  src.store.checkHealthAsync = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    return { ok: true };
+  };
+  const server = await startServer(src, { port: 0, requestConcurrency: 2, requestQueue: 0 });
+  const url = `http://127.0.0.1:${server.address().port}/readyz`;
+  try {
+    const responses = await Promise.all(Array.from({ length: 12 }, () => fetch(url)));
+    assert.ok(responses.some((response) => response.status === 503));
+    assert.ok(responses.some((response) => response.status === 200));
+    assert.match(await (await fetch(`http://127.0.0.1:${server.address().port}/metrics`)).text(), /source_request_admission_rejected_total [1-9]/);
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});
+
 test('health and readiness endpoints expose process and storage state', async () => {
   const { src } = freshSource();
   const server = await startServer(src, { port: 0 });

@@ -73,6 +73,11 @@ prefix index, keeping keyset listing scans indexable as total tenant records
 grow.
 Request-body readers also terminate promptly on client aborts, preventing
 disconnected agent requests from retaining promises and admission state.
+HTTP requests also pass through a bounded process-local admission queue (2,048
+active and 4,096 waiting by default), returning retryable 503 backpressure
+instead of allowing request work to grow without limit. Tune it with
+`--request-concurrency` and `--request-queue`; admission pressure is exposed
+through `/metrics`.
 
 Chunked Git uploads use a separate four-slot admission budget and a 16 MiB
 buffer limit by default. Known-length uploads remain streamed directly to
