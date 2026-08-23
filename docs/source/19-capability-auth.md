@@ -67,6 +67,8 @@ discovery manifest):
 | `/api/v1/orgs/{org}/projects/{p}/changes/{c}/decision` | POST | `accept_change` | org + project |
 | `/api/v1/orgs/{org}/projects/{p}/evidence/{e}` | GET | `read_context` | org + project |
 | `/api/v1/orgs/{org}/projects/{p}/evidence/{e}/artifact` | GET | `read_context` | org + project |
+| `/api/v1/orgs/{org}/projects/{p}/jobs` | GET/POST | `read_jobs`/`enqueue_job` | org + project (+ work when supplied) |
+| `/api/v1/orgs/{org}/projects/{p}/jobs/batch` | POST | `enqueue_job` | org + project |
 | `/api/v1/orgs/{org}/projects/{p}/submit` | POST | public | — |
 | `/api/v1/orgs/{org}/projects/{p}/workflows` | GET | `read_workflows` | org + project |
 | `/api/v1/orgs/{org}/projects/{p}/workflows` | POST | `manage_workflows` | org + project |
