@@ -362,15 +362,19 @@ export async function run(argv) {
         const actionManifestPath = flag('--action-manifest');
         const actionKeyringPath = flag('--action-keyring');
         if (Boolean(actionManifestPath) !== Boolean(actionKeyringPath)) fail('worker action integration requires both --action-manifest and --action-keyring');
+        const secretProviderModule = flag('--secret-provider-module');
         let actionRegistry = null;
         if (actionManifestPath) {
           const { loadActionKeyring, loadSignedActionRegistry } = await import('./action-runner.js');
           const keyring = await loadActionKeyring({ keyringPath: path.resolve(actionKeyringPath) });
           actionRegistry = await loadSignedActionRegistry({ manifestPath: path.resolve(actionManifestPath), keyring });
         }
+        const secretBroker = secretProviderModule
+          ? await (await import('./action-runner.js')).loadSecretLeaseBroker({ modulePath: path.resolve(secretProviderModule), leaseMs: Number(flag('--secret-lease-ms')) || 15 * 60_000 })
+          : null;
         const loaded = await import(pathToFileURL(path.resolve(handlerModule)).href);
         const handlers = typeof loaded.createHandlers === 'function'
-          ? await loaded.createHandlers({ actionRegistry })
+          ? await loaded.createHandlers({ actionRegistry, secretBroker })
           : loaded.handlers || loaded.default;
         if (!handlers || typeof handlers !== 'object') fail('handler module must export { handlers } or a default handler map');
         const { SourceWorker } = await import('./worker.js');
@@ -455,7 +459,7 @@ export async function run(argv) {
           '  policy show --org <o> --project <p>',
           '  audit',
           '  serve --port <n> [--host <addr>] [--store postgres] [--replication-role primary|standby --require-replication --min-replicas <n> --max-replication-lag-bytes <n>] [--trust-proxy] [--git-concurrency <n>] [--git-queue <n>] [--git-tenant-concurrency <n>] [--git-tenant-queue <n>] [--git-timeout-ms <n>] [--request-concurrency <n>] [--request-queue <n>] [--max-connections <n>] [--max-git-response <bytes>] [--max-workflow-jobs <n>] [--artifact-concurrency <n>] [--artifact-queue <n>]',
-          '  worker --store postgres --handler-module <path> [--worker-id <id> --worker-concurrency <n> --worker-poll-ms <n> --worker-max-poll-ms <n> --worker-project-burst <n> --worker-jitter-ratio <0..1> --worker-handler-timeout-ms <n> --worker-shutdown-timeout-ms <n> --action-manifest <path> --action-keyring <path>]',
+          '  worker --store postgres --handler-module <path> [--worker-id <id> --worker-concurrency <n> --worker-poll-ms <n> --worker-max-poll-ms <n> --worker-project-burst <n> --worker-jitter-ratio <0..1> --worker-handler-timeout-ms <n> --worker-shutdown-timeout-ms <n> --action-manifest <path> --action-keyring <path> --secret-provider-module <path> --secret-lease-ms <n>]',
           '  submit [--intent <s>] [--url <base>] [--credential <c>] [--cwd <dir>]',
           '',
           'Env: SOURCE_DATA (default .source), SOURCE_STORE (json|sqlite|postgres)',

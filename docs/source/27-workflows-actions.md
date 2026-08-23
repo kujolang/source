@@ -91,5 +91,8 @@ brokered values from captured stdout/stderr before returning the result.
 explicit workload identity, is not cached, receives an expiry, and emits an
 audit event containing references and metadata but never secret values. The
 deployment resolver remains responsible for backing this seam with its rotating
-secret system and revocation policy.
+secret system and revocation policy. Worker bootstrap can load that adapter with
+`--secret-provider-module <path>`; the module must export
+`resolveSecretLease`, `resolveIdentity`, and `auditSecretLease` (or equivalent
+names on its default export). `--secret-lease-ms` bounds each lease.
 against the operator's secret system.

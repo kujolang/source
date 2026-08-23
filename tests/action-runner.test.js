@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign } from 'node:crypto';
-import { canonicalActionManifestPayload, createGitHubActionsHandler, EphemeralWorkspaceManager, IsolatedActionRunner, loadActionKeyring, loadSignedActionRegistry, SecretLeaseBroker, StaticActionRegistry } from '../src/action-runner.js';
+import { canonicalActionManifestPayload, createGitHubActionsHandler, EphemeralWorkspaceManager, IsolatedActionRunner, loadActionKeyring, loadSecretLeaseBroker, loadSignedActionRegistry, SecretLeaseBroker, StaticActionRegistry } from '../src/action-runner.js';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -191,6 +191,17 @@ test('secret lease broker binds identity, avoids caching, and audits without val
   assert.deepEqual(runnerCalls.map((call) => call.env), [{ TOKEN: 'secret-1' }, { TOKEN: 'secret-2' }]);
   assert.deepEqual(events.map((event) => event.event), ['secret_lease_issued', 'secret_lease_issued']);
   assert.equal(JSON.stringify(events).includes('secret-1'), false);
+});
+
+test('secret provider module loader enforces the production adapter contract', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'source-secret-provider-'));
+  const modulePath = path.join(root, 'provider.mjs');
+  await writeFile(modulePath, `export const resolveIdentity = async () => 'module-agent';\nexport const resolveSecretLease = async () => ({ TOKEN: 'module-secret' });\nexport const auditSecretLease = () => {};\n`, 'utf8');
+  const broker = await loadSecretLeaseBroker({ modulePath, leaseMs: 2_000 });
+  assert.deepEqual(await broker.get({ parameters: { secretRefs: [] } }, { id: 'J-module' }), { TOKEN: 'module-secret' });
+  const invalidPath = path.join(root, 'invalid.mjs');
+  await writeFile(invalidPath, 'export const resolveSecretLease = async () => ({});\n', 'utf8');
+  await assert.rejects(loadSecretLeaseBroker({ modulePath: invalidPath }), /secret broker/);
 });
 
 test('ephemeral workspace manager bounds and cleans action workspaces', async () => {

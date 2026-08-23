@@ -9,6 +9,7 @@ import { spawn } from 'node:child_process';
 import { randomBytes, verify as verifySignature } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { Semaphore } from './concurrency.js';
 
 function boundedInteger(value, fallback, min, max) {
@@ -83,6 +84,16 @@ export class SecretLeaseBroker {
       throw error;
     }
   }
+}
+
+export async function loadSecretLeaseBroker({ modulePath, leaseMs = 15 * 60_000 } = {}) {
+  if (typeof modulePath !== 'string' || !modulePath || modulePath.length > 4_096) throw new Error('secret provider module path is required');
+  const loaded = await import(pathToFileURL(path.resolve(modulePath)).href);
+  const provider = loaded.secretProvider || loaded.default || loaded;
+  const resolve = provider.resolveSecretLease || provider.resolve;
+  const identity = provider.resolveIdentity || provider.identity;
+  const audit = provider.auditSecretLease || provider.audit;
+  return new SecretLeaseBroker({ resolve, identity, audit, leaseMs });
 }
 
 function redactSecretOutput(result, env) {
