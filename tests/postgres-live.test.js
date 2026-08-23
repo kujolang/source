@@ -69,6 +69,12 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     const quotaJob = (await src.jobs.claim({ workerId: 'quota-worker', limit: 1 }))[0];
     assert.equal(quotaJob.id, quotaResults.find((result) => result.status === 'fulfilled').value.id);
     await src.jobs.complete({ id: quotaJob.id, workerId: 'quota-worker', leaseToken: quotaJob.leaseToken, result: { ok: true } });
+    const recycledQuotaJob = await src.jobs.enqueue({
+      kind: 'agent.quota.recycled', payload: { recycled: true }, orgId: org.id, projectId: quotaProject.id, maxQueueDepth: 1,
+    });
+    assert.equal(recycledQuotaJob.status, 'queued');
+    const recycledClaim = (await src.jobs.claim({ workerId: 'quota-worker-2', limit: 1 }))[0];
+    await src.jobs.complete({ id: recycledClaim.id, workerId: 'quota-worker-2', leaseToken: recycledClaim.leaseToken, result: { ok: true } });
     const workflow = await src.createWorkflowAsync({
       orgId: org.id,
       projectId: project.id,

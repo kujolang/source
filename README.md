@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **118/118 default tests pass**, including a dogfood test against the real `spec` Kujo
+- **130/130 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
@@ -92,8 +92,9 @@ limited to 1 MiB, Git request bodies to 100 MiB, chunked Git uploads to 16 MiB
 and four concurrent buffered uploads, Git CGI subprocesses to 32
 active requests with a 256-request queue, Git CGI responses to 512 MiB, and
 connections to 10,000. Durable job payloads default to 64 KiB, per-project
-queue depth defaults to 100,000 records, and completed/failed jobs are pruned
-after seven days. Git CGI subprocesses have a 120-second timeout. Git
+active queue depth (queued plus leased jobs) defaults to 100,000 records, and
+completed/failed jobs are pruned after seven days. Git CGI subprocesses have a
+120-second timeout. Git
 responses are streamed with HTTP backpressure so
 large clones, fetches, and known-length pushes do not require a full
 packfile-sized buffer per request. Override these through

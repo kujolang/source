@@ -421,6 +421,7 @@ class PostgresStore {
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_decisions_change`)} ON ${this._qualified('decisions')} (org_id, project_id, change_id)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_claim`)} ON ${this._qualified('jobs')} (status, available_at, created_at)`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_scope`)} ON ${this._qualified('jobs')} (org_id, project_id, work_id, created_at)`);
+    this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_active_scope`)} ON ${this._qualified('jobs')} (org_id, project_id, status, created_at) WHERE status IN ('queued', 'leased')`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_leased`)} ON ${this._qualified('jobs')} (leased_until, created_at) WHERE status = 'leased'`);
     this._run(`CREATE UNIQUE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_jobs_dedupe`)} ON ${this._qualified('jobs')} (dedupe_key) WHERE dedupe_key IS NOT NULL`);
     this._run(`CREATE INDEX IF NOT EXISTS ${escapeSqlIdent(`${this.projectPrefix}_rate_limits_reset`)} ON ${this._qualified('rate_limits')} (reset_at)`);
@@ -991,7 +992,8 @@ class PostgresStore {
           if (existing) return `dedupe:${existing}`;
         }
         const current = await this._runAsync(`SELECT COUNT(*) FROM ${this._qualified('jobs')}
-          WHERE org_id = ${escapeSqlLiteral(orgId)} AND project_id = ${escapeSqlLiteral(projectId)}`);
+          WHERE org_id = ${escapeSqlLiteral(orgId)} AND project_id = ${escapeSqlLiteral(projectId)}
+            AND status IN ('queued', 'leased')`);
         if (Number(current || 0) >= safeDepth) return '';
         return insert();
       });
@@ -1044,7 +1046,8 @@ class PostgresStore {
 
   async countJobsAsync({ orgId, projectId }) {
     const out = await this._runAsync(`SELECT COUNT(*) FROM ${this._qualified('jobs')}
-      WHERE org_id = ${escapeSqlLiteral(orgId)} AND project_id = ${escapeSqlLiteral(projectId)}`);
+      WHERE org_id = ${escapeSqlLiteral(orgId)} AND project_id = ${escapeSqlLiteral(projectId)}
+        AND status IN ('queued', 'leased')`);
     return Number(out || 0);
   }
 
