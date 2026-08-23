@@ -56,6 +56,10 @@ the same bounded concurrency.
 Mutation-time limits also cap project repository membership at 10,000 entries
 and Change repository/evidence relationships at 1,000 entries, preventing a
 single tenant record from growing without bound.
+Canonical promotions additionally pass through a process-wide bounded gate
+(8 concurrent projects by default, 64 maximum) before acquiring the Postgres
+project-row lock. This limits the number of database connections held while
+Git subprocesses perform promotion work.
 
 Chunked Git uploads use a separate four-slot admission budget and a 16 MiB
 buffer limit by default. Known-length uploads remain streamed directly to

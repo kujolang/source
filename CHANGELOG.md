@@ -27,6 +27,8 @@ All notable changes to Source are recorded here.
   batched async evidence reads, and bounded multi-repository secret scans.
 - Added mutation-time bounds for project repository lists, Change repository
   fan-out, and Change evidence relationships.
+- Added a bounded global canonical-promotion admission gate so long-running Git
+  promotions cannot exhaust the Postgres connection pool across projects.
 
 ## [0.1.0]
 

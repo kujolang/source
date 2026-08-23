@@ -31,7 +31,7 @@ import { normalizeEvalSummary, normalizeEvalManifest, normalizeEvalRun, readEval
 import { scanSecrets } from './scan.js';
 import { JobQueue } from './job-queue.js';
 import { translateGitHubActions } from './integrations/github-actions.js';
-import { KeyedSemaphore } from './concurrency.js';
+import { KeyedSemaphore, Semaphore } from './concurrency.js';
 
 const DEFAULT_HUMAN_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_HUMAN_SESSION_ACTIONS = ['read_source', 'read_context', 'accept_change'];
@@ -43,7 +43,7 @@ const scryptAsync = promisify(scrypt);
 export class Source {
   // `store` is optional; defaults to the JSON-file store. Pass a SqliteStore
   // (see sqlite-store.js) for ACID transactions across records.
-  constructor(dataRoot, { store, gitRoot = process.env.SOURCE_GIT_ROOT || dataRoot, maxArtifactBytes = 64 * 1024 * 1024, canonicalRepoConcurrency = 8 } = {}) {
+  constructor(dataRoot, { store, gitRoot = process.env.SOURCE_GIT_ROOT || dataRoot, maxArtifactBytes = 64 * 1024 * 1024, canonicalRepoConcurrency = 8, canonicalConcurrency = 8, canonicalQueue = 256 } = {}) {
     this.dataRoot = dataRoot;
     this.gitRoot = gitRoot;
     this.maxArtifactBytes = Math.min(512 * 1024 * 1024, Math.max(1, Math.trunc(maxArtifactBytes)));
@@ -55,6 +55,11 @@ export class Source {
     this.canonicalRepoConcurrency = Number.isFinite(requestedCanonicalConcurrency)
       ? Math.min(64, Math.max(1, Math.trunc(requestedCanonicalConcurrency)))
       : 8;
+    const requestedCanonicalGlobal = Number(canonicalConcurrency);
+    const boundedCanonicalGlobal = Number.isFinite(requestedCanonicalGlobal)
+      ? Math.min(64, Math.max(1, Math.trunc(requestedCanonicalGlobal)))
+      : 8;
+    this.canonicalGlobalSlots = new Semaphore({ capacity: boundedCanonicalGlobal, queue: Math.min(10_000, Math.max(0, Math.trunc(Number(canonicalQueue) || 256))) });
   }
 
   _artifactBytes(artifact) {
@@ -1233,8 +1238,15 @@ export class Source {
       targets = match ? [match] : (change.repositoryChanges.length === 0 ? [{ repoId, baseCommit: change.baseCommit, headCommit: change.headCommit }] : []);
     } else targets = change.repositoryChanges;
     if (targets.length === 0) throw new Error('no repository changes to update');
+    const releaseGlobal = await this.canonicalGlobalSlots.acquire();
+    if (!releaseGlobal) {
+      const error = new Error('canonical update admission exhausted');
+      error.code = 'CANONICAL_ADMISSION_EXHAUSTED';
+      throw error;
+    }
     const release = await this.canonicalLocks.acquire(`${orgId}:${projectId}`);
     if (!release) {
+      releaseGlobal();
       const error = new Error('canonical update admission exhausted');
       error.code = 'CANONICAL_ADMISSION_EXHAUSTED';
       throw error;
@@ -1279,6 +1291,7 @@ export class Source {
       return await apply();
     } finally {
       release();
+      releaseGlobal();
     }
   }
 
