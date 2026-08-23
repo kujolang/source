@@ -34,6 +34,9 @@ All notable changes to Source are recorded here.
 - Added Postgres project-row locking to asynchronous Work claims and
   synchronous canonical promotion, so mixed callers share the same
   multi-node serialization boundary.
+- Converted the human-facing HTML routes to async bulk-backed renderers,
+  removing synchronous Postgres/psql calls from API request handling and
+  bounding project/work/change page reads at 1,000 records.
 - Added durable workflow job dependencies with cycle validation and
   dependency-aware claims for GitHub Actions `needs` semantics.
 - Batched Postgres workflow record reads to avoid one database round trip per

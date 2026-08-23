@@ -25,7 +25,7 @@ import http from 'node:http';
 import https from 'node:https';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { Source } from './source.js';
-import { renderOrgIndex, renderIndex, renderProject, renderWork, renderChange, renderLogin } from './web.js';
+import { renderOrgIndexAsync, renderIndexAsync, renderProjectAsync, renderWorkAsync, renderChangeAsync, renderLogin } from './web.js';
 import { gitHttpBackend } from './git-http.js';
 import { ACTIONS, authorizeRequest, authorizeRequestAsync, authorizeGit, authorizeGitAsync, bearerCredential } from './auth.js';
 import { RateLimiter } from './ratelimit.js';
@@ -562,7 +562,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
       if (req.method === 'GET' && pathname === '/') {
         const g = await guard(src, req, ACTIONS.read_source, {});
         if (g) return loginPage(res, g.status, g.body.error);
-        return html(res, 200, renderOrgIndex(src));
+        return html(res, 200, await renderOrgIndexAsync(src));
       }
 
       const orgPageMatch = pathname.match(/^\/o\/([^/]+)$/);
@@ -570,7 +570,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
         const [, orgId] = orgPageMatch;
         const g = await guard(src, req, ACTIONS.read_source, { org: orgId });
         if (g) return loginPage(res, g.status, g.body.error);
-        return html(res, 200, renderIndex(src, orgId));
+        return html(res, 200, await renderIndexAsync(src, orgId));
       }
 
       const pMatch = pathname.match(/^\/o\/([^/]+)\/p\/([^/]+)(?:\/w\/([^/]+))?(?:\/c\/([^/]+))?$/);
@@ -582,15 +582,15 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
         if (changeId) {
           const c = await src.getChangeAsync(orgId, projectId, changeId);
           if (!c) return html(res, 404, '<!doctype html><html><body><h1>Not found</h1></body></html>');
-          return html(res, 200, renderChange(src, orgId, projectId, changeId));
+          return html(res, 200, await renderChangeAsync(src, orgId, projectId, changeId));
         }
 
         if (workId) {
           const wc = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
           if (wc) return loginPage(res, wc.status, wc.body.error);
-          return html(res, 200, renderWork(src, orgId, projectId, workId));
+          return html(res, 200, await renderWorkAsync(src, orgId, projectId, workId));
         }
-        return html(res, 200, renderProject(src, orgId, projectId));
+        return html(res, 200, await renderProjectAsync(src, orgId, projectId));
       }
 
       // --- discovery (public) ---------------------------------------------

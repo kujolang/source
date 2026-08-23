@@ -54,6 +54,8 @@ Workflow, organization, Work listing/dispatch, and repository-resolution paths
 use bounded bulk record reads on Postgres, so large tenants do not fan out into
 one database round trip per returned record. Bulk results preserve path order so
 keyset pagination remains correct.
+Human-facing HTML routes use the same async read paths and bounded bulk loads;
+they do not invoke synchronous `psql` compatibility I/O on the API event loop.
 Git repository resolution on Postgres uses tenant-scoped indexed ID/name lookup,
 avoiding a scan of every repository in a large project.
 Multi-repository canonical promotion also uses bounded Git update concurrency

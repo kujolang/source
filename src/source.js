@@ -246,6 +246,18 @@ export class Source {
     return ids.map((id) => this.getProject(orgId, id)).filter(Boolean);
   }
 
+  async listProjectsAsync(orgId, { cursor, limit } = {}) {
+    const rel = `${this._orgRel(orgId)}/projects`;
+    const ids = typeof this.store.listJsonAsync === 'function'
+      ? await this.store.listJsonAsync(rel, { cursor, limit, includeDirs: true })
+      : this.store.listJson(rel, { cursor, limit, includeDirs: true });
+    if (typeof this.store.readJsonManyAsync === 'function') {
+      const rows = await this.store.readJsonManyAsync(ids.map((id) => `${rel}/${id}.json`));
+      return rows.map((row) => row.json).filter(Boolean);
+    }
+    return (await Promise.all(ids.map((id) => this.getProjectAsync(orgId, id)))).filter(Boolean);
+  }
+
   // --- repository -------------------------------------------------------
   createRepository({ orgId, projectId, name, defaultBranch = 'main' }) {
     const project = this.getProject(orgId, projectId);
@@ -808,6 +820,18 @@ export class Source {
     return ids.map((id) => this.getChange(orgId, projectId, id)).filter(Boolean);
   }
 
+  async listChangesAsync(orgId, projectId, { cursor, limit = 1_000 } = {}) {
+    const rel = `${this._projectRel(orgId, projectId)}/changes`;
+    const ids = typeof this.store.listJsonAsync === 'function'
+      ? await this.store.listJsonAsync(rel, { cursor, limit })
+      : this.store.listJson(rel, { cursor, limit });
+    if (typeof this.store.readJsonManyAsync === 'function') {
+      const rows = await this.store.readJsonManyAsync(ids.map((id) => `${rel}/${id}.json`));
+      return rows.map((row) => row.json).filter(Boolean);
+    }
+    return (await Promise.all(ids.map((id) => this.getChangeAsync(orgId, projectId, id)))).filter(Boolean);
+  }
+
   _saveChange(orgId, projectId, change) {
     this.store.writeJson(`${this._projectRel(orgId, projectId)}/changes/${change.id}.json`, change);
   }
@@ -873,6 +897,18 @@ export class Source {
   listEvidence(orgId, projectId) {
     const ids = this.store.listJson(`${this._projectRel(orgId, projectId)}/evidence`);
     return ids.map((id) => this.getEvidence(orgId, projectId, id)).filter(Boolean);
+  }
+
+  async listEvidenceAsync(orgId, projectId, { cursor, limit = 1_000 } = {}) {
+    const rel = `${this._projectRel(orgId, projectId)}/evidence`;
+    const ids = typeof this.store.listJsonAsync === 'function'
+      ? await this.store.listJsonAsync(rel, { cursor, limit })
+      : this.store.listJson(rel, { cursor, limit });
+    if (typeof this.store.readJsonManyAsync === 'function') {
+      const rows = await this.store.readJsonManyAsync(ids.map((id) => `${rel}/${id}.json`));
+      return rows.map((row) => row.json).filter(Boolean);
+    }
+    return (await Promise.all(ids.map((id) => this.getEvidenceAsync(orgId, projectId, id)))).filter(Boolean);
   }
 
   getArtifact(hash) {
