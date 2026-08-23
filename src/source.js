@@ -1388,14 +1388,18 @@ export class Source {
     return (await Promise.all(ids.map((id) => this.getWorkflowAsync(orgId, projectId, id)))).filter(Boolean);
   }
 
-  async dispatchWorkflowAsync({ orgId, projectId, workflowId = null, event, eventId = null, payload = {}, maxQueueDepth = 100_000 }) {
+  async dispatchWorkflowAsync({ orgId, projectId, workflowId = null, event, eventId = null, payload = {}, maxQueueDepth = 100_000, maxWorkflowJobs = 1_000 }) {
     if (typeof event !== 'string' || !/^[A-Za-z0-9_.:-]{1,120}$/.test(event)) throw new Error('event must be a safe event name');
     if (Buffer.byteLength(JSON.stringify(payload)) > 64 * 1024) throw new Error('event payload too large');
+    const safeMaxWorkflowJobs = Number.isInteger(maxWorkflowJobs) && maxWorkflowJobs > 0 ? Math.min(maxWorkflowJobs, 100_000) : 1_000;
     const resolvedEventId = eventId || randomHex(16);
     if (String(resolvedEventId).length > 120) throw new Error('eventId must be at most 120 characters');
     const workflows = await this.listWorkflowsAsync(orgId, projectId, { limit: 1000 });
     const runs = [];
+    let dispatchedJobCount = 0;
     for (const workflow of workflows.filter((candidate) => (!workflowId || candidate.id === workflowId) && candidate.enabled && candidate.triggers.includes(event))) {
+      if (dispatchedJobCount + workflow.jobs.length > safeMaxWorkflowJobs) throw new Error('workflow dispatch fanout exceeds configured limit');
+      dispatchedJobCount += workflow.jobs.length;
       const definitions = workflow.jobs.map((definition, step) => ({
           kind: definition.kind,
           payload: { workflowId: workflow.id, workflowVersion: workflow.version, event, eventId: resolvedEventId, step, input: payload, parameters: definition.payload },

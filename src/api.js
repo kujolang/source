@@ -326,7 +326,7 @@ async function changeWork(src, orgId, projectId, changeId) {
   return c ? c.workId : undefined;
 }
 
-export function createServer(src, { port = 8787, tls, host, trustProxy = false, webhookSecret = process.env.SOURCE_WEBHOOK_SECRET || null, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxJobPayloadBytes = 64 * 1024, maxJobQueueDepth = 100_000, maxGitBodyBytes = 100_000_000, maxChunkedGitBodyBytes = 16 * 1024 * 1024, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTenantConcurrency = 8, gitTenantQueue = 256, gitTimeoutMs = 120_000, maxConnections = 10_000 } = {}) {
+export function createServer(src, { port = 8787, tls, host, trustProxy = false, webhookSecret = process.env.SOURCE_WEBHOOK_SECRET || null, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxJobPayloadBytes = 64 * 1024, maxJobQueueDepth = 100_000, maxWorkflowJobs = 1_000, maxGitBodyBytes = 100_000_000, maxChunkedGitBodyBytes = 16 * 1024 * 1024, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTenantConcurrency = 8, gitTenantQueue = 256, gitTimeoutMs = 120_000, maxConnections = 10_000 } = {}) {
   const limiter = new RateLimiter({ maxKeys: rateLimit.maxKeys || 100_000, store: rateLimit.store || src.store });
   const gitSlots = new Semaphore({ capacity: gitConcurrency, queue: gitQueue });
   const gitTenantSlots = new KeyedSemaphore({ capacity: gitTenantConcurrency, queue: gitTenantQueue, maxKeys: rateLimit.maxKeys || 100_000 });
@@ -770,7 +770,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           const eventId = body.eventId || req.headers['x-github-delivery'] || req.headers['x-source-delivery'];
           if (!eventId) return json(res, 400, { error: 'webhook delivery id is required' });
           const event = body.event || req.headers['x-github-event'] || 'webhook';
-          const dispatch = await src.dispatchWorkflowAsync({ orgId, projectId, workflowId: workflow.id, event, eventId, payload: body.payload ?? body, maxQueueDepth: maxJobQueueDepth });
+          const dispatch = await src.dispatchWorkflowAsync({ orgId, projectId, workflowId: workflow.id, event, eventId, payload: body.payload ?? body, maxQueueDepth: maxJobQueueDepth, maxWorkflowJobs });
           return json(res, 202, dispatch);
         }
         if (workflowMatch && !workflowMatch[1] && req.method === 'GET') {
@@ -797,7 +797,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           const workflow = await src.getWorkflowAsync(orgId, projectId, workflowMatch[1]);
           if (!workflow) return json(res, 404, { error: 'workflow not found' });
           const body = await readBody(req, maxJsonBodyBytes);
-          const dispatch = await src.dispatchWorkflowAsync({ orgId, projectId, workflowId: workflow.id, event: body.event, eventId: body.eventId, payload: body.payload ?? {}, maxQueueDepth: maxJobQueueDepth });
+          const dispatch = await src.dispatchWorkflowAsync({ orgId, projectId, workflowId: workflow.id, event: body.event, eventId: body.eventId, payload: body.payload ?? {}, maxQueueDepth: maxJobQueueDepth, maxWorkflowJobs });
           return json(res, 202, dispatch);
         }
 

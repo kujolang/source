@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **141/141 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
+- **142/142 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
@@ -227,6 +227,8 @@ the result. See the deployment document for Postgres and restore-drill commands.
 
 Set `SOURCE_WEBHOOK_SECRET` to enable HMAC-signed workflow webhook ingress;
 deliveries require a provider signature and delivery ID and are replay-safe.
+Workflow dispatch is bounded to 1,000 jobs per event by default; operators can
+adjust the `maxWorkflowJobs` server option for a different controlled fan-out.
 
 ## Architecture
 
