@@ -1102,8 +1102,12 @@ class PostgresStore {
       ) SELECT COALESCE(json_agg(row_to_json(inserted)), '[]'::json)::text AS rows FROM inserted`);
       const insertedIds = new Set(inserted.map((row) => row.id));
       const insertedByKey = new Map(inserted.filter((row) => row.key).map((row) => [row.key, row.id]));
+      const resolved = dedupeKeys.length
+        ? await this._fetchJsonRowsAsync(`SELECT dedupe_key AS key, id FROM ${this._qualified('jobs')} WHERE dedupe_key IN (${dedupeKeys.map(escapeSqlLiteral).join(',')})`)
+        : [];
+      const resolvedByKey = new Map(resolved.map((row) => [row.key, row.id]));
       return normalized.map((job, index) => {
-        const id = insertedIds.has(ids[index]) ? ids[index] : existing.find((row) => row.key === job.dedupeKey)?.id || insertedByKey.get(job.dedupeKey);
+        const id = insertedIds.has(ids[index]) ? ids[index] : resolvedByKey.get(job.dedupeKey) || existing.find((row) => row.key === job.dedupeKey)?.id || insertedByKey.get(job.dedupeKey);
         return { id, kind: job.kind, payload: job.payload, orgId: job.orgId || null, projectId: job.projectId || null, workId: job.workId || null, status: insertedIds.has(ids[index]) ? 'queued' : 'deduplicated', attempts: 0, maxAttempts: job.maxAttempts, availableAt: job.availableAt, dedupeKey: job.dedupeKey };
       });
     });
