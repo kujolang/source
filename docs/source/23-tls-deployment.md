@@ -71,6 +71,28 @@ server {
 }
 ```
 
+## Container deployment
+
+The repository includes a non-root production image for the Postgres-backed
+server. It contains Git and the Postgres client required by the storage
+bootstrap/fallback paths, keeps metadata and bare Git objects in separate
+mounts, and exposes a container health check:
+
+```bash
+docker build -t source:local .
+docker run --read-only --tmpfs /tmp --cap-drop=ALL \
+  -p 8787:8787 \
+  -e SOURCE_DATABASE_URL='postgresql://source:password@db/source' \
+  -v source-data:/var/lib/source/data \
+  -v source-git:/var/lib/source/git \
+  source:local
+```
+
+Use a private network, inject the DSN through the orchestrator's secret
+facility, and place the Git volume on storage with documented snapshot and
+restore semantics. The image is a serving node; action workers remain separate
+processes so container execution capacity can be scaled independently.
+
 ## Certificate management
 
 - **Let's Encrypt** (ACME) is the default recommendation for public domains;

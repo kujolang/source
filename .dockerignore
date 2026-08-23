@@ -1,0 +1,8 @@
+.git
+.source
+.eval_results
+node_modules
+npm-debug.log
+tests
+docs
+*.md

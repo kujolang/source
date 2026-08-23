@@ -223,6 +223,10 @@ Caddy, HAProxy). See `docs/source/23-tls-deployment.md` for the full self-host
 path, certificate management, custom domains, and data-durability/backup
 requirements.
 
+The included `Dockerfile` builds a non-root Postgres serving image with
+separate `/var/lib/source/data` and `/var/lib/source/git` mount points. Scale
+serving nodes and worker processes independently behind the reverse proxy.
+
 Backups are executable and verifiable: `npm run backup -- --output
 /var/backups/source` archives the metadata/Git roots, verifies bare repositories,
 and emits checksums; `npm run backup:verify -- --backup <directory>` validates
