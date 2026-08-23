@@ -84,7 +84,10 @@ never a control.
   limiting on push.
 - **Detective:** post-receive events; audit.
 - **Recovery:** reflog; restore refs.
-- **Remaining risk:** MVP local transport; smart-HTTP hardening deferred.
+- **Remaining risk:** smart-HTTP request/response bounds, Git subprocess
+  timeouts, global/per-project admission, and auth/rate limits are enforced;
+  shared Git-volume durability, Git implementation defects, and deployment
+  edge throttling remain operational risks.
 
 ### T8 — Malicious repository content
 - **Asset:** server, other tenants. **Attacker:** contributor.
@@ -155,7 +158,11 @@ never a control.
   policy gates execution; no LLM in deterministic orchestration.
 - **Detective:** audit log.
 - **Recovery:** disable workflow.
-- **Remaining risk:** MVP has no arbitrary workflow execution (deferred).
+- **Remaining risk:** imported workflow `run` steps execute only through the
+  operator-selected Podman/Docker isolated runner, with no-network,
+  read-only-root, dropped-capability, resource, output, timeout, workspace,
+  and secret-environment bounds; runner images, host runtimes, and secret
+  providers remain deployment trust assumptions. `uses` actions are rejected.
 
 ### T15 — Prompt injection through repository content
 - **Asset:** agent behavior. **Attacker:** contributor.
@@ -195,7 +202,10 @@ never a control.
 - **Preventive:** validate/sanitize all event payloads; treat as untrusted.
 - **Detective:** error logging.
 - **Recovery:** replay-safe event log.
-- **Remaining risk:** MVP has no external webhooks (deferred).
+- **Remaining risk:** webhook ingress now requires a configured HMAC secret,
+  validates the raw request signature, applies rate limits, and deduplicates
+  delivery IDs before workflow fan-out; secret rotation, provider-specific
+  adapters, and replay/availability operations remain deployment concerns.
 
 ### T19 — Artifact substitution
 - **Asset:** evidence. **Attacker:** contributor.
