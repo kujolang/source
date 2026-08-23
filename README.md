@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **142/142 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
+- **143/143 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
@@ -108,7 +108,10 @@ default), a 10-second connection timeout, a 30-second idle timeout, and a
 30-second query timeout; tune these through the store's `connectionOptions` for
 the deployment's database capacity. Requests are rejected with backpressure
 when the admission queue is exhausted instead of accumulating unboundedly in
-the driver.
+the driver. Transient database disconnects, failover shutdowns, serialization
+conflicts, and deadlocks return retryable `503` responses with `Retry-After: 1`
+so agents can use bounded exponential backoff rather than treating
+infrastructure pressure as a permanent request error.
 
 `/healthz` reports process liveness. `/metrics` exposes low-cardinality
 Prometheus-compatible request, response, active-request, and abort counters,

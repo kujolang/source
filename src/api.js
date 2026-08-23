@@ -102,6 +102,18 @@ function html(res, status, body) {
   res.end(body);
 }
 
+function isRetryableStoreError(error) {
+  const code = String(error?.code || '');
+  return code === 'DB_ADMISSION_EXHAUSTED'
+    || code === 'ECONNRESET'
+    || code === 'ECONNREFUSED'
+    || code === 'ETIMEDOUT'
+    || code === '53300'
+    || code === '57P01'
+    || code === '40001'
+    || code === '40P01';
+}
+
 function readText(req, maxBytes = 1_000_000) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -1087,6 +1099,10 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
       if (e?.code === 'DB_ADMISSION_EXHAUSTED') {
         res.setHeader('Retry-After', '1');
         return json(res, 503, { error: 'database admission capacity exhausted', retryable: true });
+      }
+      if (isRetryableStoreError(e)) {
+        res.setHeader('Retry-After', '1');
+        return json(res, 503, { error: 'storage temporarily unavailable', retryable: true });
       }
       return json(res, 400, { error: e.message });
     }

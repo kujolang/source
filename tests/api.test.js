@@ -54,6 +54,26 @@ test('database admission exhaustion returns retryable service backpressure', asy
   });
 });
 
+test('transient database failures return retryable service backpressure', async () => {
+  const { src, org, project, agent } = freshSource();
+  const capability = src.capabilities.issue({
+    principalId: agent.id,
+    scope: { org: org.id, project: project.id },
+    allowed: ['read_source'],
+  });
+  src.getProjectAsync = async () => {
+    const error = new Error('database connection reset');
+    error.code = 'ECONNRESET';
+    throw error;
+  };
+  await withServer(src, async (base) => {
+    const response = await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}`, { headers: auth(capability.credential) });
+    assert.equal(response.status, 503);
+    assert.equal(response.headers.get('retry-after'), '1');
+    assert.deepEqual(await response.json(), { error: 'storage temporarily unavailable', retryable: true });
+  });
+});
+
 test('agents can enqueue a bounded job batch through one capability-gated request', async () => {
   const { src, org, project, agent } = freshSource();
   const capability = src.capabilities.issue({
