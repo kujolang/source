@@ -13,6 +13,8 @@ All notable changes to Source are recorded here.
   other eligible projects in a shared Postgres worker fleet.
 - Added durable workflow job dependencies with cycle validation and
   dependency-aware claims for GitHub Actions `needs` semantics.
+- Batched Postgres workflow record reads to avoid one database round trip per
+  workflow during dispatch and listing.
 
 ## [0.1.0]
 
