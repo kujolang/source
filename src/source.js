@@ -302,6 +302,10 @@ export class Source {
       : (rel) => this.store.readJson(rel);
     const project = await readJson(`${this._projectRel(orgId, projectId)}/project.json`);
     if (!project) return null;
+    if (typeof this.store.readJsonManyAsync === 'function') {
+      const rows = await this.store.readJsonManyAsync(project.repositories.map((id) => `${this._projectRel(orgId, projectId)}/repos/${id}.json`));
+      return rows.map((row) => row.json).find((repo) => repo && (repo.id === repoRef || repo.name === repoRef)) || null;
+    }
     for (const id of project.repositories) {
       const repo = await readJson(`${this._projectRel(orgId, projectId)}/repos/${id}.json`);
       if (repo && (repo.id === repoRef || repo.name === repoRef)) return repo;

@@ -41,9 +41,10 @@ are eligible, while allowing a single eligible project to fill the requested
 batch. This provides fair progress across tenants without reducing throughput
 for a worker fleet serving one project; tune the limit with
 `--worker-project-burst`.
-Workflow, organization, and Work listing/dispatch paths use bounded bulk record
-reads on Postgres, so large tenants do not fan out into one database round trip
-per returned record.
+Workflow, organization, Work listing/dispatch, and repository-resolution paths
+use bounded bulk record reads on Postgres, so large tenants do not fan out into
+one database round trip per returned record. Bulk results preserve path order so
+keyset pagination remains correct.
 
 Chunked Git uploads use a separate four-slot admission budget and a 16 MiB
 buffer limit by default. Known-length uploads remain streamed directly to

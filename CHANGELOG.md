@@ -17,6 +17,8 @@ All notable changes to Source are recorded here.
   workflow during dispatch and listing.
 - Extended bounded Postgres bulk reads to organization and Work listings,
   removing their per-record query fan-out.
+- Applied the same bulk-read path to repository resolution, keeping Git-facing
+  repository lookup bounded for projects with many repositories.
 
 ## [0.1.0]
 

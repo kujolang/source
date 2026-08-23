@@ -686,6 +686,7 @@ class PostgresStore {
       SELECT path, json
       FROM ${this._qualified('records')}
       WHERE path IN (${paths.map(escapeSqlLiteral).join(',')})
+      ORDER BY path
     `);
   }
 
