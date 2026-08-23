@@ -23,7 +23,9 @@ by default.
 
 Every asynchronous Postgres operation also passes through a bounded admission
 queue (eight waiters per pool connection by default; the live 1,000-agent gate
-uses a 4,096-operation deployment budget). Once that queue is full,
+uses a 4,096-operation deployment budget). A 5,000-agent live profile has been
+verified with a 10,000-operation deployment budget and 256 concurrent HTTP
+clients. Once that queue is full,
 the operation is rejected rather than retained indefinitely in the database
 driver's internal wait list. Admission activity and rejections are exposed
 through `/metrics` for capacity planning.

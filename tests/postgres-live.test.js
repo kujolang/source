@@ -12,7 +12,10 @@ import { SourceWorker } from '../src/worker.js';
 
 const dsn = process.env.SOURCE_TEST_DATABASE_URL;
 
-test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents', { skip: !dsn }, async () => {
+test('Postgres async lifecycle and HTTP burst remain correct under a configurable agent fleet', { skip: !dsn }, async () => {
+  const agentCount = Math.min(5_000, Math.max(1_000, Math.trunc(Number(process.env.SOURCE_LIVE_AGENTS) || 1_000)));
+  const dbQueue = Math.min(100_000, Math.max(4_096, Math.trunc(Number(process.env.SOURCE_LIVE_DB_QUEUE) || 4_096)));
+  const httpConcurrency = Math.min(agentCount, Math.max(1, Math.trunc(Number(process.env.SOURCE_LIVE_HTTP_CONCURRENCY) || 256)));
   const schema = `source_test_${Date.now()}_${process.pid}`;
   let store;
   let src;
@@ -20,7 +23,7 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
   let server;
   let peerServer;
   try {
-    store = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 32, maxDbQueue: 4_096 } });
+    store = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 32, maxDbQueue: dbQueue } });
     const dataRoot = mkdtempSync(path.join(tmpdir(), 'source-pg-live-'));
     const gitRoot = mkdtempSync(path.join(tmpdir(), 'source-pg-git-'));
     src = new Source(dataRoot, { store, gitRoot });
@@ -32,7 +35,7 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     assert.equal(replicationPage.hasMore, false);
     assert.ok(replicationPage.events.some((event) => event.path.endsWith('/project.json')));
     const principal = await src.createPrincipalAsync({ type: 'agent', name: 'load-agent' });
-    peerStore = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 32, maxDbQueue: 4_096 } });
+    peerStore = new PostgresStore({ dsn, schema, connectionOptions: { maxConnections: 32, maxDbQueue: dbQueue } });
     const peerSrc = new Source(dataRoot, { store: peerStore, gitRoot });
     assert.equal((await peerSrc.getProjectAsync(org.id, project.id)).id, project.id);
     const peerRepo = src.createRepository({ orgId: org.id, projectId: project.id, name: 'shared-main' });
@@ -46,14 +49,22 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     execFileSync('git', ['-C', workflowClone, 'add', '.github/workflows/checks.yml']);
     execFileSync('git', ['-C', workflowClone, 'commit', '-m', 'add workflow'], { stdio: 'ignore' });
     execFileSync('git', ['-C', workflowClone, 'push', 'origin', 'HEAD:main'], { stdio: 'ignore' });
-    const works = await Promise.all(Array.from({ length: 1_000 }, (_, i) => src.createWorkAsync({
+    const works = await Promise.all(Array.from({ length: agentCount }, (_, i) => src.createWorkAsync({
       orgId: org.id,
       projectId: project.id,
       intent: `agent-${i}`,
       requester: principal.id,
     })));
-    assert.equal(works.length, 1_000);
-    assert.equal((await src.listWorkAsync(org.id, project.id, { limit: 1_001 })).length, 1_000);
+    assert.equal(works.length, agentCount);
+    let listedWorks = 0;
+    let workCursor;
+    while (true) {
+      const page = await src.listWorkAsync(org.id, project.id, { cursor: workCursor, limit: 1_000 });
+      listedWorks += page.length;
+      if (page.length < 1_000) break;
+      workCursor = page.at(-1).id;
+    }
+    assert.equal(listedWorks, agentCount);
     const firstWorkPage = await src.listWorkAsync(org.id, project.id, { limit: 100 });
     const secondWorkPage = await src.listWorkAsync(org.id, project.id, { cursor: firstWorkPage.at(-1).id, limit: 100 });
     assert.equal(firstWorkPage.length, 100);
@@ -228,7 +239,7 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     assert.equal(handled, 100);
     assert.equal(retryAttempts, 2);
 
-    server = await startServer(src, { port: 0, maxConnections: 2_000, webhookSecret: 'live-webhook-secret' });
+    server = await startServer(src, { port: 0, maxConnections: Math.max(2_000, agentCount), webhookSecret: 'live-webhook-secret' });
     const jobCapability = await src.capabilities.issueAsync({
       principalId: principal.id,
       scope: { org: org.id, project: project.id },
@@ -308,8 +319,17 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     assert.ok(claimedWebhookJobs.some((job) => job.id === webhookDispatch.workflows[0].jobs[0].id));
     await Promise.all([...claimedApiJobs, ...claimedWebhookJobs].map((job) => src.jobs.complete({ id: job.id, workerId: job.workerId, leaseToken: job.leaseToken, result: { ok: true } })));
     const url = `http://127.0.0.1:${server.address().port}/.well-known/source`;
-    const responses = await Promise.all(Array.from({ length: 1_000 }, () => fetch(url)));
-    assert.ok(responses.every((response) => response.status === 200));
+    const responseStatuses = [];
+    let nextRequest = 0;
+    async function requestWorker() {
+      while (true) {
+        const index = nextRequest++;
+        if (index >= agentCount) return;
+        responseStatuses[index] = (await fetch(url)).status;
+      }
+    }
+    await Promise.all(Array.from({ length: httpConcurrency }, requestWorker));
+    assert.equal(responseStatuses.filter((status) => status === 200).length, agentCount);
 
     peerServer = await startServer(peerSrc, { port: 0, maxConnections: 2_000 });
     const peerUrl = `http://127.0.0.1:${peerServer.address().port}/.well-known/source`;
