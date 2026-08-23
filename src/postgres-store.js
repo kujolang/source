@@ -1485,6 +1485,46 @@ class PostgresStore {
     return true;
   }
 
+  async checkReplicationAsync({ role = 'primary', minStandbys = 1, maxLagBytes = 64 * 1024 * 1024 } = {}) {
+    if (role !== 'primary' && role !== 'standby') throw new Error('replication role must be primary or standby');
+    const observed = role === 'primary'
+      ? (await this._fetchJsonRowsAsync(`
+        SELECT json_build_object(
+          'inRecovery', pg_is_in_recovery(),
+          'standbys', COALESCE((SELECT json_agg(json_build_object(
+            'state', state,
+            'syncState', sync_state,
+            'replayLagBytes', COALESCE(pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn), 0)
+          )) FROM pg_stat_replication), '[]'::json)
+        ) AS status`))[0]?.status
+      : (await this._fetchJsonRowsAsync(`
+        SELECT json_build_object(
+          'inRecovery', pg_is_in_recovery(),
+          'receiverStatus', COALESCE((SELECT status FROM pg_stat_wal_receiver LIMIT 1), 'disconnected'),
+          'receiveLagBytes', COALESCE(pg_wal_lsn_diff(pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn()), 0)
+        ) AS status`))[0]?.status;
+    const failures = [];
+    if (role === 'primary') {
+      if (observed?.inRecovery) failures.push('database is in recovery, expected primary');
+      const standbys = Array.isArray(observed?.standbys) ? observed.standbys : [];
+      const streaming = standbys.filter((replica) => replica.state === 'streaming');
+      if (streaming.length < minStandbys) failures.push(`only ${streaming.length} streaming standby(s), expected at least ${minStandbys}`);
+      if (streaming.some((replica) => Number(replica.replayLagBytes) > maxLagBytes)) failures.push('standby replay lag exceeds configured bound');
+    } else {
+      if (!observed?.inRecovery) failures.push('database is not in recovery, expected standby');
+      if (observed?.receiverStatus !== 'streaming') failures.push(`WAL receiver status is ${observed?.receiverStatus || 'unknown'}, expected streaming`);
+      if (Number(observed?.receiveLagBytes) > maxLagBytes) failures.push('standby receive lag exceeds configured bound');
+    }
+    if (failures.length) {
+      const error = new Error(failures.join('; '));
+      error.code = 'REPLICATION_NOT_READY';
+      error.failures = failures;
+      error.observed = observed;
+      throw error;
+    }
+    return { role, observed };
+  }
+
   poolStats() {
     return {
       total: Number(this.pool.totalCount || 0),

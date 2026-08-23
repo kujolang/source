@@ -374,6 +374,19 @@ test('health and readiness endpoints expose process and storage state', async ()
   }
 });
 
+test('required replication keeps a node out of readiness without a durable gate', async () => {
+  const { src } = freshSource();
+  const server = await startServer(src, { port: 0, requireReplication: true, replicationMinStandbys: 1 });
+  try {
+    assert.equal((await fetch(`http://127.0.0.1:${server.address().port}/readyz`)).status, 503);
+    src.store.checkReplicationAsync = async () => ({ role: 'primary', observed: { standbys: [{ state: 'streaming' }] } });
+    assert.equal((await fetch(`http://127.0.0.1:${server.address().port}/readyz`)).status, 200);
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});
+
 test('Git-backed scan requests honor the shared concurrency budget', async () => {
   const { src, org, project } = freshSource();
   const cap = src.capabilities.issue({

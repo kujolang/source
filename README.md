@@ -269,6 +269,10 @@ configured primary/standby contract with
 --role primary --min-standbys 1`; the check fails unless a streaming standby is
 present and within the configured replay-lag bound.
 
+Serving nodes can enforce the same contract on `/readyz` with
+`--require-replication --min-replicas 1`. This keeps a node out of service when
+its configured Postgres topology has lost the required standby.
+
 Set `SOURCE_WEBHOOK_SECRET` to enable HMAC-signed workflow webhook ingress;
 deliveries require a provider signature and delivery ID and are replay-safe.
 Workflow dispatch is bounded to 1,000 jobs per event by default; operators can

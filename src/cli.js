@@ -326,6 +326,10 @@ export async function run(argv) {
             artifactQueue: numberFlag('--artifact-queue', 64),
             requestConcurrency: numberFlag('--request-concurrency', 2_048),
             requestQueue: numberFlag('--request-queue', 4_096),
+            requireReplication: hasFlag('--require-replication'),
+            replicationRole: flag('--replication-role') || 'primary',
+            replicationMinStandbys: numberFlag('--min-replicas', 1),
+            replicationMaxLagBytes: numberFlag('--max-replication-lag-bytes', 64 * 1024 * 1024),
           }))
           .then((server) => {
             const scheme = tls ? 'https' : 'http';
@@ -438,7 +442,7 @@ export async function run(argv) {
           '  decision accept|reject|request-revision --org <o> --project <p>',
           '  policy show --org <o> --project <p>',
           '  audit',
-          '  serve --port <n> [--host <addr>] [--store postgres] [--trust-proxy] [--git-concurrency <n>] [--git-queue <n>] [--git-tenant-concurrency <n>] [--git-tenant-queue <n>] [--git-timeout-ms <n>] [--request-concurrency <n>] [--request-queue <n>] [--max-connections <n>] [--max-git-response <bytes>] [--max-workflow-jobs <n>] [--artifact-concurrency <n>] [--artifact-queue <n>]',
+          '  serve --port <n> [--host <addr>] [--store postgres] [--require-replication --min-replicas <n> --max-replication-lag-bytes <n>] [--trust-proxy] [--git-concurrency <n>] [--git-queue <n>] [--git-tenant-concurrency <n>] [--git-tenant-queue <n>] [--git-timeout-ms <n>] [--request-concurrency <n>] [--request-queue <n>] [--max-connections <n>] [--max-git-response <bytes>] [--max-workflow-jobs <n>] [--artifact-concurrency <n>] [--artifact-queue <n>]',
           '  worker --store postgres --handler-module <path> [--worker-id <id> --worker-concurrency <n> --worker-project-burst <n> --worker-jitter-ratio <0..1> --worker-handler-timeout-ms <n> --worker-shutdown-timeout-ms <n>]',
           '  submit [--intent <s>] [--url <base>] [--credential <c>] [--cwd <dir>]',
           '',

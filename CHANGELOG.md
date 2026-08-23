@@ -20,6 +20,8 @@ All notable changes to Source are recorded here.
 - Prevented accidental exposure of JSON/SQLite single-node stores; exposed
   `serve` bindings now require Postgres unless an explicit unsafe override is
   supplied.
+- Added optional fail-closed `/readyz` enforcement with `--require-replication`,
+  minimum standby, and replication-lag settings.
 - Made the default Node test command deterministic by serializing test files;
   the dedicated scale suite still exercises the 1,000-connection burst while
   avoiding host TCP backlog contention from unrelated test servers.

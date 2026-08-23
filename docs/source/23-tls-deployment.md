@@ -218,6 +218,10 @@ a standby. It is intentionally a failing gate when the deployment has no
 streaming standby; Source does not pretend that an application-level mirror
 provides metadata consensus.
 
+Pass `--require-replication` to `source serve` to make `/readyz` enforce the
+same requirement continuously. A node whose primary has lost its required
+standby then remains out of service until the deployment recovers replication.
+
 ## Security notes
 
 - TLS resolves the "no TLS" remaining risk in `12-threat-model.md` T4
