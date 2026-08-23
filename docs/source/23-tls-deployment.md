@@ -202,6 +202,22 @@ branches, tags, deletions, and objects are reconciled without loading packfiles
 into Node memory. This replicates Git source state; Postgres metadata still
 requires its own native replication/consensus deployment.
 
+Before declaring a multi-node deployment ready, verify the database side of the
+topology as well:
+
+```bash
+npm run check:postgres-replication -- \
+  --database-url "$SOURCE_DATABASE_URL" \
+  --role primary \
+  --min-standbys 1 \
+  --max-lag-bytes 67108864
+```
+
+The check uses `pg_stat_replication` on a primary and `pg_stat_wal_receiver` on
+a standby. It is intentionally a failing gate when the deployment has no
+streaming standby; Source does not pretend that an application-level mirror
+provides metadata consensus.
+
 ## Security notes
 
 - TLS resolves the "no TLS" remaining risk in `12-threat-model.md` T4

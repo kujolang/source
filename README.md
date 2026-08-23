@@ -259,6 +259,12 @@ mirror jobs: `npm run replicate:git -- --source-root "$SOURCE_GIT_ROOT"
 replicated independently with Git's mirror refspec, pruning deleted refs and
 running `git fsck`; rerunning after a peer outage is safe.
 
+Postgres metadata replication remains a deployment responsibility. Verify the
+configured primary/standby contract with
+`npm run check:postgres-replication -- --database-url "$SOURCE_DATABASE_URL"
+--role primary --min-standbys 1`; the check fails unless a streaming standby is
+present and within the configured replay-lag bound.
+
 Set `SOURCE_WEBHOOK_SECRET` to enable HMAC-signed workflow webhook ingress;
 deliveries require a provider signature and delivery ID and are replay-safe.
 Workflow dispatch is bounded to 1,000 jobs per event by default; operators can

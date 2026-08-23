@@ -19,7 +19,8 @@
     "backup": "node scripts/backup.js",
     "backup:verify": "node scripts/verify-backup.js",
     "backup:restore-drill": "node scripts/restore-drill.js",
-    "replicate:git": "node scripts/replicate-git.js"
+    "replicate:git": "node scripts/replicate-git.js",
+    "check:postgres-replication": "node scripts/check-postgres-replication.js"
   },
   "engines": {
     "node": ">=18"
