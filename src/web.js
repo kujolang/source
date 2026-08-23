@@ -13,8 +13,8 @@ export function esc(s) {
 }
 
 function page(title, body) {
-  return `<!doctype html><html lang="en" data-theme="kujo-light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title><link rel="stylesheet" href="/assets/sitekit/sitekit.css"><link rel="stylesheet" href="/assets/source.css"><script src="/assets/sitekit/sitekit.js" defer></script></head>
- <body><div class="sk-container sk-stack source-page">${body}</div><script src="/assets/source.js" defer></script></body></html>`;
+  return `<!doctype html><html lang="en" data-theme="kujo-light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title><link rel="stylesheet" href="/assets/sitekit/sitekit.css"><link rel="stylesheet" href="/assets/source.css?v=70f9f2b"><script src="/assets/sitekit/sitekit.js" defer></script></head>
+ <body><div class="sk-container sk-stack source-page">${body}</div><script src="/assets/source.js?v=70f9f2b" defer></script></body></html>`;
 }
 
 // Instance index: list organizations (the tenant boundary).
