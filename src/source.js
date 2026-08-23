@@ -679,13 +679,22 @@ export class Source {
   }
 
   async claimWorkAsync({ orgId, projectId, workId, principalId }) {
-    const work = await this.getWorkAsync(orgId, projectId, workId);
-    if (!work) throw new Error(`work not found: ${workId}`);
-    transitionWork(work, 'claimed');
-    work.assignee = principalId;
-    await this._asyncWrite(`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work);
-    await this._asyncAudit({ event: 'work.claim', orgId, projectId, workId, principalId });
-    return work;
+    const claim = async () => {
+      const work = await this.getWorkAsync(orgId, projectId, workId);
+      if (!work) throw new Error(`work not found: ${workId}`);
+      transitionWork(work, 'claimed');
+      work.assignee = principalId;
+      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work);
+      await this._asyncAudit({ event: 'work.claim', orgId, projectId, workId, principalId });
+      return work;
+    };
+    if (typeof this.store.lockProjectAsync === 'function' && typeof this.store.transactionAsync === 'function') {
+      return this.store.transactionAsync(async () => {
+        await this.store.lockProjectAsync(orgId, projectId);
+        return claim();
+      });
+    }
+    return claim();
   }
 
   assignWork({ orgId, projectId, workId, principalId }) {
@@ -1098,6 +1107,17 @@ export class Source {
   // the base commit (TOCTOU). Returns {ok, reason} for a single-repo update
   // (repoId provided) or {ok, results} for a multi-repo update (repoId omitted).
   updateCanonicalState({ orgId, projectId, changeId, repoId = null }) {
+    if (typeof this.store.lockProject === 'function' && typeof this.store.transaction === 'function' && !this._canonicalSyncLockHeld) {
+      this._canonicalSyncLockHeld = true;
+      try {
+        return this.store.transaction(() => {
+          this.store.lockProject(orgId, projectId);
+          return this.updateCanonicalState({ orgId, projectId, changeId, repoId });
+        });
+      } finally {
+        this._canonicalSyncLockHeld = false;
+      }
+    }
     const change = this.getChange(orgId, projectId, changeId);
     if (!change) throw new Error(`change not found: ${changeId}`);
     if (change.decisionState !== 'accepted') {

@@ -117,6 +117,16 @@ test('Postgres canonical promotion lock uses the project row', async () => {
   assert.match(calls[0], /FOR UPDATE/);
 });
 
+test('Postgres synchronous canonical promotion exposes the same project lock primitive', () => {
+  const calls = [];
+  const store = Object.create(PostgresStore.prototype);
+  store._qualified = (name) => `"source"."${name}"`;
+  store._run = (sql) => { calls.push(sql); return ''; };
+  store.lockProject('O1', 'P1');
+  assert.match(calls[0], /WHERE org_id = 'O1' AND id = 'P1'/);
+  assert.match(calls[0], /FOR UPDATE/);
+});
+
 test('Postgres async transactions roll back relational record fan-out on failure', async () => {
   const calls = [];
   const client = {

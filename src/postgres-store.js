@@ -979,6 +979,12 @@ class PostgresStore {
       FOR UPDATE`);
   }
 
+  lockProject(orgId, projectId) {
+    this._run(`SELECT id FROM ${this._qualified('projects')}
+      WHERE org_id = ${escapeSqlLiteral(orgId)} AND id = ${escapeSqlLiteral(projectId)}
+      FOR UPDATE`);
+  }
+
   getMeta(key) {
     const rows = this._fetchJsonRows(`SELECT value FROM ${this._qualified('meta')} WHERE key = ${escapeSqlLiteral(key)}`);
     return rows[0] ? rows[0].value : undefined;
