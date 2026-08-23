@@ -139,6 +139,7 @@ test('Postgres replication event apply is resumable and rejects gaps', async () 
   const result = await store.applyReplicationEventsAsync({ sourceId: 'primary', events: [{ seq: 1, operation: 'upsert', path: 'instance.json', json: { id: 'instance' } }] });
   assert.deepEqual(result, { sourceId: 'primary', applied: 1, cursor: 1 });
   assert.ok(calls.includes('instance.json:instance:false'));
+  await assert.rejects(() => store.applyReplicationEventsAsync({ sourceId: 'primary', events: [{ seq: 1, operation: 'upsert', path: 'instance.json', previousHash: 'local-write', json: { id: 'remote' } }] }), /replication conflict/);
   await assert.rejects(() => store.applyReplicationEventsAsync({ sourceId: 'primary', events: [{ seq: 3, operation: 'upsert', path: 'x.json', json: {} }] }), /replication event gap/);
 });
 

@@ -221,9 +221,10 @@ npm run replicate:postgres -- \
 ```
 
 The target stores its source cursor transactionally, rejects sequence gaps,
-and does not re-emit imported events, preventing replication loops. This is a
-one-way convergence tool; multi-writer conflict resolution still requires a
-consensus deployment.
+rejects divergent target writes using per-event predecessor hashes, and does
+not re-emit imported events, preventing replication loops. This is a one-way
+convergence tool; multi-writer conflict resolution still requires a consensus
+deployment.
 
 Before declaring a multi-node deployment ready, verify the database side of the
 topology as well:

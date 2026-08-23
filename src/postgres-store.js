@@ -428,7 +428,6 @@ class PostgresStore {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
-
     this._run(`
       CREATE TABLE IF NOT EXISTS ${this._qualified('audit')} (
         seq BIGSERIAL PRIMARY KEY,
@@ -446,10 +445,14 @@ class PostgresStore {
         org_id TEXT,
         project_id TEXT,
         entity_id TEXT,
+        previous_hash TEXT,
+        current_hash TEXT,
         json JSONB NOT NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
+    this._run(`ALTER TABLE ${this._qualified('replication_events')} ADD COLUMN IF NOT EXISTS previous_hash TEXT`);
+    this._run(`ALTER TABLE ${this._qualified('replication_events')} ADD COLUMN IF NOT EXISTS current_hash TEXT`);
 
     this._run(`
       CREATE TABLE IF NOT EXISTS ${this._qualified('rate_limits')} (
@@ -847,6 +850,16 @@ class PostgresStore {
 
   async _writeJsonAsync(relPath, obj, { emitReplicationEvent = true } = {}) {
     const classified = this._classifyRelPath(relPath);
+    if (emitReplicationEvent) {
+      await this._runAsync(`INSERT INTO ${this._qualified('replication_events')} (operation, path, kind, org_id, project_id, entity_id, previous_hash, current_hash, json)
+        SELECT 'upsert', ${escapeSqlLiteral(relPath)}, ${escapeSqlLiteral(classified.kind)}, ${escapeSqlLiteral(classified.orgId || null)},
+          ${escapeSqlLiteral(classified.projectId || null)}, ${escapeSqlLiteral(classified.id || null)}, md5(json::text), md5(${toJson(obj)}::jsonb::text), ${toJson(obj)}::jsonb
+        FROM ${this._qualified('records')} WHERE path = ${escapeSqlLiteral(relPath)}
+        UNION ALL
+        SELECT 'upsert', ${escapeSqlLiteral(relPath)}, ${escapeSqlLiteral(classified.kind)}, ${escapeSqlLiteral(classified.orgId || null)},
+          ${escapeSqlLiteral(classified.projectId || null)}, ${escapeSqlLiteral(classified.id || null)}, NULL, md5(${toJson(obj)}::jsonb::text), ${toJson(obj)}::jsonb
+        WHERE NOT EXISTS (SELECT 1 FROM ${this._qualified('records')} WHERE path = ${escapeSqlLiteral(relPath)})`);
+    }
     await this._runAsync(`INSERT INTO ${this._qualified('records')} (path, kind, org_id, project_id, entity_id, json)
       VALUES (${escapeSqlLiteral(relPath)}, ${escapeSqlLiteral(classified.kind)}, ${escapeSqlLiteral(classified.orgId || null)}, ${escapeSqlLiteral(classified.projectId || null)}, ${escapeSqlLiteral(classified.id || null)}, ${toJson(obj)})
       ON CONFLICT (path) DO UPDATE SET kind = EXCLUDED.kind, org_id = EXCLUDED.org_id, project_id = EXCLUDED.project_id, entity_id = EXCLUDED.entity_id, json = EXCLUDED.json`);
@@ -933,11 +946,6 @@ class PostgresStore {
         VALUES (${escapeSqlLiteral(obj.principalId)}, 'human', 'capability principal', ${toJson({ id: obj.principalId })})
         ON CONFLICT (id) DO NOTHING`);
     }
-    if (emitReplicationEvent) {
-      await this._runAsync(`INSERT INTO ${this._qualified('replication_events')} (operation, path, kind, org_id, project_id, entity_id, json)
-        VALUES ('upsert', ${escapeSqlLiteral(relPath)}, ${escapeSqlLiteral(classified.kind)}, ${escapeSqlLiteral(classified.orgId || null)},
-          ${escapeSqlLiteral(classified.projectId || null)}, ${escapeSqlLiteral(classified.id || null)}, ${toJson(obj)})`);
-    }
   }
 
   // Ordered, transactional CDC seam for a deployment's native replication or
@@ -947,7 +955,7 @@ class PostgresStore {
     const cursor = Math.max(0, Math.trunc(Number(afterSeq) || 0));
     const pageSize = Math.min(1_000, Math.max(1, Math.trunc(Number(limit) || 1)));
     const rows = await this._fetchJsonRowsAsync(`
-      SELECT seq, operation, path, kind, org_id AS "orgId", project_id AS "projectId", entity_id AS "entityId", json, created_at AS "createdAt"
+      SELECT seq, operation, path, kind, org_id AS "orgId", project_id AS "projectId", entity_id AS "entityId", previous_hash AS "previousHash", current_hash AS "currentHash", json, created_at AS "createdAt"
       FROM ${this._qualified('replication_events')}
       WHERE seq > ${cursor}
       ORDER BY seq
@@ -968,6 +976,11 @@ class PostgresStore {
       const key = `replication:cursor:${sourceId}`;
       const currentRows = await this._fetchJsonRowsAsync(`SELECT value FROM ${this._qualified('meta')} WHERE key = ${escapeSqlLiteral(key)}`);
       let cursor = Number(currentRows[0]?.value || 0);
+      const paths = [...new Set(events.filter((event) => Number(event?.seq) > cursor).map((event) => event?.path).filter((path) => typeof path === 'string'))];
+      const currentRecords = paths.length
+        ? await this._fetchJsonRowsAsync(`SELECT path, md5(json::text) AS hash FROM ${this._qualified('records')} WHERE path IN (${paths.map(escapeSqlLiteral).join(',')})`)
+        : [];
+      const currentHashes = new Map(currentRecords.map((row) => [row.path, row.hash]));
       let applied = 0;
       for (const event of events) {
         const sequence = Number(event?.seq);
@@ -980,7 +993,14 @@ class PostgresStore {
         if (event.operation !== 'upsert' || typeof event.path !== 'string' || !event.path || event.json === undefined) {
           throw new Error('replication event is invalid');
         }
+        if (event.previousHash !== undefined && (currentHashes.get(event.path) || null) !== event.previousHash) {
+          const error = new Error(`replication conflict at ${event.path}`);
+          error.code = 'REPLICATION_CONFLICT';
+          error.path = event.path;
+          throw error;
+        }
         await this._writeJsonAsync(event.path, event.json, { emitReplicationEvent: false });
+        currentHashes.set(event.path, event.currentHash || 'updated');
         cursor = sequence;
         applied += 1;
       }
