@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **194/194 non-skipped default tests pass** (one documented opt-in skip), including a dogfood test against the real `spec` Kujo
+- **197/197 non-skipped default tests pass** (one documented opt-in skip), including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
@@ -64,12 +64,20 @@ node bin/source.js cap issue --principal U2 --org O1 --project P1 \
 # Issue a Git-transport capability (read + push) for a contributor
 node bin/source.js git-cap --org O1 --project P1 --principal U1
 
-# Serve the HTTP API + minimal web UI + smart-HTTP Git transport
+# Serve the HTTP API + local management UI + smart-HTTP Git transport
 node bin/source.js serve --port 8787
 #   GET /.well-known/source                          (agent discovery)
-#   GET /                                            (human org index)
+#   GET /                                            (human dashboard)
+#   GET /o/O1/p/P1                                   (project, repositories, work, changes, actions)
+#   GET /o/O1/p/P1/r/R1/tree/main                    (repository browser)
+#   GET /o/O1/p/P1/actions                           (workflow/action management and run queue)
+#   GET /o/O1/p/P1/settings                          (collaborators and deployment settings)
 #   GET /api/v1/orgs/O1/projects/P1/work              (machine interface, requires capability)
 #   git clone http://localhost:8787/git/O1/P1/R1.git (smart-HTTP)
+
+# Open http://localhost:8787, sign in with a human principal, and select
+# “Enable project management controls” to use role-gated create/review/dispatch
+# forms. Production workflow execution still requires a Postgres-backed worker.
 
 # Serve over HTTPS (in-process TLS termination)
 node bin/source.js serve --host 0.0.0.0 --port 443 \

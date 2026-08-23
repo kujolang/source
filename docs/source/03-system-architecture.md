@@ -49,7 +49,7 @@ boundaries required for later scaling.
 | Git server | **`git` CLI via `child_process`, bare repos** | Evidence-backed | Git remains authoritative; no packfile/network reimplementation. Smart-HTTP and `file://`/local transport for MVP. |
 | Artifact storage | **Filesystem, content-addressed by SHA-256** | Evidence-backed | Immutable artifacts keyed by hash; provenance links to source revision. |
 | API | **HTTP + JSON (REST-shaped), discovery endpoint** | Evidence-backed | Compact, cacheable, content-negotiable; `/.well-known/source` for agent discovery. |
-| Frontend | **Static HTML + vanilla JS** | Implementation hypothesis | MVP needs enough UI to understand a Change; no framework. |
+| Frontend | **Server-rendered HTML + vanilla browser controls** | Evidence-backed implementation | The local UI covers repository browsing, work/change review, workflow dispatch, run inspection, collaborators, and deployment settings without a frontend build pipeline; the JSON/API contracts remain primary for agents. |
 | Events | **Bounded request work plus a Postgres lease queue** | Evidence-backed increment | Git subprocesses and request bodies are bounded in-process; deferred workflows can be claimed by independent workers with `SKIP LOCKED`, leases, retries, and recovery. |
 | Identity | **Principal records + opaque capability tokens (HMAC-signed)** | Evidence-backed | No custom cryptography; Node `crypto` HMAC-SHA256 for capability tokens. |
 | Crypto | **Node built-in `crypto`** | Evidence-backed | SHA-256 hashing, HMAC signing, `randomBytes` for tokens. No custom primitives. |
