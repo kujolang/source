@@ -3,7 +3,7 @@
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class SourceWorker {
-  constructor({ queue, handlers = {}, workerId, concurrency = 8, leaseMs = 30_000, pollMs = 1_000, retryDelayMs = 1_000, maxAttempts = 5, errorBackoffMs = 1_000, onError = null } = {}) {
+  constructor({ queue, handlers = {}, workerId, concurrency = 8, leaseMs = 30_000, pollMs = 1_000, retryDelayMs = 1_000, maxAttempts = 5, errorBackoffMs = 1_000, shutdownTimeoutMs = 30_000, onError = null } = {}) {
     if (!queue) throw new Error('queue is required');
     if (!workerId) throw new Error('workerId is required');
     this.queue = queue;
@@ -15,6 +15,7 @@ export class SourceWorker {
     this.retryDelayMs = Math.max(0, Math.trunc(retryDelayMs));
     this.maxAttempts = Math.max(1, Math.trunc(maxAttempts));
     this.errorBackoffMs = Math.max(1, Math.trunc(errorBackoffMs));
+    this.shutdownTimeoutMs = Math.min(300_000, Math.max(0, Math.trunc(shutdownTimeoutMs)));
     this.onError = typeof onError === 'function' ? onError : () => {};
     this.lastError = null;
     this.stopping = false;
@@ -28,9 +29,27 @@ export class SourceWorker {
     return this;
   }
 
-  async stop() {
+  async stop({ timeoutMs = this.shutdownTimeoutMs } = {}) {
     this.stopping = true;
-    await this.running;
+    if (!this.running) return true;
+    const safeTimeout = Math.min(300_000, Math.max(0, Math.trunc(timeoutMs)));
+    if (!safeTimeout) {
+      await this.running;
+      return true;
+    }
+    let timer;
+    const drained = await Promise.race([
+      this.running.then(() => true),
+      new Promise((resolve) => {
+        timer = setTimeout(() => {
+          this._reportError(new Error(`worker shutdown drain exceeded ${safeTimeout}ms; leases will recover after expiry`));
+          resolve(false);
+        }, safeTimeout);
+        timer.unref?.();
+      }),
+    ]);
+    clearTimeout(timer);
+    return drained;
   }
 
   async _loop() {

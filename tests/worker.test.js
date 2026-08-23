@@ -92,3 +92,31 @@ test('worker survives transient queue outages and reports errors', async () => {
   assert.deepEqual(errors, ['database unavailable', 'database unavailable']);
   assert.equal(worker.lastError.message, 'database unavailable');
 });
+
+test('worker shutdown has a bounded drain and leaves hung leases recoverable', async () => {
+  let release;
+  const blocked = new Promise((resolve) => { release = resolve; });
+  let claimed = false;
+  const queue = {
+    async claim() {
+      if (claimed) return [];
+      claimed = true;
+      return [{ id: 'J1', kind: 'blocked', payload: {}, leaseToken: 'lease-1', maxAttempts: 2 }];
+    },
+    async extend() {},
+    async complete() {},
+    async fail() {},
+  };
+  const worker = new SourceWorker({
+    queue,
+    workerId: 'shutdown-test',
+    pollMs: 1,
+    shutdownTimeoutMs: 10,
+    handlers: { blocked: async () => blocked },
+  });
+  worker.start();
+  await waitFor(() => claimed);
+  assert.equal(await worker.stop(), false);
+  release();
+  await waitFor(() => worker.running === null);
+});

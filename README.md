@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **131/131 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
+- **132/132 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
@@ -133,7 +133,8 @@ failed jobs can be retried with bounded attempts. This is the worker-plane seam
 for batch workflows that should not run inside request handlers.
 Workers back off and report transient queue/database failures instead of
 terminating, while leases allow abandoned jobs to be recovered by another
-worker.
+worker. Shutdown drains for 30 seconds by default; a hung handler then leaves
+its lease to expire so another worker can recover the job.
 
 Workers register handlers by job kind and can run as separate processes:
 
