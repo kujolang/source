@@ -83,6 +83,30 @@ test('human login is rate-limited by client address', async () => {
   }
 });
 
+test('trusted proxy mode uses the forwarded client address for rate limits', async () => {
+  const { src, org, project, human } = freshSource();
+  const server = await startServer(src, { port: 0, trustProxy: true, rateLimit: { login: { limit: 1, windowMs: 60_000 } } });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const body = JSON.stringify({ principalId: human.id, password: 'test-password-123', orgId: org.id, projectId: project.id });
+    const first = await fetch(`${base}/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json', 'x-forwarded-for': '198.51.100.10' },
+      body,
+    });
+    const second = await fetch(`${base}/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json', 'x-forwarded-for': '198.51.100.11' },
+      body,
+    });
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 200);
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});
+
 test('session issuance is rate-limited by client address', async () => {
   const { src, org, project, human, agent } = freshSource();
   const work = src.createWork({ orgId: org.id, projectId: project.id, intent: 'session throttle', requester: human.id });

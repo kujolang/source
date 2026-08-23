@@ -293,6 +293,18 @@ function gitAuthError(res, status, error) {
   res.end(body);
 }
 
+function clientAddress(req, trustProxy = false) {
+  const remote = req.socket.remoteAddress || 'unknown';
+  if (!trustProxy) return remote;
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string') {
+    const first = forwarded.split(',')[0]?.trim();
+    if (first) return first;
+  }
+  const real = req.headers['x-real-ip'];
+  return typeof real === 'string' && real.trim() ? real.trim() : remote;
+}
+
 // Resolve the Work id a Change belongs to (for work-scoped capability checks).
 async function changeWork(src, orgId, projectId, changeId) {
   const c = typeof src.getChangeAsync === 'function'
@@ -301,7 +313,7 @@ async function changeWork(src, orgId, projectId, changeId) {
   return c ? c.workId : undefined;
 }
 
-export function createServer(src, { port = 8787, tls, host, webhookSecret = process.env.SOURCE_WEBHOOK_SECRET || null, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxJobPayloadBytes = 64 * 1024, maxJobQueueDepth = 100_000, maxGitBodyBytes = 100_000_000, maxChunkedGitBodyBytes = 16 * 1024 * 1024, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTimeoutMs = 120_000, maxConnections = 10_000 } = {}) {
+export function createServer(src, { port = 8787, tls, host, trustProxy = false, webhookSecret = process.env.SOURCE_WEBHOOK_SECRET || null, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxJobPayloadBytes = 64 * 1024, maxJobQueueDepth = 100_000, maxGitBodyBytes = 100_000_000, maxChunkedGitBodyBytes = 16 * 1024 * 1024, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTimeoutMs = 120_000, maxConnections = 10_000 } = {}) {
   const limiter = new RateLimiter({ maxKeys: rateLimit.maxKeys || 100_000, store: rateLimit.store || src.store });
   const gitSlots = new Semaphore({ capacity: gitConcurrency, queue: gitQueue });
   const chunkedGitSlots = new Semaphore({ capacity: Math.max(1, Math.min(4, gitConcurrency)), queue: Math.max(0, Math.min(32, gitQueue)) });
@@ -348,7 +360,7 @@ export function createServer(src, { port = 8787, tls, host, webhookSecret = proc
       }
 
       if (req.method === 'POST' && pathname === '/login') {
-        const ip = req.socket.remoteAddress || 'unknown';
+        const ip = clientAddress(req, trustProxy);
         if (!(await limiter.allowAsync(`login:${ip}`, limits.login))) {
           if (wantsJson(req)) return json(res, 429, { error: 'rate limit exceeded' });
           return loginPage(res, 429, 'rate limit exceeded');
@@ -547,7 +559,7 @@ export function createServer(src, { port = 8787, tls, host, webhookSecret = proc
         }
 
         // Rate-limit the write path (push) by client address.
-        const ip = req.socket.remoteAddress || 'unknown';
+        const ip = clientAddress(req, trustProxy);
         if (isWrite) {
           if (!(await limiter.allowAsync(`gitpush:${ip}`, limits.gitPush))) {
             return gitAuthError(res, 429, 'rate limit exceeded');
@@ -726,7 +738,7 @@ export function createServer(src, { port = 8787, tls, host, webhookSecret = proc
         const webhookMatch = rest.match(/^\/workflows\/([^/]+)\/webhook$/);
         if (webhookMatch && req.method === 'POST') {
           if (!webhookSecret) return json(res, 503, { error: 'webhook ingress is not configured' });
-          const ip = req.socket.remoteAddress || 'unknown';
+          const ip = clientAddress(req, trustProxy);
           if (!(await limiter.allowAsync(`webhook:${ip}:${orgId}:${projectId}`, limits.workflowDispatch))) return json(res, 429, { error: 'rate limit exceeded' });
           const raw = await readText(req, maxJsonBodyBytes);
           if (!validWebhookSignature(raw, req.headers['x-hub-signature-256'] || req.headers['x-source-signature-256'], webhookSecret)) return json(res, 401, { error: 'invalid webhook signature' });
@@ -757,7 +769,7 @@ export function createServer(src, { port = 8787, tls, host, webhookSecret = proc
         }
 
         if (workflowMatch && workflowMatch[1] && workflowMatch[2] === '/dispatch' && req.method === 'POST') {
-          const ip = req.socket.remoteAddress || 'unknown';
+          const ip = clientAddress(req, trustProxy);
           if (!(await limiter.allowAsync(`workflow:${ip}:${orgId}:${projectId}`, limits.workflowDispatch))) return json(res, 429, { error: 'rate limit exceeded' });
           const g = await guard(src, req, ACTIONS.dispatch_workflow, { org: orgId, project: projectId });
           if (g) return json(res, g.status, g.body);
@@ -792,7 +804,7 @@ export function createServer(src, { port = 8787, tls, host, webhookSecret = proc
 
         if (rest === '/jobs' && req.method === 'POST') {
           const body = await readBody(req, maxJsonBodyBytes);
-          const ip = req.socket.remoteAddress || 'unknown';
+          const ip = clientAddress(req, trustProxy);
           if (!(await limiter.allowAsync(`job:${ip}:${orgId}:${projectId}`, limits.jobEnqueue))) {
             return json(res, 429, { error: 'rate limit exceeded' });
           }
@@ -829,7 +841,7 @@ export function createServer(src, { port = 8787, tls, host, webhookSecret = proc
         // lifecycle server-side. Public projects support low-friction
         // onboarding; private projects require a project-scoped capability.
         if (rest === '/submit' && req.method === 'POST') {
-          const ip = req.socket.remoteAddress || 'unknown';
+          const ip = clientAddress(req, trustProxy);
           if (!(await limiter.allowAsync(`submit:${ip}`, limits.submit))) {
             return json(res, 429, { error: 'rate limit exceeded' });
           }
@@ -885,7 +897,7 @@ export function createServer(src, { port = 8787, tls, host, webhookSecret = proc
           }
 
           if (wrest === '/sessions' && req.method === 'POST') {
-            const ip = req.socket.remoteAddress || 'unknown';
+            const ip = clientAddress(req, trustProxy);
             if (!(await limiter.allowAsync(`session:${ip}`, limits.session))) {
               return json(res, 429, { error: 'rate limit exceeded' });
             }

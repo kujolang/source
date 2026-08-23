@@ -20,7 +20,7 @@ scanning).
 
 ## Status
 
-- **135/135 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
+- **136/136 non-skipped default tests pass**, including a dogfood test against the real `spec` Kujo
   repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
   artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
   `source submit` contribution-flow tests, capability-gated API auth tests,
@@ -118,6 +118,12 @@ available and writable; remove an instance
 from service when readiness returns `503`. On shutdown the CLI marks the
 instance draining, rejects new work with `503`, allows active requests to
 finish, and force-closes connections after 30 seconds.
+
+When Source is behind a trusted reverse proxy, set `trustProxy: true` in
+`startServer`/`createServer` (or pass `--trust-proxy` to `serve`) so rate
+limits use the first `X-Forwarded-For` address. Leave it disabled for directly
+exposed servers; forwarding headers are otherwise client-controlled and must
+not influence identity or throttles.
 
 For a real deployment burst test, use the dependency-free load harness:
 
