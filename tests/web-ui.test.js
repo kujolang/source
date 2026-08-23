@@ -30,7 +30,7 @@ test('local management UI covers repositories, workflows, runs, and settings', a
     const sourceScript = await fetch(`${base}/assets/source.js`);
     assert.equal(sourceScript.status, 200);
     assert.match(await sourceScript.text(), /data-source-copy/);
-    assert.match(projectHtml, /class="sk-navigation"/);
+    assert.match(projectHtml, /class="[^"]*sk-navigation/);
     assert.match(projectHtml, /class="[^"]*source-page/);
     assert.match(projectHtml, /Repositories/);
     assert.match(projectHtml, /Add repository/);
@@ -60,6 +60,10 @@ test('local management UI covers repositories, workflows, runs, and settings', a
     assert.match(repoHtml, /Clone this repository/);
     assert.match(repoHtml, /data-source-copy="http:\/\/127\.0\.0\.1:/);
     assert.match(repoHtml, /git clone http:\/\/127\.0\.0\.1:/);
+    assert.match(repoHtml, /data-source-branch-select/);
+    assert.match(repoHtml, /data-source-repo-tab="contents"/);
+    assert.match(repoHtml, /data-source-repo-tab="history"/);
+    assert.match(repoHtml, /source-file-kind/);
 
     const readmePage = await fetch(`${base}/o/${org.id}/p/${project.id}/r/${repo.id}/blob/main/README.md`, { headers });
     assert.equal(readmePage.status, 200);
