@@ -70,3 +70,8 @@ Timeout and output-limit cleanup terminates the runtime process group as well
 as the direct runtime process and explicitly removes the named runtime
 container, preventing orphaned containers from consuming capacity after a
 failed or hung action.
+The handler sanitizes broker output to an allowlisted, bounded environment,
+rejects runtime-injection variables such as `NODE_OPTIONS`, and redacts
+brokered values from captured stdout/stderr before returning the result. A
+production secret provider must still implement identity, rotation, and audit
+against the operator's secret system.

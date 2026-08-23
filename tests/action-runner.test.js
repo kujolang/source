@@ -66,8 +66,19 @@ test('GitHub handler resolves an isolated workspace and passes brokered secrets 
   assert.deepEqual(result, { ok: true });
   assert.deepEqual(calls[0], [
     { steps: [{ run: 'kujo check' }] },
-    { workspace: '/srv/workspaces/job-2', env: { TOKEN: 'redacted', NODE_OPTIONS: '--require evil' } },
+    { workspace: '/srv/workspaces/job-2', env: { TOKEN: 'redacted' } },
   ]);
+});
+
+test('GitHub handler redacts brokered secrets from runner output', async () => {
+  const handler = createGitHubActionsHandler({
+    runner: { run: async (_request, options) => ({ ok: true, stdout: `token=${options.env.TOKEN}`, stderr: options.env.NODE_OPTIONS || '' }) },
+    workspaceForJob: async () => '/srv/workspaces/job-3',
+    secretProvider: async () => ({ TOKEN: 'super-secret-token', NODE_OPTIONS: '--require evil' }),
+  });
+  const result = await handler({ parameters: { steps: [{ run: 'kujo check' }] } }, { id: 'J3' });
+  assert.equal(result.stdout, 'token=[REDACTED]');
+  assert.equal(result.stderr, '');
 });
 
 test('ephemeral workspace manager bounds and cleans action workspaces', async () => {

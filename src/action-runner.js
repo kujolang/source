@@ -47,7 +47,18 @@ function safeEnvironment(env) {
     && !/^(?:LD_|BASH_ENV$|ENV$|NODE_OPTIONS$|PYTHONPATH$|PERL5OPT$|RUBYOPT$|GIT_CONFIG_)/.test(key)
     && typeof value === 'string'
     && value.length <= 4096
-  )));
+  )).slice(0, 128));
+}
+
+function redactSecretOutput(result, env) {
+  if (!result || typeof result !== 'object') return result;
+  const secrets = Object.values(env).filter((value) => value.length >= 4);
+  const redact = (value) => secrets.reduce((out, secret) => out.split(secret).join('[REDACTED]'), String(value));
+  return {
+    ...result,
+    ...(typeof result.stdout === 'string' ? { stdout: redact(result.stdout) } : {}),
+    ...(typeof result.stderr === 'string' ? { stderr: redact(result.stderr) } : {}),
+  };
 }
 
 function killRuntimeProcess(child) {
@@ -220,8 +231,9 @@ export function createGitHubActionsHandler({ runner, workspaceForJob, workspaceM
       ? await workspaceManager.acquire(job)
       : await workspaceForJob(payload, job);
     try {
-      const env = await secretProvider(payload, job);
-      return await runner.run({ steps: parameters.steps }, { workspace, env });
+      const env = safeEnvironment(await secretProvider(payload, job));
+      const result = await runner.run({ steps: parameters.steps }, { workspace, env });
+      return redactSecretOutput(result, env);
     } finally {
       if (workspaceManager) await workspaceManager.release(job);
     }
