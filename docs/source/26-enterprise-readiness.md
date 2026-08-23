@@ -44,6 +44,9 @@ are eligible, while allowing a single eligible project to fill the requested
 batch. This provides fair progress across tenants without reducing throughput
 for a worker fleet serving one project; tune the limit with
 `--worker-project-burst`.
+Worker idle polls and transient-error backoff use bounded jitter by default, so
+large fleets do not wake and retry in lockstep after a queue or database event.
+Tune the range with `--worker-jitter-ratio` (default `0.2`, capped at `1`).
 Workflow, organization, Work listing/dispatch, and repository-resolution paths
 use bounded bulk record reads on Postgres, so large tenants do not fan out into
 one database round trip per returned record. Bulk results preserve path order so

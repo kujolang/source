@@ -11,6 +11,9 @@ All notable changes to Source are recorded here.
 - Added Kujo Eval, dependency-audit, and Kujo Doctor release checks.
 - Added bounded per-project worker claim bursts so a noisy project cannot starve
   other eligible projects in a shared Postgres worker fleet.
+- Added bounded jitter to worker polling and outage backoff to prevent large
+  worker fleets from synchronizing claim and retry storms; the range is
+  configurable with `--worker-jitter-ratio`.
 - Added durable workflow job dependencies with cycle validation and
   dependency-aware claims for GitHub Actions `needs` semantics.
 - Batched Postgres workflow record reads to avoid one database round trip per

@@ -3,7 +3,7 @@
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class SourceWorker {
-  constructor({ queue, handlers = {}, workerId, concurrency = 8, leaseMs = 30_000, pollMs = 1_000, retryDelayMs = 1_000, maxAttempts = 5, projectBurst = 8, errorBackoffMs = 1_000, handlerTimeoutMs = 15 * 60_000, shutdownTimeoutMs = 30_000, onError = null } = {}) {
+  constructor({ queue, handlers = {}, workerId, concurrency = 8, leaseMs = 30_000, pollMs = 1_000, retryDelayMs = 1_000, maxAttempts = 5, projectBurst = 8, errorBackoffMs = 1_000, jitterRatio = 0.2, random = Math.random, handlerTimeoutMs = 15 * 60_000, shutdownTimeoutMs = 30_000, onError = null } = {}) {
     if (!queue) throw new Error('queue is required');
     if (!workerId) throw new Error('workerId is required');
     this.queue = queue;
@@ -16,6 +16,8 @@ export class SourceWorker {
     this.maxAttempts = Math.max(1, Math.trunc(maxAttempts));
     this.projectBurst = Math.min(1_000, Math.max(1, Math.trunc(projectBurst)));
     this.errorBackoffMs = Math.max(1, Math.trunc(errorBackoffMs));
+    this.jitterRatio = Math.min(1, Math.max(0, Number(jitterRatio) || 0));
+    this.random = typeof random === 'function' ? random : Math.random;
     this.handlerTimeoutMs = Math.min(24 * 60 * 60_000, Math.max(0, Math.trunc(handlerTimeoutMs)));
     this.shutdownTimeoutMs = Math.min(300_000, Math.max(0, Math.trunc(shutdownTimeoutMs)));
     this.onError = typeof onError === 'function' ? onError : () => {};
@@ -64,11 +66,11 @@ export class SourceWorker {
       } catch (error) {
         failures += 1;
         this._reportError(error);
-        await sleep(Math.min(60_000, this.errorBackoffMs * (2 ** Math.min(failures - 1, 6))));
+        await sleep(this._jitteredDelay(Math.min(60_000, this.errorBackoffMs * (2 ** Math.min(failures - 1, 6)))));
         continue;
       }
       if (!jobs.length) {
-        await sleep(this.pollMs);
+        await sleep(this._jitteredDelay(this.pollMs));
         continue;
       }
       await Promise.all(jobs.map((job) => this._runJob(job)));
@@ -125,5 +127,12 @@ export class SourceWorker {
   _reportError(error) {
     this.lastError = error instanceof Error ? error : new Error(String(error));
     try { this.onError(this.lastError); } catch { /* telemetry must not kill the worker */ }
+  }
+
+  _jitteredDelay(baseMs) {
+    if (!this.jitterRatio) return baseMs;
+    const randomValue = Math.min(1, Math.max(0, Number(this.random()) || 0));
+    const factor = 1 - this.jitterRatio + (2 * this.jitterRatio * randomValue);
+    return Math.max(1, Math.round(baseMs * factor));
   }
 }

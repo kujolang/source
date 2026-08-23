@@ -169,10 +169,12 @@ retried with bounded attempts. This is the worker-plane seam
 for batch workflows that should not run inside request handlers.
 Workers back off and report transient queue/database failures instead of
 terminating, while leases allow abandoned jobs to be recovered by another
-worker. Shutdown drains for 30 seconds by default; a hung handler then leaves
+terminating. Idle polls and outage backoff include bounded jitter, preventing a
+large worker fleet from synchronizing claim storms. Shutdown drains for 30 seconds by default; a hung handler then leaves
 its lease to expire so another worker can recover the job. Handlers also have a
 15-minute execution timeout by default and receive an `AbortSignal`; tune it
-with `--worker-handler-timeout-ms`.
+with `--worker-handler-timeout-ms`. The jitter range is configurable with
+`--worker-jitter-ratio` (default `0.2`, capped at `1`).
 
 Workers register handlers by job kind and can run as separate processes:
 

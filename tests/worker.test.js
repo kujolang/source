@@ -149,3 +149,12 @@ test('worker times out a hung handler and aborts its signal before retry routing
   assert.match(failure.error, /handler exceeded 10ms/);
   assert.equal(observedSignal.aborted, true);
 });
+
+test('worker jitters idle polling and outage backoff to avoid fleet synchronization', async () => {
+  const worker = new SourceWorker({ queue: { claim: async () => [] }, workerId: 'jitter-test', pollMs: 100, jitterRatio: 0.25, random: () => 0 });
+  assert.equal(worker._jitteredDelay(100), 75);
+  worker.random = () => 1;
+  assert.equal(worker._jitteredDelay(100), 125);
+  worker.jitterRatio = 0;
+  assert.equal(worker._jitteredDelay(100), 100);
+});
