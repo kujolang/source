@@ -86,6 +86,10 @@ container, preventing orphaned containers from consuming capacity after a
 failed or hung action.
 The handler sanitizes broker output to an allowlisted, bounded environment,
 rejects runtime-injection variables such as `NODE_OPTIONS`, and redacts
-brokered values from captured stdout/stderr before returning the result. A
-production secret provider must still implement identity, rotation, and audit
+brokered values from captured stdout/stderr before returning the result.
+`SecretLeaseBroker` provides the production seam: each resolution requires an
+explicit workload identity, is not cached, receives an expiry, and emits an
+audit event containing references and metadata but never secret values. The
+deployment resolver remains responsible for backing this seam with its rotating
+secret system and revocation policy.
 against the operator's secret system.

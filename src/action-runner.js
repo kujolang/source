@@ -50,6 +50,41 @@ function safeEnvironment(env) {
   )).slice(0, 128));
 }
 
+// Deployment-owned secret broker boundary. Secrets are resolved per job (no
+// process cache), bound to an explicit workload identity, and audited without
+// recording secret values. Providers should implement rotation and revocation
+// behind `resolve` rather than handing Source a long-lived secret store.
+export class SecretLeaseBroker {
+  constructor({ resolve, identity, audit, leaseMs = 15 * 60_000 } = {}) {
+    if (typeof resolve !== 'function') throw new Error('secret broker resolve function is required');
+    if (typeof audit !== 'function') throw new Error('secret broker audit function is required');
+    if (typeof identity !== 'string' && typeof identity !== 'function') throw new Error('secret broker identity is required');
+    this.resolve = resolve;
+    this.identity = identity;
+    this.audit = audit;
+    this.leaseMs = Math.min(60 * 60_000, Math.max(1_000, Math.trunc(leaseMs)));
+  }
+
+  async get(payload, job) {
+    const resolvedIdentity = typeof this.identity === 'function' ? await this.identity(payload, job) : this.identity;
+    if (typeof resolvedIdentity !== 'string' || !resolvedIdentity || resolvedIdentity.length > 256) throw new Error('secret broker identity is invalid');
+    const requested = payload?.parameters?.secretRefs ?? payload?.parameters?.secrets ?? [];
+    if (!Array.isArray(requested) || requested.length > 64 || requested.some((reference) => typeof reference !== 'string' || !reference || reference.length > 256)) throw new Error('secret references are invalid');
+    const issuedAt = new Date();
+    const expiresAt = new Date(issuedAt.getTime() + this.leaseMs).toISOString();
+    try {
+      const supplied = await this.resolve({ identity: resolvedIdentity, references: requested, payload, job, expiresAt });
+      const environment = supplied?.env && typeof supplied.env === 'object' ? supplied.env : supplied;
+      const safe = safeEnvironment(environment);
+      await this.audit({ event: 'secret_lease_issued', identity: resolvedIdentity, jobId: String(job?.id || ''), references: requested, issuedAt: issuedAt.toISOString(), expiresAt, keyCount: Object.keys(safe).length });
+      return safe;
+    } catch (error) {
+      await Promise.resolve(this.audit({ event: 'secret_lease_denied', identity: resolvedIdentity, jobId: String(job?.id || ''), references: requested, issuedAt: issuedAt.toISOString(), reason: error?.message ? 'provider_error' : 'provider_failure' })).catch(() => {});
+      throw error;
+    }
+  }
+}
+
 function redactSecretOutput(result, env) {
   if (!result || typeof result !== 'object') return result;
   const secrets = Object.values(env).filter((value) => value.length >= 4);
@@ -351,9 +386,10 @@ export class IsolatedActionRunner {
   }
 }
 
-export function createGitHubActionsHandler({ runner, workspaceForJob, workspaceManager = null, secretProvider = async () => ({}) } = {}) {
+export function createGitHubActionsHandler({ runner, workspaceForJob, workspaceManager = null, secretProvider = async () => ({}), secretBroker = null } = {}) {
   if (!runner || typeof runner.run !== 'function') throw new Error('runner is required');
   if (!workspaceManager && typeof workspaceForJob !== 'function') throw new Error('workspaceForJob is required');
+  if (secretBroker && typeof secretBroker.get !== 'function') throw new Error('secret broker must expose get(payload, job)');
   return async (payload, job) => {
     const parameters = payload?.parameters;
     if (!parameters) throw new Error('workflow job parameters are missing');
@@ -361,7 +397,7 @@ export function createGitHubActionsHandler({ runner, workspaceForJob, workspaceM
       ? await workspaceManager.acquire(job)
       : await workspaceForJob(payload, job);
     try {
-      const env = safeEnvironment(await secretProvider(payload, job));
+      const env = safeEnvironment(await (secretBroker ? secretBroker.get(payload, job) : secretProvider(payload, job)));
       const result = await runner.run({ steps: parameters.steps }, { workspace, env });
       return redactSecretOutput(result, env);
     } finally {

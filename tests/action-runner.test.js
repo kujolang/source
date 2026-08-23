@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign } from 'node:crypto';
-import { canonicalActionManifestPayload, createGitHubActionsHandler, EphemeralWorkspaceManager, IsolatedActionRunner, loadActionKeyring, loadSignedActionRegistry, StaticActionRegistry } from '../src/action-runner.js';
+import { canonicalActionManifestPayload, createGitHubActionsHandler, EphemeralWorkspaceManager, IsolatedActionRunner, loadActionKeyring, loadSignedActionRegistry, SecretLeaseBroker, StaticActionRegistry } from '../src/action-runner.js';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -161,6 +161,36 @@ test('GitHub handler redacts brokered secrets from runner output', async () => {
   const result = await handler({ parameters: { steps: [{ run: 'kujo check' }] } }, { id: 'J3' });
   assert.equal(result.stdout, 'token=[REDACTED]');
   assert.equal(result.stderr, '');
+});
+
+test('secret lease broker binds identity, avoids caching, and audits without values', async () => {
+  const events = [];
+  let resolutions = 0;
+  const broker = new SecretLeaseBroker({
+    identity: async () => 'agent-42',
+    resolve: async ({ identity, references }) => {
+      resolutions += 1;
+      assert.equal(identity, 'agent-42');
+      assert.deepEqual(references, ['DEPLOY_TOKEN']);
+      return { env: { TOKEN: `secret-${resolutions}`, NODE_OPTIONS: '--require unsafe' } };
+    },
+    audit: (event) => events.push(event),
+  });
+  const runnerCalls = [];
+  const handler = createGitHubActionsHandler({
+    runner: { run: async (_request, options) => { runnerCalls.push(options); return { ok: true, stdout: options.env.TOKEN }; } },
+    workspaceForJob: async () => '/srv/workspaces/job-secret',
+    secretBroker: broker,
+  });
+  const payload = { parameters: { secretRefs: ['DEPLOY_TOKEN'], steps: [{ run: 'deploy' }] } };
+  const first = await handler(payload, { id: 'J-secret' });
+  const second = await handler(payload, { id: 'J-secret' });
+  assert.equal(first.stdout, '[REDACTED]');
+  assert.equal(second.stdout, '[REDACTED]');
+  assert.equal(resolutions, 2);
+  assert.deepEqual(runnerCalls.map((call) => call.env), [{ TOKEN: 'secret-1' }, { TOKEN: 'secret-2' }]);
+  assert.deepEqual(events.map((event) => event.event), ['secret_lease_issued', 'secret_lease_issued']);
+  assert.equal(JSON.stringify(events).includes('secret-1'), false);
 });
 
 test('ephemeral workspace manager bounds and cleans action workspaces', async () => {
