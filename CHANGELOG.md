@@ -16,6 +16,8 @@ All notable changes to Source are recorded here.
   configurable with `--worker-jitter-ratio`.
 - Added bounded HTTP request admission (2,048 active and 4,096 queued by
   default) with retryable 503 backpressure and Prometheus metrics.
+- Removed a synchronous fallback from asynchronous Change submission when an
+  optional session record is absent, preserving nonblocking Postgres behavior.
 - Added durable workflow job dependencies with cycle validation and
   dependency-aware claims for GitHub Actions `needs` semantics.
 - Batched Postgres workflow record reads to avoid one database round trip per

@@ -59,6 +59,9 @@ unbounded subprocess burst while preserving parallelism.
 Async contribution submission and secret scanning stay on the non-blocking
 Postgres/Git paths; evidence reads are bulk-loaded and repository scans share
 the same bounded concurrency.
+Missing optional session records in asynchronous Change submission also remain
+on the async store path rather than falling back to synchronous compatibility
+I/O.
 Mutation-time limits also cap project repository membership at 10,000 entries
 and Change repository/evidence relationships at 1,000 entries, preventing a
 single tenant record from growing without bound.
