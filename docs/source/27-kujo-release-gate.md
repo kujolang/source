@@ -14,7 +14,8 @@ kujo run ../eval/main.kujo run eval.json \
 ```
 
 The gate records the normal Node suite, concurrency suite, CLI contract,
-whitespace cleanliness, and Kujo Doctor result as machine-readable artifacts.
+whitespace cleanliness, production dependency audit, and Kujo Doctor result as
+machine-readable artifacts.
 When a Postgres test deployment is available, run the opt-in live gate
 separately:
 

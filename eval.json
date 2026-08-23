@@ -28,6 +28,12 @@
       "params": { "command": "git diff --check" }
     },
     {
+      "name": "Production dependency audit is clean",
+      "check": "command_succeeds",
+      "params": { "command": "npm audit --omit=dev --audit-level=high" },
+      "timeout_seconds": 120
+    },
+    {
       "name": "Kujo environment doctor passes without failures",
       "check": "command_succeeds",
       "params": { "command": "kujo doctor --deep --json" },
