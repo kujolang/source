@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign } from 'node:crypto';
-import { canonicalActionManifestPayload, createGitHubActionsHandler, EphemeralWorkspaceManager, IsolatedActionRunner, loadSignedActionRegistry, StaticActionRegistry } from '../src/action-runner.js';
+import { canonicalActionManifestPayload, createGitHubActionsHandler, EphemeralWorkspaceManager, IsolatedActionRunner, loadActionKeyring, loadSignedActionRegistry, StaticActionRegistry } from '../src/action-runner.js';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -96,6 +96,16 @@ test('signed action registry loader selects keys from a rotatable keyring', asyn
   });
   assert.deepEqual(await registry.resolve({ uses: reference }), [{ run: 'kujo setup source' }]);
   await assert.rejects(loadSignedActionRegistry({ manifestPath, keyring: { 'new-runner-key': publicKey } }), /not in the configured keyring/);
+});
+
+test('action keyring loader bounds and validates deployment key files', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'source-action-keyring-'));
+  const keyringPath = path.join(root, 'keys.json');
+  await writeFile(keyringPath, JSON.stringify({ 'old-runner-key': '-----BEGIN PUBLIC KEY-----\nkey\n-----END PUBLIC KEY-----' }), 'utf8');
+  assert.deepEqual(await loadActionKeyring({ keyringPath }), { 'old-runner-key': '-----BEGIN PUBLIC KEY-----\nkey\n-----END PUBLIC KEY-----' });
+  const invalidPath = path.join(root, 'invalid.json');
+  await writeFile(invalidPath, JSON.stringify({ 'bad key': 'x' }), 'utf8');
+  await assert.rejects(loadActionKeyring({ keyringPath: invalidPath }), /entry is invalid/);
 });
 
 test('isolated runner bounds container admission independently of workspaces', async () => {

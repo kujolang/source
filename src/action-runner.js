@@ -166,6 +166,26 @@ export async function loadSignedActionRegistry({ manifestPath, keyring, allowMut
   return StaticActionRegistry.fromSignedManifest(manifest, { publicKey, allowMutableRefs, maxActions, now });
 }
 
+export async function loadActionKeyring({ keyringPath, maxKeyringBytes = 1 * 1024 * 1024, maxKeys = 100 } = {}) {
+  if (typeof keyringPath !== 'string' || !keyringPath || keyringPath.length > 4_096) throw new Error('action keyring path is required');
+  const safeMaxBytes = Math.min(4 * 1024 * 1024, Math.max(1, Math.trunc(maxKeyringBytes)));
+  const metadata = await stat(keyringPath);
+  if (!metadata.isFile() || metadata.size > safeMaxBytes) throw new Error('action keyring exceeds configured size or is not a file');
+  let keyring;
+  try {
+    keyring = JSON.parse(await readFile(keyringPath, 'utf8'));
+  } catch {
+    throw new Error('action keyring JSON is invalid');
+  }
+  if (!keyring || typeof keyring !== 'object' || Array.isArray(keyring)) throw new Error('action keyring must be an object');
+  const entries = Object.entries(keyring);
+  if (entries.length > Math.min(1_000, Math.max(1, Math.trunc(maxKeys)))) throw new Error('action keyring exceeds configured key limit');
+  for (const [keyId, publicKey] of entries) {
+    if (!/^[A-Za-z0-9_.:-]{1,120}$/.test(keyId) || typeof publicKey !== 'string' || publicKey.length > 16 * 1024) throw new Error('action keyring entry is invalid');
+  }
+  return keyring;
+}
+
 export class EphemeralWorkspaceManager {
   constructor({ root, maxActive = 256, queue = 512 } = {}) {
     if (typeof root !== 'string' || !root) throw new Error('workspace root is required');
