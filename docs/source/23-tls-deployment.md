@@ -261,13 +261,16 @@ npm run drill:failover -- \
   --source-url "$SOURCE_DATABASE_URL" \
   --target-url "$SOURCE_PEER_DATABASE_URL" \
   --source-id primary-a \
-  --timeout-ms 60000
+  --timeout-ms 60000 \
+  --max-rto-ms 5000
 ```
 
 The drill writes a unique sentinel under `replication-drills/`, replays the
 transactional feed, verifies the peer can read it, and reports `rtoMs` and the
 source sequence. It is intentionally staging-only because it creates a
 durable sentinel record; it does not claim consensus or failover promotion.
+When `--max-rto-ms` is supplied, the command exits non-zero when the measured
+recovery exceeds that SLO, making the drill suitable for a release gate.
 
 ## Security notes
 

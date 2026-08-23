@@ -11,7 +11,7 @@ function flag(args, name) {
 }
 
 function usage() {
-  process.stdout.write('Usage: node scripts/failover-drill.js --source-url <dsn> --target-url <dsn> [--source-schema source] [--target-schema source] [--source-id primary] [--timeout-ms N]\n');
+  process.stdout.write('Usage: node scripts/failover-drill.js --source-url <dsn> --target-url <dsn> [--source-schema source] [--target-schema source] [--source-id primary] [--timeout-ms N] [--max-rto-ms N]\n');
 }
 
 async function main() {
@@ -23,6 +23,7 @@ async function main() {
   const targetSchema = flag(args, '--target-schema') || 'source';
   const sourceId = flag(args, '--source-id') || sourceSchema;
   const timeoutMs = Math.min(10 * 60_000, Math.max(1_000, Math.trunc(Number(flag(args, '--timeout-ms')) || 60_000)));
+  const maxRtoMs = flag(args, '--max-rto-ms') == null ? null : Math.min(timeoutMs, Math.max(1, Math.trunc(Number(flag(args, '--max-rto-ms')) || 1)));
   if (sourceDsn === targetDsn && sourceSchema === targetSchema) throw new Error('source and target Postgres stores must be distinct');
 
   const source = new PostgresStore({ dsn: sourceDsn, schema: sourceSchema });
@@ -44,7 +45,10 @@ async function main() {
       cursor = result.cursor;
       applied += result.applied;
       if (await target.readJsonAsync(sentinelPath)) {
-        process.stdout.write(`${JSON.stringify({ status: 'passed', sourceId, sentinelPath, sourceSequence, cursor, applied, rtoMs: Date.now() - startedAt }, null, 2)}\n`);
+        const rtoMs = Date.now() - startedAt;
+        const output = { status: maxRtoMs != null && rtoMs > maxRtoMs ? 'failed' : 'passed', sourceId, sentinelPath, sourceSequence, cursor, applied, rtoMs, maxRtoMs };
+        process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
+        if (output.status === 'failed') throw new Error(`RTO budget exceeded: ${rtoMs}ms > ${maxRtoMs}ms`);
         return;
       }
       if (!page.hasMore) await new Promise((resolve) => setTimeout(resolve, 100));
