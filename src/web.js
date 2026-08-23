@@ -265,13 +265,96 @@ export async function renderRepositorySettingsAsync(src, orgId, projectId, repoI
   return managementPage(`${repo.name} settings`, `<h1>${esc(repo.name)} settings</h1><p><a href="/o/${esc(orgId)}/p/${esc(projectId)}/r/${esc(repoId)}/tree/${encodeURIComponent(repo.defaultBranch)}">← repository</a></p><form method="POST" action="/o/${esc(orgId)}/p/${esc(projectId)}/r/${esc(repoId)}/settings">${input('name', 'Repository name', repo.name)} ${input('defaultBranch', 'Default branch', repo.defaultBranch)}<button type="submit">Save repository settings</button></form><div class="card"><h2>Transport</h2><p><code>/git/${esc(orgId)}/${esc(projectId)}/${esc(repo.id)}.git</code></p><p>Visibility follows the project policy: <strong>${esc(repo.visibility)}</strong>.</p></div>`, orgId, projectId);
 }
 
+function markdownInline(value) {
+  let html = esc(value);
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|\/[^\s)]+|#[^\s)]+)\)/g, '<a href="$2">$1</a>');
+  return html;
+}
+
+function markdownHtml(source) {
+  const lines = String(source).split('\n');
+  const blocks = [];
+  let paragraph = [];
+  let list = null;
+  let code = null;
+
+  const flushParagraph = () => {
+    if (paragraph.length) blocks.push(`<p>${paragraph.map(markdownInline).join('<br>')}</p>`);
+    paragraph = [];
+  };
+  const flushList = () => {
+    if (!list) return;
+    blocks.push(`<${list.kind}>${list.items.map((item) => `<li>${markdownInline(item)}</li>`).join('')}</${list.kind}>`);
+    list = null;
+  };
+  const flushCode = () => {
+    if (!code) return;
+    blocks.push(`<pre class="source-markdown-code"><code>${esc(code.lines.join('\n'))}</code></pre>`);
+    code = null;
+  };
+
+  for (const line of lines) {
+    if (code) {
+      if (/^```/.test(line.trim())) flushCode();
+      else code.lines.push(line);
+      continue;
+    }
+    const fence = line.match(/^```\s*([\w-]*)/);
+    if (fence) {
+      flushParagraph();
+      flushList();
+      code = { language: fence[1], lines: [] };
+      continue;
+    }
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      flushList();
+      const level = Math.min(heading[1].length + 1, 4);
+      blocks.push(`<h${level}>${markdownInline(heading[2])}</h${level}>`);
+      continue;
+    }
+    const item = line.match(/^\s*([-*+] |\d+\. )(.+)$/);
+    if (item) {
+      flushParagraph();
+      const kind = /^\d/.test(item[1]) ? 'ol' : 'ul';
+      if (!list || list.kind !== kind) {
+        flushList();
+        list = { kind, items: [] };
+      }
+      list.items.push(item[2]);
+      continue;
+    }
+    if (!line.trim()) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+    paragraph.push(line);
+  }
+  flushCode();
+  flushParagraph();
+  flushList();
+  return blocks.join('');
+}
+
+function sourceCodeViewer(source) {
+  const lines = String(source).split('\n');
+  return `<pre class="source-code-viewer"><code>${lines.map((line, index) => `<span class="source-code-line"><span class="source-line-number" aria-hidden="true">${index + 1}</span><span class="source-line-content">${esc(line) || ' '}</span></span>`).join('')}</code></pre>`;
+}
+
 export async function renderBlobAsync(src, orgId, projectId, repoId, ref, filePath) {
   const repo = await src.getRepositoryAsync(orgId, projectId, repoId);
   if (!repo) return managementPage('Not found', '<h1>Repository not found</h1>', orgId, projectId);
   const content = await src.gitRepo(orgId, projectId, repoId).showFileAsync(ref, filePath).catch(() => null);
   if (content == null) return managementPage('Not found', '<h1>File not found</h1>', orgId, projectId);
   const directory = filePath.split('/').slice(0, -1).join('/');
-  return managementPage(filePath, `<h1>${esc(filePath)}</h1><p><a href="/o/${esc(orgId)}/p/${esc(projectId)}/r/${esc(repoId)}/tree/${encodeURIComponent(ref)}${directory ? `/${directory.split('/').map(encodeURIComponent).join('/')}` : ''}">← back to tree</a></p><pre>${esc(content)}</pre>`, orgId, projectId);
+  const treeUrl = `/o/${esc(orgId)}/p/${esc(projectId)}/r/${esc(repoId)}/tree/${encodeURIComponent(ref)}${directory ? `/${directory.split('/').map(encodeURIComponent).join('/')}` : ''}`;
+  const isMarkdown = /\.(md|markdown)$/i.test(filePath);
+  const rendered = isMarkdown ? `<article class="source-readme-content">${markdownHtml(content)}</article><details class="source-file-source"><summary>View source</summary>${sourceCodeViewer(content)}</details>` : sourceCodeViewer(content);
+  return managementPage(filePath, `<main class="source-file-page"><header class="source-file-header sk-card"><div><p class="source-eyebrow">${isMarkdown ? 'Documentation' : 'File'}</p><h1>${esc(filePath)}</h1><p class="sk-muted">${esc(ref)} · ${content.split('\n').length} lines</p></div><a class="sk-button" data-variant="secondary" href="${treeUrl}">← Back to repository</a></header><section class="source-file-panel">${rendered}</section></main>`, orgId, projectId);
 }
 
 export async function renderActionsAsync(src, orgId, projectId) {

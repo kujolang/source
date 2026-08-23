@@ -61,6 +61,13 @@ test('local management UI covers repositories, workflows, runs, and settings', a
     assert.match(repoHtml, /data-source-copy="http:\/\/127\.0\.0\.1:/);
     assert.match(repoHtml, /git clone http:\/\/127\.0\.0\.1:/);
 
+    const readmePage = await fetch(`${base}/o/${org.id}/p/${project.id}/r/${repo.id}/blob/main/README.md`, { headers });
+    assert.equal(readmePage.status, 200);
+    const readmeHtml = await readmePage.text();
+    assert.match(readmeHtml, /source-file-page/);
+    assert.match(readmeHtml, /source-readme-content/);
+    assert.match(readmeHtml, /View source/);
+
     const createWorkflow = await fetch(`${base}/o/${org.id}/p/${project.id}/actions`, { headers });
     const actionsHtml = await createWorkflow.text();
     assert.equal(createWorkflow.status, 200, actionsHtml);
