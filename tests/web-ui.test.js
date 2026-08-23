@@ -27,6 +27,9 @@ test('local management UI covers repositories, workflows, runs, and settings', a
     const siteKit = await fetch(`${base}/assets/sitekit/sitekit.css`);
     assert.equal(siteKit.status, 200);
     assert.match(await siteKit.text(), /--sk-color-black/);
+    const sourceScript = await fetch(`${base}/assets/source.js`);
+    assert.equal(sourceScript.status, 200);
+    assert.match(await sourceScript.text(), /data-source-copy/);
     assert.match(projectHtml, /class="sk-navigation"/);
     assert.match(projectHtml, /class="[^"]*source-page/);
     assert.match(projectHtml, /Repositories/);
@@ -53,7 +56,10 @@ test('local management UI covers repositories, workflows, runs, and settings', a
 
     const repoPage = await fetch(`${base}/o/${org.id}/p/${project.id}/r/${repo.id}/tree/main`, { headers });
     assert.equal(repoPage.status, 200);
-    assert.match(await repoPage.text(), /Clone URL/);
+    const repoHtml = await repoPage.text();
+    assert.match(repoHtml, /Clone this repository/);
+    assert.match(repoHtml, /data-source-copy="http:\/\/127\.0\.0\.1:/);
+    assert.match(repoHtml, /git clone http:\/\/127\.0\.0\.1:/);
 
     const createWorkflow = await fetch(`${base}/o/${org.id}/p/${project.id}/actions`, { headers });
     const actionsHtml = await createWorkflow.text();

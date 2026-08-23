@@ -193,6 +193,7 @@ function redirect(res, location) {
 
 const STATIC_ASSETS = new Map([
   ['/assets/source.css', { body: readFileSync(new URL('../assets/source.css', import.meta.url)), type: 'text/css; charset=utf-8' }],
+  ['/assets/source.js', { body: readFileSync(new URL('../assets/source.js', import.meta.url)), type: 'application/javascript; charset=utf-8' }],
   ['/assets/sitekit/sitekit.css', { body: readFileSync(new URL('../assets/sitekit/sitekit.css', import.meta.url)), type: 'text/css; charset=utf-8' }],
   ['/assets/sitekit/sitekit.js', { body: readFileSync(new URL('../assets/sitekit/sitekit.js', import.meta.url)), type: 'application/javascript; charset=utf-8' }],
   ['/assets/sitekit/sitekit-manifest.json', { body: readFileSync(new URL('../assets/sitekit/sitekit-manifest.json', import.meta.url)), type: 'application/json; charset=utf-8' }],
@@ -719,7 +720,9 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           if (g) return loginPage(res, g.status, g.body.error);
           const ref = decodeURIComponent(repoTree[2]);
           const directory = (repoTree[3] || '').split('/').filter(Boolean).map(decodeURIComponent).join('/');
-          return html(res, 200, await renderRepositoryAsync(src, orgId, projectId, repoTree[1], ref, directory));
+          const scheme = req.socket.encrypted ? 'https' : 'http';
+          const origin = `${scheme}://${req.headers.host || 'localhost'}`;
+          return html(res, 200, await renderRepositoryAsync(src, orgId, projectId, repoTree[1], ref, directory, origin));
         }
         const repoSettings = managementPath.match(/^r\/([^/]+)\/settings$/);
         if (req.method === 'GET' && repoSettings) {

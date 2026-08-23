@@ -14,7 +14,7 @@ export function esc(s) {
 
 function page(title, body) {
   return `<!doctype html><html lang="en" data-theme="kujo-light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title><link rel="stylesheet" href="/assets/sitekit/sitekit.css"><link rel="stylesheet" href="/assets/source.css"><script src="/assets/sitekit/sitekit.js" defer></script></head>
- <body><div class="sk-container sk-stack source-page">${body}</div></body></html>`;
+ <body><div class="sk-container sk-stack source-page">${body}</div><script src="/assets/source.js" defer></script></body></html>`;
 }
 
 // Instance index: list organizations (the tenant boundary).
@@ -219,7 +219,7 @@ export function managementPage(title, body, orgId, projectId) {
   return page(title, `${nav(orgId, projectId)}${styledBody}`);
 }
 
-export async function renderRepositoryAsync(src, orgId, projectId, repoId, ref = 'HEAD', directory = '') {
+export async function renderRepositoryAsync(src, orgId, projectId, repoId, ref = 'HEAD', directory = '', origin = '') {
   const repo = await src.getRepositoryAsync(orgId, projectId, repoId);
   if (!repo) return managementPage('Not found', '<h1>Repository not found</h1>', orgId, projectId);
   const git = src.gitRepo(orgId, projectId, repoId);
@@ -240,9 +240,11 @@ export async function renderRepositoryAsync(src, orgId, projectId, repoId, ref =
   }).join('');
   const commitRows = commits.map((commit) => `<tr><td><a href="/o/${esc(orgId)}/p/${esc(projectId)}/r/${esc(repoId)}/commit/${esc(commit.hash)}"><code>${esc(commit.hash.slice(0, 12))}</code></a></td><td>${esc(commit.subject)}</td><td>${esc(commit.author)}</td><td>${esc(commit.date)}</td></tr>`).join('');
   const branchLinks = branches.map((branch) => `<a href="/o/${esc(orgId)}/p/${esc(projectId)}/r/${esc(repoId)}/tree/${encodeURIComponent(branch.name)}">${esc(branch.name)}</a>`).join(' · ') || '<span class="muted">unborn repository</span>';
-  const cloneUrl = `/git/${encodeURIComponent(orgId)}/${encodeURIComponent(projectId)}/${encodeURIComponent(repo.id)}.git`;
-  return managementPage(repo.name, `<h1>${esc(repo.name)}</h1><p class="muted">${esc(repo.visibility)} · default branch ${esc(repo.defaultBranch)} · tip <code>${esc(tip || 'unborn')}</code> · <a href="/o/${esc(orgId)}/p/${esc(projectId)}/r/${esc(repoId)}/settings">settings</a></p>
-<div class="card"><strong>Clone URL</strong><pre>${esc(cloneUrl)}</pre><p class="muted">Use a Source Git capability for private reads and pushes.</p></div>
+  const clonePath = `/git/${encodeURIComponent(orgId)}/${encodeURIComponent(projectId)}/${encodeURIComponent(repo.id)}.git`;
+  const cloneUrl = `${origin}${clonePath}`;
+  const cloneCommand = `git clone ${cloneUrl}`;
+  return managementPage(repo.name, `<header class="source-repository-header"><div><p class="source-eyebrow">Repository</p><h1>${esc(repo.name)}</h1><p class="muted">${esc(repo.visibility)} · default branch ${esc(repo.defaultBranch)} · tip <code>${esc(tip || 'unborn')}</code></p></div><a class="sk-button" data-variant="secondary" href="/o/${esc(orgId)}/p/${esc(projectId)}/r/${esc(repoId)}/settings">Repository settings</a></header>
+<section class="source-clone-panel" aria-labelledby="clone-heading"><div><p class="source-eyebrow">Quick start</p><h2 id="clone-heading">Clone this repository</h2><p>Copy the transport URL or the ready-to-run terminal command.</p></div><div class="source-clone-tabs" role="tablist" aria-label="Clone options"><span class="source-clone-tab" data-active="true">HTTP</span></div><div class="source-copy-row"><input class="source-clone-input" aria-label="Clone URL" readonly value="${esc(cloneUrl)}"><button class="sk-button" type="button" data-source-copy="${esc(cloneUrl)}">Copy URL</button></div><div class="source-copy-row"><code class="source-command">${esc(cloneCommand)}</code><button class="sk-button" type="button" data-source-copy="${esc(cloneCommand)}">Copy command</button></div><p class="source-clone-help">Private repositories require a Source Git capability for reads and pushes.</p></section>
 <h2>Branches</h2><p>${branchLinks}</p>
 <h2>Files <span class="muted">${esc(directory || '/')} @ ${esc(ref)}</span></h2>
 ${directory ? `<p><a href="/o/${esc(orgId)}/p/${esc(projectId)}/r/${esc(repoId)}/tree/${encodeURIComponent(ref)}/${parent.split('/').map(encodeURIComponent).join('/')}">← parent</a></p>` : ''}

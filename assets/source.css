@@ -1,6 +1,7 @@
 /* Source-specific compositions built on Kujo SiteKit primitives. */
 .source-page { padding-block: var(--sk-space-8); }
 .source-project-header { display: grid; gap: var(--sk-space-6); }
+.source-repository-header { display: flex; justify-content: space-between; gap: var(--sk-space-6); align-items: end; }
 .source-breadcrumb { display: flex; flex-wrap: wrap; gap: var(--sk-space-2); align-items: center; color: var(--sk-text-muted); font-family: var(--sk-font-mono); font-size: var(--sk-type-size-xs); text-transform: uppercase; }
 .source-breadcrumb strong { color: var(--sk-text-primary); }
 .source-project-title { display: flex; justify-content: space-between; gap: var(--sk-space-6); align-items: end; }
@@ -22,6 +23,16 @@
 .source-repo-card__top { display: flex; justify-content: space-between; gap: var(--sk-space-3); }
 .source-repo-card h3 { margin: 0; font-size: var(--sk-type-size-xl); }
 .source-clone-url { display: block; overflow: auto; border-block: var(--sk-border-1) solid var(--sk-border-subtle); padding-block: var(--sk-space-3); }
+.source-clone-panel { display: grid; gap: var(--sk-space-4); margin-block: var(--sk-space-6); padding: var(--sk-space-6); background: var(--sk-surface-inverse); color: var(--sk-text-inverse); }
+.source-clone-panel p, .source-clone-panel .source-eyebrow { color: inherit; }
+.source-clone-panel .source-eyebrow { opacity: .7; }
+.source-clone-tabs { display: flex; gap: var(--sk-space-4); border-block-end: var(--sk-border-1) solid var(--sk-border-inverse); }
+.source-clone-tab { padding-block: var(--sk-space-2); border-block-end: var(--sk-border-2) solid var(--sk-text-inverse); font-family: var(--sk-font-mono); font-size: var(--sk-type-size-xs); text-transform: uppercase; }
+.source-copy-row { display: flex; gap: var(--sk-space-3); align-items: stretch; }
+.source-clone-input, .source-command { min-inline-size: 0; flex: 1; border: var(--sk-border-1) solid var(--sk-border-inverse); background: var(--sk-color-gray-900); color: var(--sk-text-inverse); padding: var(--sk-space-3); font-family: var(--sk-font-mono); font-size: var(--sk-type-size-sm); }
+.source-command { overflow: auto; white-space: nowrap; }
+.source-clone-panel .sk-button { border-color: var(--sk-text-inverse); background: var(--sk-text-inverse); color: var(--sk-surface-inverse); white-space: nowrap; }
+.source-clone-help { margin: 0; font-size: var(--sk-type-size-sm); opacity: .75; }
 .source-card-actions { margin-block-start: var(--sk-space-2); }
 .source-card-actions .sk-button { font-size: var(--sk-type-size-xs); }
 .source-inline-form { gap: var(--sk-space-4); }
@@ -30,6 +41,7 @@
 .source-form-row label { min-inline-size: 0; }
 .source-form-row button { margin-block-end: var(--sk-space-1); }
 .source-panel .sk-table { margin: 0; }
+.source-panel, .source-project-header, .source-repo-card { border-color: var(--sk-border-subtle); }
 .source-panel .sk-table caption { text-align: start; }
 .source-login { min-block-size: calc(100vh - (2 * var(--sk-space-8))); align-content: center; }
 .source-login__panel, .source-login__aside { align-self: center; }
@@ -48,5 +60,5 @@
 .source-page .sk-form textarea { min-block-size: 6rem; }
 .source-page .sk-badge.ok { border-color: var(--sk-state-success); color: var(--sk-state-success); background: transparent; }
 .source-page .sk-badge.missing { border-color: var(--sk-state-danger); color: var(--sk-state-danger); background: transparent; }
-@media (max-width: 60rem) { .source-project-title, .source-layout { grid-template-columns: 1fr; display: grid; align-items: start; } .source-header-actions { justify-content: start; } .source-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 40rem) { .source-page { padding-block: var(--sk-space-4); } .source-stats, .source-form-row { grid-template-columns: 1fr; } .source-tabs { overflow-x: auto; flex-wrap: nowrap; } .source-tabs a { white-space: nowrap; } }
+@media (max-width: 60rem) { .source-project-title, .source-layout, .source-repository-header { grid-template-columns: 1fr; display: grid; align-items: start; } .source-header-actions { justify-content: start; } .source-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 40rem) { .source-page { padding-block: var(--sk-space-4); } .source-stats, .source-form-row { grid-template-columns: 1fr; } .source-tabs { overflow-x: auto; flex-wrap: nowrap; } .source-tabs a { white-space: nowrap; } .source-copy-row { display: grid; } }
