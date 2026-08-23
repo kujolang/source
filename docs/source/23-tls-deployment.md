@@ -209,6 +209,22 @@ that feed when a deployment needs to project metadata into a separate
 consensus or replication service; it does not by itself provide multi-writer
 conflict resolution.
 
+For a bounded one-way standby or peer bootstrap, the repository also provides
+the resumable importer:
+
+```bash
+npm run replicate:postgres -- \
+  --source-url "$SOURCE_DATABASE_URL" \
+  --target-url "$SOURCE_PEER_DATABASE_URL" \
+  --source-id primary-a \
+  --batch-size 500
+```
+
+The target stores its source cursor transactionally, rejects sequence gaps,
+and does not re-emit imported events, preventing replication loops. This is a
+one-way convergence tool; multi-writer conflict resolution still requires a
+consensus deployment.
+
 Before declaring a multi-node deployment ready, verify the database side of the
 topology as well:
 

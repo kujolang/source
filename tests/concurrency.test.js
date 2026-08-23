@@ -125,6 +125,23 @@ test('Postgres replication event reads use a bounded cursor page', async () => {
   assert.match(query, /LIMIT 3/);
 });
 
+test('Postgres replication event apply is resumable and rejects gaps', async () => {
+  const calls = [];
+  const store = Object.create(PostgresStore.prototype);
+  store._qualified = (name) => `"source"."${name}"`;
+  store._asyncTransaction = new (await import('node:async_hooks')).AsyncLocalStorage();
+  store.pool = { connect: async () => ({
+    async query(sql) { calls.push(String(sql).trim()); return { rows: [] }; },
+    release() {},
+  }) };
+  store._fetchJsonRowsAsync = async () => [];
+  store._writeJsonAsync = async (path, json, options) => { calls.push(`${path}:${json.id}:${options.emitReplicationEvent}`); };
+  const result = await store.applyReplicationEventsAsync({ sourceId: 'primary', events: [{ seq: 1, operation: 'upsert', path: 'instance.json', json: { id: 'instance' } }] });
+  assert.deepEqual(result, { sourceId: 'primary', applied: 1, cursor: 1 });
+  assert.ok(calls.includes('instance.json:instance:false'));
+  await assert.rejects(() => store.applyReplicationEventsAsync({ sourceId: 'primary', events: [{ seq: 3, operation: 'upsert', path: 'x.json', json: {} }] }), /replication event gap/);
+});
+
 test('async change submission does not fall back to synchronous reads for missing sessions', async () => {
   const { src, org, project, agent } = freshSource();
   const work = await src.createWorkAsync({ orgId: org.id, projectId: project.id, intent: 'async change', requester: agent.id });

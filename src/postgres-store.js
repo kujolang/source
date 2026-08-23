@@ -845,7 +845,7 @@ class PostgresStore {
     });
   }
 
-  async _writeJsonAsync(relPath, obj) {
+  async _writeJsonAsync(relPath, obj, { emitReplicationEvent = true } = {}) {
     const classified = this._classifyRelPath(relPath);
     await this._runAsync(`INSERT INTO ${this._qualified('records')} (path, kind, org_id, project_id, entity_id, json)
       VALUES (${escapeSqlLiteral(relPath)}, ${escapeSqlLiteral(classified.kind)}, ${escapeSqlLiteral(classified.orgId || null)}, ${escapeSqlLiteral(classified.projectId || null)}, ${escapeSqlLiteral(classified.id || null)}, ${toJson(obj)})
@@ -933,9 +933,11 @@ class PostgresStore {
         VALUES (${escapeSqlLiteral(obj.principalId)}, 'human', 'capability principal', ${toJson({ id: obj.principalId })})
         ON CONFLICT (id) DO NOTHING`);
     }
-    await this._runAsync(`INSERT INTO ${this._qualified('replication_events')} (operation, path, kind, org_id, project_id, entity_id, json)
-      VALUES ('upsert', ${escapeSqlLiteral(relPath)}, ${escapeSqlLiteral(classified.kind)}, ${escapeSqlLiteral(classified.orgId || null)},
-        ${escapeSqlLiteral(classified.projectId || null)}, ${escapeSqlLiteral(classified.id || null)}, ${toJson(obj)})`);
+    if (emitReplicationEvent) {
+      await this._runAsync(`INSERT INTO ${this._qualified('replication_events')} (operation, path, kind, org_id, project_id, entity_id, json)
+        VALUES ('upsert', ${escapeSqlLiteral(relPath)}, ${escapeSqlLiteral(classified.kind)}, ${escapeSqlLiteral(classified.orgId || null)},
+          ${escapeSqlLiteral(classified.projectId || null)}, ${escapeSqlLiteral(classified.id || null)}, ${toJson(obj)})`);
+    }
   }
 
   // Ordered, transactional CDC seam for a deployment's native replication or
@@ -957,6 +959,36 @@ class PostgresStore {
       nextCursor: events.length ? Number(events.at(-1).seq) : cursor,
       hasMore: rows.length > pageSize,
     };
+  }
+
+  async applyReplicationEventsAsync({ sourceId, events } = {}) {
+    if (typeof sourceId !== 'string' || !/^[A-Za-z0-9_.:-]{1,120}$/.test(sourceId)) throw new Error('replication source id is invalid');
+    if (!Array.isArray(events) || events.length > 1_000) throw new Error('replication event batch must contain 0-1000 events');
+    return this.transactionAsync(async () => {
+      const key = `replication:cursor:${sourceId}`;
+      const currentRows = await this._fetchJsonRowsAsync(`SELECT value FROM ${this._qualified('meta')} WHERE key = ${escapeSqlLiteral(key)}`);
+      let cursor = Number(currentRows[0]?.value || 0);
+      let applied = 0;
+      for (const event of events) {
+        const sequence = Number(event?.seq);
+        if (!Number.isSafeInteger(sequence) || sequence <= cursor) continue;
+        if (sequence !== cursor + 1) {
+          const error = new Error(`replication event gap: expected ${cursor + 1}, received ${sequence}`);
+          error.code = 'REPLICATION_GAP';
+          throw error;
+        }
+        if (event.operation !== 'upsert' || typeof event.path !== 'string' || !event.path || event.json === undefined) {
+          throw new Error('replication event is invalid');
+        }
+        await this._writeJsonAsync(event.path, event.json, { emitReplicationEvent: false });
+        cursor = sequence;
+        applied += 1;
+      }
+      await this._runAsync(`INSERT INTO ${this._qualified('meta')} (key, value)
+        VALUES (${escapeSqlLiteral(key)}, ${toJson(cursor)})
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`);
+      return { sourceId, applied, cursor };
+    });
   }
 
   listJson(dirRel, { cursor, limit, includeDirs = false } = {}) {
