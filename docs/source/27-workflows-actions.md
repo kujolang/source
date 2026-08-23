@@ -46,10 +46,16 @@ allowing hundreds or thousands of workers to process independent steps.
 
 This is a workflow/action control plane, not a claim of complete GitHub Actions
 runtime compatibility. YAML import preserves `run`, `uses`, permissions, and
-environment as untrusted step data; it never executes them in Source. Container
-isolation, runner provisioning, secrets
-brokering, and per-provider secret rotation remain deployment-specific work
-required before advertising drop-in `.github/workflows` compatibility. The
+environment as untrusted step data; it never executes them in Source. The
+repository includes an explicit `IsolatedActionRunner` seam for operators that
+provision Podman or Docker. It runs only bounded `run` steps in a
+non-privileged, read-only, no-network-by-default container with CPU, memory,
+PID, output, and wall-clock limits; `uses` steps are rejected. Configure a
+separate workspace resolver and secret provider through
+`createGitHubActionsHandler`; workflow YAML is never a secret store. Container
+runtime provisioning, secrets brokering, and per-provider secret rotation
+remain deployment-specific work required before advertising drop-in
+`.github/workflows` compatibility. The
 webhook endpoint itself is provider-neutral: it uses the delivery ID as the
 idempotency key and maps `X-GitHub-Event` plus the JSON payload into the Source
 workflow event contract.
