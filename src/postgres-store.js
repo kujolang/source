@@ -1692,17 +1692,20 @@ class PostgresStore {
     if (typeof name !== 'string' || !/^[A-Za-z0-9_.:-]{1,120}$/.test(name)) throw new Error('writer lease name is invalid');
     if (typeof owner !== 'string' || !/^[A-Za-z0-9_.:-]{1,240}$/.test(owner)) throw new Error('writer lease owner is invalid');
     const safeLease = Math.min(86_400_000, Math.max(1_000, Math.trunc(leaseMs)));
-    const rows = await this._fetchJsonRowsAsync(`
-      INSERT INTO ${this._qualified('writer_leases')} (name, owner, fencing_token, lease_until)
-      VALUES (${escapeSqlLiteral(name)}, ${escapeSqlLiteral(owner)}, 1, NOW() + (${safeLease} * INTERVAL '1 millisecond'))
-      ON CONFLICT (name) DO UPDATE SET
-        owner = EXCLUDED.owner,
-        fencing_token = ${this._qualified('writer_leases')}.fencing_token + 1,
-        lease_until = EXCLUDED.lease_until,
-        updated_at = NOW()
-      WHERE ${this._qualified('writer_leases')}.lease_until < NOW()
-         OR ${this._qualified('writer_leases')}.owner = EXCLUDED.owner
-      RETURNING name, owner, fencing_token AS "fencingToken", lease_until AS "leaseUntil"
+    const rows = await this._runJsonCommandAsync(`
+      WITH upsert AS (
+        INSERT INTO ${this._qualified('writer_leases')} (name, owner, fencing_token, lease_until)
+        VALUES (${escapeSqlLiteral(name)}, ${escapeSqlLiteral(owner)}, 1, NOW() + (${safeLease} * INTERVAL '1 millisecond'))
+        ON CONFLICT (name) DO UPDATE SET
+          owner = EXCLUDED.owner,
+          fencing_token = ${this._qualified('writer_leases')}.fencing_token + 1,
+          lease_until = EXCLUDED.lease_until,
+          updated_at = NOW()
+        WHERE ${this._qualified('writer_leases')}.lease_until < NOW()
+           OR ${this._qualified('writer_leases')}.owner = EXCLUDED.owner
+        RETURNING name, owner, fencing_token AS "fencingToken", lease_until AS "leaseUntil"
+      )
+      SELECT COALESCE(json_agg(row_to_json(upsert)), '[]'::json)::text AS rows FROM upsert
     `);
     if (!rows[0]) {
       const error = new Error('writer lease is held by another owner');
@@ -1715,12 +1718,15 @@ class PostgresStore {
   async renewWriterLeaseAsync({ name = 'primary', owner, fencingToken, leaseMs = 30_000 } = {}) {
     if (!owner || !Number.isSafeInteger(Number(fencingToken))) throw new Error('writer lease renewal identity is invalid');
     const safeLease = Math.min(86_400_000, Math.max(1_000, Math.trunc(leaseMs)));
-    const rows = await this._fetchJsonRowsAsync(`
-      UPDATE ${this._qualified('writer_leases')}
-      SET lease_until = NOW() + (${safeLease} * INTERVAL '1 millisecond'), updated_at = NOW()
-      WHERE name = ${escapeSqlLiteral(name)} AND owner = ${escapeSqlLiteral(owner)}
-        AND fencing_token = ${Number(fencingToken)} AND lease_until >= NOW()
-      RETURNING name, owner, fencing_token AS "fencingToken", lease_until AS "leaseUntil"
+    const rows = await this._runJsonCommandAsync(`
+      WITH renewed AS (
+        UPDATE ${this._qualified('writer_leases')}
+        SET lease_until = NOW() + (${safeLease} * INTERVAL '1 millisecond'), updated_at = NOW()
+        WHERE name = ${escapeSqlLiteral(name)} AND owner = ${escapeSqlLiteral(owner)}
+          AND fencing_token = ${Number(fencingToken)} AND lease_until >= NOW()
+        RETURNING name, owner, fencing_token AS "fencingToken", lease_until AS "leaseUntil"
+      )
+      SELECT COALESCE(json_agg(row_to_json(renewed)), '[]'::json)::text AS rows FROM renewed
     `);
     return rows[0] || null;
   }
@@ -1744,10 +1750,13 @@ class PostgresStore {
 
   async releaseWriterLeaseAsync({ name = 'primary', owner, fencingToken } = {}) {
     if (!owner || !Number.isSafeInteger(Number(fencingToken))) throw new Error('writer lease release identity is invalid');
-    const rows = await this._fetchJsonRowsAsync(`
-      DELETE FROM ${this._qualified('writer_leases')}
-      WHERE name = ${escapeSqlLiteral(name)} AND owner = ${escapeSqlLiteral(owner)} AND fencing_token = ${Number(fencingToken)}
-      RETURNING name
+    const rows = await this._runJsonCommandAsync(`
+      WITH removed AS (
+        DELETE FROM ${this._qualified('writer_leases')}
+        WHERE name = ${escapeSqlLiteral(name)} AND owner = ${escapeSqlLiteral(owner)} AND fencing_token = ${Number(fencingToken)}
+        RETURNING name
+      )
+      SELECT COALESCE(json_agg(row_to_json(removed)), '[]'::json)::text AS rows FROM removed
     `);
     return Boolean(rows[0]);
   }

@@ -22,7 +22,17 @@ cleanup() {
   docker volume rm "$volume" >/dev/null 2>&1 || true
   psql "$SOURCE_TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -c "DROP SCHEMA IF EXISTS \"$schema\" CASCADE" >/dev/null 2>&1 || true
 }
-trap cleanup EXIT
+finish() {
+  local rc="$?"
+  if [[ "$rc" -ne 0 ]]; then
+    echo "container failover smoke failed; node logs:" >&2
+    docker logs "$node_a" 2>&1 | tail -80 >&2 || true
+    docker logs "$node_b" 2>&1 | tail -80 >&2 || true
+  fi
+  cleanup
+  exit "$rc"
+}
+trap finish EXIT
 
 docker volume create "$volume" >/dev/null
 docker run --rm --user root -v "$volume":/var/lib/source/git "$image" \
