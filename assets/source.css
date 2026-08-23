@@ -2,6 +2,14 @@
 .source-page { padding-block: var(--sk-space-8); }
 .source-project-header { display: grid; gap: var(--sk-space-6); }
 .source-repository-header { display: flex; justify-content: space-between; gap: var(--sk-space-6); align-items: end; }
+.source-repository-page { display: grid; gap: var(--sk-space-5); }
+.source-repository-header h1 { margin-block-end: var(--sk-space-2); }
+.source-repo-section { display: grid; gap: var(--sk-space-4); border: var(--sk-border-1) solid var(--sk-border-subtle); background: var(--sk-surface-card); padding: var(--sk-space-5); }
+.source-section-heading { display: flex; justify-content: space-between; gap: var(--sk-space-4); align-items: start; }
+.source-section-heading h2 { margin: 0; }
+.source-branch-list { display: flex; flex-wrap: wrap; gap: var(--sk-space-2); }
+.source-branch-chip { display: inline-flex; max-width: 100%; border: var(--sk-border-1) solid var(--sk-border-subtle); border-radius: var(--sk-radius-1); background: var(--sk-surface-subtle); padding: var(--sk-space-2) var(--sk-space-3); text-decoration: none; }
+.source-branch-chip:hover { border-color: var(--sk-border-strong); background: var(--sk-surface-raised); text-decoration: none; }
 .source-breadcrumb { display: flex; flex-wrap: wrap; gap: var(--sk-space-2); align-items: center; color: var(--sk-text-muted); font-family: var(--sk-font-mono); font-size: var(--sk-type-size-xs); text-transform: uppercase; }
 .source-breadcrumb strong { color: var(--sk-text-primary); }
 .source-project-title { display: flex; justify-content: space-between; gap: var(--sk-space-6); align-items: end; }
@@ -43,6 +51,7 @@
 .source-form-row label { min-inline-size: 0; }
 .source-form-row button { margin-block-end: var(--sk-space-1); }
 .source-panel .sk-table { margin: 0; }
+.source-repo-section .sk-table { margin: 0; }
 .source-panel, .source-project-header, .source-repo-card { border-color: var(--sk-border-subtle); }
 .source-panel .sk-table caption { text-align: start; }
 .source-login { min-block-size: calc(100vh - (2 * var(--sk-space-8))); align-content: center; }
