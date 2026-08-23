@@ -15,6 +15,8 @@ All notable changes to Source are recorded here.
   dependency-aware claims for GitHub Actions `needs` semantics.
 - Batched Postgres workflow record reads to avoid one database round trip per
   workflow during dispatch and listing.
+- Extended bounded Postgres bulk reads to organization and Work listings,
+  removing their per-record query fan-out.
 
 ## [0.1.0]
 

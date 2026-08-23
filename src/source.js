@@ -188,6 +188,10 @@ export class Source {
     const ids = typeof this.store.listJsonAsync === 'function'
       ? await this.store.listJsonAsync('orgs', { cursor, limit, includeDirs: true })
       : this.store.listJson('orgs', { cursor, limit, includeDirs: true });
+    if (typeof this.store.readJsonManyAsync === 'function') {
+      const rows = await this.store.readJsonManyAsync(ids.map((id) => `orgs/${id}.json`));
+      return rows.map((row) => row.json).filter(Boolean);
+    }
     return Promise.all(ids.map((id) => this.getOrgAsync(id))).then((items) => items.filter(Boolean));
   }
 
@@ -632,6 +636,10 @@ export class Source {
     const ids = typeof this.store.listJsonAsync === 'function'
       ? await this.store.listJsonAsync(rel, { cursor, limit })
       : this.store.listJson(rel, { cursor, limit });
+    if (typeof this.store.readJsonManyAsync === 'function') {
+      const rows = await this.store.readJsonManyAsync(ids.map((id) => `${rel}/${id}.json`));
+      return rows.map((row) => row.json).filter(Boolean);
+    }
     return Promise.all(ids.map((id) => this.getWorkAsync(orgId, projectId, id))).then((items) => items.filter(Boolean));
   }
 
