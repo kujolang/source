@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { translateGitHubActions } from '../src/integrations/github-actions.js';
+import { freshSource } from './helpers.js';
 
 test('GitHub Actions translation preserves bounded step data without executing it', () => {
   const workflow = translateGitHubActions(`
@@ -28,4 +29,18 @@ jobs:
 test('GitHub Actions translation rejects unsupported or oversized workflows', () => {
   assert.throws(() => translateGitHubActions('on: workflow_call\njobs:\n  test:\n    steps: []\n'), /supported GitHub event/);
   assert.throws(() => translateGitHubActions('on: push\njobs:\n  test:\n    steps:\n' + Array.from({ length: 101 }, (_, i) => `      - name: ${i}`).join('\n')), /too many steps/);
+});
+
+test('workflow import resolves repositories through project membership', async () => {
+  const { src, org, project } = freshSource();
+  src.getRepositoryAsync = async () => ({ barePath: '/outside/project.git' });
+  await assert.rejects(
+    src.importGitHubWorkflowAsync({
+      orgId: org.id,
+      projectId: project.id,
+      repoId: '../../other-org/repos/R1',
+      path: '.github/workflows/checks.yml',
+    }),
+    /repository not found/,
+  );
 });

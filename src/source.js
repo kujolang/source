@@ -1498,7 +1498,10 @@ export class Source {
     if (!repoId || typeof workflowPath !== 'string' || !/^\.github\/workflows\/[^/]+\.ya?ml$/.test(workflowPath)) {
       throw new Error('workflow path must be a .github/workflows/*.yml file');
     }
-    const repo = await this.getRepositoryAsync(orgId, projectId, repoId);
+    // Resolve through the project membership index before constructing any
+    // repository path. Besides supporting repository names, this prevents a
+    // caller-controlled `repoId` from escaping the project with `..` segments.
+    const repo = await this.resolveRepositoryAsync(orgId, projectId, repoId);
     if (!repo) throw new Error(`repository not found: ${repoId}`);
     const raw = await new GitRepo(repo.barePath).showFileAsync(ref, workflowPath);
     const translated = translateGitHubActions(raw, { path: workflowPath, repoId, ref });
