@@ -12,14 +12,14 @@ export function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
-function page(title, body) {
+function page(title, body, extraCss = '') {
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
 <style>:root{color-scheme:light}body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:1100px;margin:0 auto;padding:2rem 1.25rem;line-height:1.5;color:#1f2328;background:#fff}
 h1,h2{border-bottom:1px solid #eee;padding-bottom:.25rem}
 table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:.4rem;text-align:left}
 .badge{display:inline-block;padding:.1rem .5rem;border-radius:3px;font-size:.8rem;background:#eee}
 .ok{background:#d4edda;color:#155724}.missing{background:#f8d7da;color:#721c24}
-pre{background:#f6f8fa;padding:.75rem;overflow:auto}.auth-shell{min-height:calc(100vh - 4rem);display:grid;place-items:center}.auth-card{width:min(100%,560px);border:1px solid #d0d7de;border-radius:14px;padding:2rem;box-shadow:0 8px 30px #1f232812}.auth-card h1{margin-top:0}.auth-card .brand{font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#57606a;font-size:.8rem}.auth-card form{margin:1.5rem 0 0}.auth-card label{display:block;margin:1rem 0;font-weight:600}.auth-card input:not([type=checkbox]){display:block;width:100%;box-sizing:border-box;margin-top:.35rem;padding:.65rem;border:1px solid #8c959f;border-radius:6px;font:inherit}.auth-card .check{display:flex;gap:.5rem;align-items:flex-start;font-weight:400}.auth-card .check input{margin-top:.35rem}.auth-card button{padding:.6rem 1rem;border:1px solid #1f2328;border-radius:7px;background:#1f2328;color:#fff;cursor:pointer;font:inherit}.auth-card .error{padding:.75rem;border-radius:7px;background:#ffebe9;color:#cf222e}.auth-card .help{padding:1rem;background:#f6f8fa;border-radius:8px;color:#57606a;font-size:.92rem}.auth-card code{word-break:break-word}</style></head>
+pre{background:#f6f8fa;padding:.75rem;overflow:auto}.auth-shell{min-height:calc(100vh - 4rem);display:grid;place-items:center}.auth-card{width:min(100%,560px);border:1px solid #d0d7de;border-radius:14px;padding:2rem;box-shadow:0 8px 30px #1f232812}.auth-card h1{margin-top:0}.auth-card .brand{font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#57606a;font-size:.8rem}.auth-card form{margin:1.5rem 0 0}.auth-card label{display:block;margin:1rem 0;font-weight:600}.auth-card input:not([type=checkbox]){display:block;width:100%;box-sizing:border-box;margin-top:.35rem;padding:.65rem;border:1px solid #8c959f;border-radius:6px;font:inherit}.auth-card .check{display:flex;gap:.5rem;align-items:flex-start;font-weight:400}.auth-card .check input{margin-top:.35rem}.auth-card button{padding:.6rem 1rem;border:1px solid #1f2328;border-radius:7px;background:#1f2328;color:#fff;cursor:pointer;font:inherit}.auth-card .error{padding:.75rem;border-radius:7px;background:#ffebe9;color:#cf222e}.auth-card .help{padding:1rem;background:#f6f8fa;border-radius:8px;color:#57606a;font-size:.92rem}.auth-card code{word-break:break-word}${extraCss}</style></head>
 <body>${body}</body></html>`;
 }
 
@@ -212,7 +212,8 @@ function input(name, label, value = '', type = 'text') {
 }
 
 export function managementPage(title, body, orgId, projectId) {
-  return page(title, `${nav(orgId, projectId)}${body}`.replace('</style>', '.inline{display:inline}nav{display:flex;gap:.6rem;align-items:center;margin-bottom:1.5rem}form{background:#f6f8fa;padding:1rem;border-radius:8px;margin:1rem 0}label{display:block;margin:.5rem 0}input,textarea,select{display:block;width:100%;max-width:680px;padding:.5rem;border:1px solid #ccd1d5;border-radius:5px}button{padding:.45rem .8rem;border:1px solid #87909a;border-radius:5px;background:#fff;cursor:pointer}a{color:#0969da;text-decoration:none}a:hover{text-decoration:underline}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem}.card{border:1px solid #d0d7de;border-radius:8px;padding:1rem}.muted{color:#57606a;font-size:.9rem}</style>'));
+  const css = '.inline{display:inline}nav{display:flex;gap:.6rem;align-items:center;margin-bottom:1.5rem;padding:.75rem 1rem;background:#1f2328;border-radius:10px}nav a{color:#fff;font-weight:600}nav form{margin:0 0 0 auto;padding:0;background:transparent}form{background:#f6f8fa;padding:1rem;border-radius:8px;margin:1rem 0}label{display:block;margin:.5rem 0}input,textarea,select{display:block;width:100%;max-width:680px;padding:.5rem;border:1px solid #ccd1d5;border-radius:5px;box-sizing:border-box;font:inherit}button{padding:.45rem .8rem;border:1px solid #87909a;border-radius:5px;background:#fff;cursor:pointer;font:inherit}a{color:#0969da;text-decoration:none}a:hover{text-decoration:underline}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem}.card{border:1px solid #d0d7de;border-radius:8px;padding:1rem;background:#fff}.muted{color:#57606a;font-size:.9rem}';
+  return page(title, `${nav(orgId, projectId)}${body}`, css);
 }
 
 export async function renderRepositoryAsync(src, orgId, projectId, repoId, ref = 'HEAD', directory = '') {

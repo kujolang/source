@@ -22,6 +22,8 @@ test('local management UI covers repositories, workflows, runs, and settings', a
     const projectPage = await fetch(`${base}/o/${org.id}/p/${project.id}`, { headers });
     assert.equal(projectPage.status, 200);
     const projectHtml = await projectPage.text();
+    assert.match(projectHtml, /nav\{display:flex/);
+    assert.match(projectHtml, /background:#1f2328/);
     assert.match(projectHtml, /Repositories/);
     assert.match(projectHtml, /Add repository/);
     assert.match(projectHtml, /Actions/);
