@@ -33,6 +33,8 @@ All notable changes to Source are recorded here.
   capacity planning and alerting.
 - Added a Postgres `text_pattern_ops` index for bounded prefix directory
   listings over compatibility records.
+- Aborted JSON and raw request bodies now reject immediately instead of leaving
+  disconnected-agent promises pending.
 
 ## [0.1.0]
 

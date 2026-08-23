@@ -65,6 +65,8 @@ promotion pressure visible to operators.
 Postgres compatibility-record directory listings use a `text_pattern_ops`
 prefix index, keeping keyset listing scans indexable as total tenant records
 grow.
+Request-body readers also terminate promptly on client aborts, preventing
+disconnected agent requests from retaining promises and admission state.
 
 Chunked Git uploads use a separate four-slot admission budget and a 16 MiB
 buffer limit by default. Known-length uploads remain streamed directly to

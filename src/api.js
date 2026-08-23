@@ -176,6 +176,12 @@ function readText(req, maxBytes = 1_000_000) {
         reject(error);
       }
     });
+    req.on('aborted', () => {
+      if (!settled) {
+        settled = true;
+        reject(new Error('request body aborted'));
+      }
+    });
   });
 }
 
@@ -243,6 +249,12 @@ function readRawBody(req, maxBytes = 100_000_000) {
       if (!settled) {
         settled = true;
         reject(error);
+      }
+    });
+    req.on('aborted', () => {
+      if (!settled) {
+        settled = true;
+        reject(new Error('request body aborted'));
       }
     });
   });
