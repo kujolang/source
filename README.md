@@ -115,6 +115,8 @@ Repository-level acceptance criteria live in `[.spec.yml](.spec.yml)`. The
 portable checks are available through `npm run lint`, `npm run format:check`,
 and `npm test`; the GitHub Actions workflow mirrors those deterministic checks
 while Source's own Kujo release gate remains the authoritative ecosystem gate.
+The SiteKit integration and vendor-update procedure are documented in
+[`docs/SITEKIT.md`](docs/SITEKIT.md).
 
 The server applies bounded resource controls by default: JSON requests are
 limited to 1 MiB, Git request bodies to 100 MiB, chunked Git uploads to 16 MiB
