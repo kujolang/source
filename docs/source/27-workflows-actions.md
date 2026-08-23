@@ -64,6 +64,10 @@ allowlists each action before resolving it. Mutable tags require an explicit
 development-only opt-in. `StaticActionRegistry.fromSignedManifest` additionally
 verifies an expiring Ed25519-signed manifest before accepting the catalog, so
 action allowlists can be rotated without trusting the workflow repository.
+`loadSignedActionRegistry({ manifestPath, keyring })` loads the bounded JSON
+manifest from deployment storage and selects the signing key by `keyId`; keep
+the retiring public key in the keyring until all manifests it signed expire,
+then remove it as part of rotation.
 Container
 runtime provisioning, secrets brokering, and per-provider secret rotation
 remain deployment-specific work required before advertising drop-in

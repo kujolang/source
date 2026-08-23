@@ -7,7 +7,7 @@
 
 import { spawn } from 'node:child_process';
 import { randomBytes, verify as verifySignature } from 'node:crypto';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { Semaphore } from './concurrency.js';
 
@@ -148,6 +148,22 @@ export class StaticActionRegistry {
     if (!inputs || typeof inputs !== 'object' || Array.isArray(inputs) || JSON.stringify(inputs).length > 64 * 1024) throw new Error('action inputs are invalid or too large');
     return typeof action === 'function' ? action({ uses, with: inputs }) : action;
   }
+}
+
+export async function loadSignedActionRegistry({ manifestPath, keyring, allowMutableRefs = false, maxActions = 10_000, maxManifestBytes = 4 * 1024 * 1024, now = Date.now() } = {}) {
+  if (typeof manifestPath !== 'string' || !manifestPath || manifestPath.length > 4_096) throw new Error('action manifest path is required');
+  const safeMaxBytes = Math.min(16 * 1024 * 1024, Math.max(1, Math.trunc(maxManifestBytes)));
+  const metadata = await stat(manifestPath);
+  if (!metadata.isFile() || metadata.size > safeMaxBytes) throw new Error('action manifest exceeds configured size or is not a file');
+  let manifest;
+  try {
+    manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  } catch {
+    throw new Error('action manifest JSON is invalid');
+  }
+  const publicKey = keyring instanceof Map ? keyring.get(manifest?.keyId) : keyring?.[manifest?.keyId];
+  if (!publicKey) throw new Error(`action manifest key is not in the configured keyring: ${String(manifest?.keyId || '')}`);
+  return StaticActionRegistry.fromSignedManifest(manifest, { publicKey, allowMutableRefs, maxActions, now });
 }
 
 export class EphemeralWorkspaceManager {

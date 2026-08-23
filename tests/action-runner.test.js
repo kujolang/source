@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign } from 'node:crypto';
-import { canonicalActionManifestPayload, createGitHubActionsHandler, EphemeralWorkspaceManager, IsolatedActionRunner, StaticActionRegistry } from '../src/action-runner.js';
-import { mkdtemp } from 'node:fs/promises';
+import { canonicalActionManifestPayload, createGitHubActionsHandler, EphemeralWorkspaceManager, IsolatedActionRunner, loadSignedActionRegistry, StaticActionRegistry } from '../src/action-runner.js';
+import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
@@ -74,6 +74,28 @@ test('signed action manifests require valid Ed25519 signatures and expiry', asyn
   await assert.rejects(Promise.resolve().then(() => StaticActionRegistry.fromSignedManifest(tampered, { publicKey })), /signature verification failed/);
   const expired = { ...manifest, expiresAt: new Date(Date.now() - 1).toISOString() };
   await assert.rejects(Promise.resolve().then(() => StaticActionRegistry.fromSignedManifest(expired, { publicKey })), /expired/);
+});
+
+test('signed action registry loader selects keys from a rotatable keyring', async () => {
+  const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+  const reference = `kujo/setup@${'d'.repeat(40)}`;
+  const manifest = {
+    version: 1,
+    keyId: 'old-runner-key',
+    issuedAt: new Date(Date.now() - 1_000).toISOString(),
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    actions: { [reference]: [{ run: 'kujo setup source' }] },
+  };
+  manifest.signature = sign(null, canonicalActionManifestPayload(manifest), privateKey).toString('base64');
+  const root = await mkdtemp(path.join(tmpdir(), 'source-action-manifest-'));
+  const manifestPath = path.join(root, 'actions.json');
+  await writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
+  const registry = await loadSignedActionRegistry({
+    manifestPath,
+    keyring: new Map([['old-runner-key', publicKey], ['new-runner-key', generateKeyPairSync('ed25519').publicKey]]),
+  });
+  assert.deepEqual(await registry.resolve({ uses: reference }), [{ run: 'kujo setup source' }]);
+  await assert.rejects(loadSignedActionRegistry({ manifestPath, keyring: { 'new-runner-key': publicKey } }), /not in the configured keyring/);
 });
 
 test('isolated runner bounds container admission independently of workspaces', async () => {
