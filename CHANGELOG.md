@@ -25,6 +25,8 @@ All notable changes to Source are recorded here.
   per project by default, with a safe operator limit of 64.
 - Removed synchronous repository resolution from async contribution submission,
   batched async evidence reads, and bounded multi-repository secret scans.
+- Added mutation-time bounds for project repository lists, Change repository
+  fan-out, and Change evidence relationships.
 
 ## [0.1.0]
 

@@ -35,6 +35,9 @@ import { KeyedSemaphore } from './concurrency.js';
 
 const DEFAULT_HUMAN_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_HUMAN_SESSION_ACTIONS = ['read_source', 'read_context', 'accept_change'];
+const MAX_CHANGE_REPOSITORIES = 1_000;
+const MAX_CHANGE_EVIDENCE = 1_000;
+const MAX_PROJECT_REPOSITORIES = 10_000;
 const scryptAsync = promisify(scrypt);
 
 export class Source {
@@ -241,6 +244,7 @@ export class Source {
   createRepository({ orgId, projectId, name, defaultBranch = 'main' }) {
     const project = this.getProject(orgId, projectId);
     if (!project) throw new Error(`project not found: ${projectId}`);
+    if (!Array.isArray(project.repositories) || project.repositories.length >= MAX_PROJECT_REPOSITORIES) throw new Error('project repository limit exceeded');
     const id = nextId(this.store, 'repository');
     const repo = {
       id,
@@ -734,6 +738,7 @@ export class Source {
 
   // --- change -----------------------------------------------------------
   submitChange({ orgId, projectId, workId, sessionId, baseCommit = '', headCommit = '', repositories = [], repositoryChanges = null }) {
+    if (!Array.isArray(repositories) || (repositoryChanges != null && !Array.isArray(repositoryChanges)) || repositories.length > MAX_CHANGE_REPOSITORIES || (repositoryChanges && repositoryChanges.length > MAX_CHANGE_REPOSITORIES)) throw new Error('change repository limit exceeded');
     const work = this.getWork(orgId, projectId, workId);
     if (!work) throw new Error(`work not found: ${workId}`);
     transitionWork(work, 'submitted');
@@ -752,6 +757,7 @@ export class Source {
   }
 
   async submitChangeAsync({ orgId, projectId, workId, sessionId, baseCommit = '', headCommit = '', repositories = [], repositoryChanges = null }) {
+    if (!Array.isArray(repositories) || (repositoryChanges != null && !Array.isArray(repositoryChanges)) || repositories.length > MAX_CHANGE_REPOSITORIES || (repositoryChanges && repositoryChanges.length > MAX_CHANGE_REPOSITORIES)) throw new Error('change repository limit exceeded');
     const work = await this.getWorkAsync(orgId, projectId, workId);
     if (!work) throw new Error(`work not found: ${workId}`);
     transitionWork(work, 'submitted');
@@ -791,6 +797,7 @@ export class Source {
   addEvidence({ orgId, projectId, changeId, subject, claim, type, producer, artifact = null, result = null, provenance = {}, environment = {}, sourceRevision = null, validity = 'valid' }) {
     const change = this.getChange(orgId, projectId, changeId);
     if (!change) throw new Error(`change not found: ${changeId}`);
+    if (change.evidence.length >= MAX_CHANGE_EVIDENCE) throw new Error('change evidence limit exceeded');
     const id = nextId(this.store, 'evidence');
     let artifactRef = null;
     if (artifact != null) {
@@ -810,6 +817,7 @@ export class Source {
   async addEvidenceAsync({ orgId, projectId, changeId, subject, claim, type, producer, artifact = null, result = null, provenance = {}, environment = {}, sourceRevision = null, validity = 'valid' }) {
     const change = await this.getChangeAsync(orgId, projectId, changeId);
     if (!change) throw new Error(`change not found: ${changeId}`);
+    if (change.evidence.length >= MAX_CHANGE_EVIDENCE) throw new Error('change evidence limit exceeded');
     const id = await nextIdAsync(this.store, 'evidence');
     let artifactRef = null;
     if (artifact != null) {

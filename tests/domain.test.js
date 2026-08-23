@@ -102,6 +102,23 @@ test('workflow dependency identifiers remain bounded and unique', async () => {
   }), /safe event names/);
 });
 
+test('change fan-out and evidence relationships are bounded', () => {
+  const { src, org, project, agent } = freshSource();
+  const work = src.createWork({ orgId: org.id, projectId: project.id, intent: 'bounded change', requester: agent.id });
+  src.claimWork({ orgId: org.id, projectId: project.id, workId: work.id, principalId: agent.id });
+  const session = src.startSession({ orgId: org.id, projectId: project.id, workId: work.id, principalId: agent.id });
+  assert.throws(() => src.submitChange({
+    orgId: org.id, projectId: project.id, workId: work.id, sessionId: session.id,
+    repositories: Array.from({ length: 1_001 }, (_, index) => `R${index}`),
+  }), /repository limit/);
+  const change = src.submitChange({ orgId: org.id, projectId: project.id, workId: work.id, sessionId: session.id });
+  change.evidence = Array.from({ length: 1_000 }, (_, index) => `E${index}`);
+  src.store.writeJson(`${src._projectRel(org.id, project.id)}/changes/${change.id}.json`, change);
+  assert.throws(() => src.addEvidence({
+    orgId: org.id, projectId: project.id, changeId: change.id, subject: 'bounded', claim: 'bounded', type: 'test', producer: agent.id,
+  }), /evidence limit/);
+});
+
 test('a change can be submitted and is tied to an exact base state', () => {
   const { src, org, project, agent } = freshSource();
   const w = src.createWork({ orgId: org.id, projectId: project.id, intent: 'change', requester: 'U1' });
