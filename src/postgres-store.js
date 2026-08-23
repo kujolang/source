@@ -675,6 +675,20 @@ class PostgresStore {
     return this._queryPathRowAsync(relPath);
   }
 
+  async readJsonManyAsync(relPaths) {
+    if (!Array.isArray(relPaths) || relPaths.length > 1_000) throw new Error('bulk record read must contain 0-1000 paths');
+    const paths = [...new Set(relPaths.map((relPath) => {
+      if (typeof relPath !== 'string' || !relPath || relPath.length > 1_000) throw new Error('record path is invalid');
+      return relPath;
+    }))];
+    if (!paths.length) return [];
+    return this._fetchJsonRowsAsync(`
+      SELECT path, json
+      FROM ${this._qualified('records')}
+      WHERE path IN (${paths.map(escapeSqlLiteral).join(',')})
+    `);
+  }
+
   writeJson(relPath, obj) {
     const classified = this._classifyRelPath(relPath);
 

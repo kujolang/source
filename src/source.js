@@ -1433,6 +1433,10 @@ export class Source {
     const ids = typeof this.store.listJsonAsync === 'function'
       ? await this.store.listJsonAsync(rel, { cursor, limit })
       : this.store.listJson(rel, { cursor, limit });
+    if (typeof this.store.readJsonManyAsync === 'function') {
+      const rows = await this.store.readJsonManyAsync(ids.map((id) => this._workflowRel(orgId, projectId, id)));
+      return rows.map((row) => row.json).filter(Boolean);
+    }
     return (await Promise.all(ids.map((id) => this.getWorkflowAsync(orgId, projectId, id)))).filter(Boolean);
   }
 

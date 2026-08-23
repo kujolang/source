@@ -149,6 +149,17 @@ test('Postgres worker claims bound expired-attempt cleanup', async () => {
   assert.match(query, /project_rank <= 8/);
 });
 
+test('Postgres workflow records use one bounded bulk read', async () => {
+  const store = Object.create(PostgresStore.prototype);
+  let query = '';
+  store._qualified = (name) => `"source"."${name}"`;
+  store._fetchJsonRowsAsync = async (sql) => { query = sql; return [{ path: 'workflows/W1.json', json: { id: 'W1' } }]; };
+  const rows = await store.readJsonManyAsync(['workflows/W1.json', 'workflows/W1.json']);
+  assert.deepEqual(rows, [{ path: 'workflows/W1.json', json: { id: 'W1' } }]);
+  assert.match(query, /path IN \('workflows\/W1\.json'\)/);
+  await assert.rejects(() => store.readJsonManyAsync(Array.from({ length: 1_001 }, (_, index) => `W${index}`)), /0-1000/);
+});
+
 test('SQLite counter allocation returns unique monotonic IDs', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'source-counter-'));
   const store = new SqliteStore(root);
