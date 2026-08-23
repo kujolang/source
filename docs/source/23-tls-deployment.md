@@ -290,6 +290,14 @@ const writerLease = {
 const server = await startServer(source, { writerLease });
 ```
 
+The production CLI wiring acquires and renews this lease before listening:
+
+```bash
+source serve --store postgres --database-url "$SOURCE_DATABASE_URL" \
+  --writer-lease --writer-owner "$SOURCE_INSTANCE_ID" \
+  --writer-lease-name primary --writer-lease-ms 30000
+```
+
 The API checks the guard during readiness and before every mutating HTTP
 request; a lost lease returns retryable `503` and leaves liveness, metrics, and
 read requests available. A deployment must run renewal and stop serving when

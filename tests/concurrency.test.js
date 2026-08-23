@@ -7,6 +7,7 @@ import { GitRepo } from '../src/git.js';
 import { startServer } from '../src/api.js';
 import { gitHttpBackend } from '../src/git-http.js';
 import { PostgresStore } from '../src/postgres-store.js';
+import { WriterLeaseController } from '../src/writer-lease.js';
 import { freshSource } from './helpers.js';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -499,6 +500,24 @@ test('Postgres writer lease uses durable fencing tokens and fail-closed errors',
   assert.match(source, /WRITER_LEASE_HELD/);
   assert.match(source, /WRITER_LEASE_LOST/);
   assert.match(source, /renewWriterLeaseAsync/);
+});
+
+test('writer lease controller renews and fails closed when ownership is lost', async () => {
+  const calls = [];
+  const store = {
+    async acquireWriterLeaseAsync() { calls.push('acquire'); return { fencingToken: '7' }; },
+    async renewWriterLeaseAsync() { calls.push('renew'); return null; },
+    async assertWriterLeaseAsync() { calls.push('assert'); return true; },
+    async releaseWriterLeaseAsync() { calls.push('release'); return true; },
+  };
+  let lost = 0;
+  const controller = new WriterLeaseController(store, { owner: 'node-a', leaseMs: 1_000, onLost: async () => { lost += 1; } });
+  await controller.start();
+  await controller._renew();
+  await assert.rejects(() => controller.assertAsync(), { code: 'WRITER_LEASE_LOST' });
+  assert.equal(lost, 1);
+  await controller.stop();
+  assert.deepEqual(calls, ['acquire', 'renew', 'release']);
 });
 
 test('standby replicas fence all mutating HTTP and Git requests', async () => {

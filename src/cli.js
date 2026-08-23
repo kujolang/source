@@ -10,6 +10,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { hostname } from 'node:os';
 import { Source } from './source.js';
 
 function dataRoot() {
@@ -301,6 +302,18 @@ export async function run(argv) {
           tls = { key: readFileSync(tlsKey), cert: readFileSync(tlsCert) };
         }
         const host = flag('--host');
+        let writerLease = null;
+        if (hasFlag('--writer-lease')) {
+          if (backend !== 'postgres') fail('--writer-lease requires --store postgres');
+          const { WriterLeaseController } = await import('./writer-lease.js');
+          const owner = flag('--writer-owner') || process.env.SOURCE_INSTANCE_ID || `${hostname().replace(/[^A-Za-z0-9_.:-]/g, '-')}-${process.pid}`;
+          writerLease = new WriterLeaseController(src.store, {
+            name: flag('--writer-lease-name') || 'primary',
+            owner,
+            leaseMs: Number(flag('--writer-lease-ms')) || 30_000,
+          });
+          await writerLease.start();
+        }
         const numberFlag = (name, fallback) => {
           const value = Number(flag(name));
           return Number.isFinite(value) && value > 0 ? value : fallback;
@@ -330,6 +343,7 @@ export async function run(argv) {
             replicationRole: flag('--replication-role') || 'primary',
             replicationMinStandbys: numberFlag('--min-replicas', 1),
             replicationMaxLagBytes: numberFlag('--max-replication-lag-bytes', 64 * 1024 * 1024),
+            writerLease,
           }))
           .then((server) => {
             const scheme = tls ? 'https' : 'http';
@@ -346,6 +360,7 @@ export async function run(argv) {
                 const timer = setTimeout(() => server.closeAllConnections?.(), 30_000);
                 server.close(() => { clearTimeout(timer); resolve(); });
               });
+              await writerLease?.stop();
               await src.store.closeAsync?.();
             };
             for (const signal of ['SIGTERM', 'SIGINT']) {
@@ -460,7 +475,7 @@ export async function run(argv) {
           '  decision accept|reject|request-revision --org <o> --project <p>',
           '  policy show --org <o> --project <p>',
           '  audit',
-          '  serve --port <n> [--host <addr>] [--store postgres] [--replication-role primary|standby --require-replication --min-replicas <n> --max-replication-lag-bytes <n>] [--trust-proxy] [--git-concurrency <n>] [--git-queue <n>] [--git-tenant-concurrency <n>] [--git-tenant-queue <n>] [--git-timeout-ms <n>] [--request-concurrency <n>] [--request-queue <n>] [--max-connections <n>] [--max-git-response <bytes>] [--max-workflow-jobs <n>] [--artifact-concurrency <n>] [--artifact-queue <n>]',
+          '  serve --port <n> [--host <addr>] [--store postgres] [--writer-lease --writer-lease-name <name> --writer-owner <id> --writer-lease-ms <n>] [--replication-role primary|standby --require-replication --min-replicas <n> --max-replication-lag-bytes <n>] [--trust-proxy] [--git-concurrency <n>] [--git-queue <n>] [--git-tenant-concurrency <n>] [--git-tenant-queue <n>] [--git-timeout-ms <n>] [--request-concurrency <n>] [--request-queue <n>] [--max-connections <n>] [--max-git-response <bytes>] [--max-workflow-jobs <n>] [--artifact-concurrency <n>] [--artifact-queue <n>]',
           '  worker --store postgres --handler-module <path> [--worker-id <id> --worker-concurrency <n> --worker-poll-ms <n> --worker-max-poll-ms <n> --worker-project-burst <n> --worker-jitter-ratio <0..1> --worker-handler-timeout-ms <n> --worker-shutdown-timeout-ms <n> --action-manifest <path> --action-keyring <path> --secret-provider-module <path> --secret-lease-ms <n>]',
           '  submit [--intent <s>] [--url <base>] [--credential <c>] [--cwd <dir>]',
           '',
