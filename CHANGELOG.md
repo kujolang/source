@@ -28,6 +28,9 @@ All notable changes to Source are recorded here.
   containers from consuming worker capacity.
 - Fixed maximum-size Postgres keyset pagination by allowing one bounded
   lookahead row, so 1,000-item pages continue to return a correct next cursor.
+- Postgres job enqueue now rejects missing dependency references and cyclic
+  batch graphs; claims also terminally fail legacy queued jobs whose
+  dependencies are missing instead of retaining them forever.
 - Added durable workflow job dependencies with cycle validation and
   dependency-aware claims for GitHub Actions `needs` semantics.
 - Batched Postgres workflow record reads to avoid one database round trip per

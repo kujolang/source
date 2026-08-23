@@ -53,6 +53,21 @@ function normalizeJobDependencies(value) {
   }))];
 }
 
+function assertDependencyAcyclic(jobs) {
+  const edges = new Map(jobs.map((job) => [job.dedupeKey, job.dependsOn.filter((dependency) => jobs.some((candidate) => candidate.dedupeKey === dependency))]));
+  const visiting = new Set();
+  const visited = new Set();
+  const visit = (key) => {
+    if (visiting.has(key)) throw new Error('job dependencies contain a cycle');
+    if (visited.has(key)) return;
+    visiting.add(key);
+    for (const dependency of edges.get(key) || []) visit(dependency);
+    visiting.delete(key);
+    visited.add(key);
+  };
+  for (const key of edges.keys()) visit(key);
+}
+
 class PostgresStore {
   constructor({
     dsn = process.env.SOURCE_DATABASE_URL || process.env.DATABASE_URL,
@@ -1065,6 +1080,14 @@ class PostgresStore {
     const safeDepth = maxQueueDepth == null ? null : Math.min(10_000_000, Math.max(1, Math.trunc(maxQueueDepth)));
     const safeDedupeKey = dedupeKey == null ? null : String(dedupeKey).slice(0, 240);
     const safeDependsOn = normalizeJobDependencies(dependsOn);
+    const validateDependencies = async () => {
+      if (!safeDependsOn.length) return;
+      const rows = await this._fetchJsonRowsAsync(`SELECT id, dedupe_key AS key FROM ${this._qualified('jobs')}
+        WHERE id IN (${safeDependsOn.map(escapeSqlLiteral).join(',')})
+           OR dedupe_key IN (${safeDependsOn.map(escapeSqlLiteral).join(',')})`);
+      const known = new Set(rows.flatMap((row) => [row.id, row.key]).filter(Boolean));
+      if (safeDependsOn.some((dependency) => !known.has(dependency))) throw new Error('job dependency does not exist');
+    };
     const insert = () => this._runAsync(`INSERT INTO ${this._qualified('jobs')} (id, kind, payload, org_id, project_id, work_id, status, available_at, max_attempts, dedupe_key, depends_on)
       VALUES (${escapeSqlLiteral(id)}, ${escapeSqlLiteral(kind)}, ${toJson(payload)}, ${escapeSqlLiteral(orgId)}, ${escapeSqlLiteral(projectId)}, ${escapeSqlLiteral(workId)}, 'queued', ${escapeSqlLiteral(at)}, ${safeAttempts}, ${escapeSqlLiteral(safeDedupeKey)}, ${toJson(safeDependsOn)})
       ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING
@@ -1076,6 +1099,7 @@ class PostgresStore {
       // lock, which would make a count-then-insert quota race under burst load.
       inserted = await this.transactionAsync(async () => {
         await this._runAsync(`SELECT id FROM ${this._qualified('projects')} WHERE id = ${escapeSqlLiteral(projectId)} FOR UPDATE`);
+        await validateDependencies();
         if (safeDedupeKey) {
           const existing = await this._runAsync(`SELECT id FROM ${this._qualified('jobs')} WHERE dedupe_key = ${escapeSqlLiteral(safeDedupeKey)} LIMIT 1`);
           if (existing) return `dedupe:${existing}`;
@@ -1087,7 +1111,10 @@ class PostgresStore {
         return insert();
       });
     } else {
-      inserted = await insert();
+      inserted = await this.transactionAsync(async () => {
+        await validateDependencies();
+        return insert();
+      });
     }
     if (typeof inserted === 'string' && inserted.startsWith('dedupe:')) {
       return { id: inserted.slice('dedupe:'.length), kind, payload, orgId, projectId, workId, status: 'deduplicated', attempts: 0, maxAttempts: safeAttempts, availableAt: at, dedupeKey: safeDedupeKey, dependsOn: safeDependsOn };
@@ -1125,6 +1152,8 @@ class PostgresStore {
     if (scopes.size > 1) throw new Error('job batch must use one organization and project scope');
     const orgId = normalized[0].orgId || null;
     const projectId = normalized[0].projectId || null;
+    const batchDedupeKeys = new Set(normalized.map((job) => job.dedupeKey).filter(Boolean));
+    assertDependencyAcyclic(normalized.filter((job) => job.dedupeKey));
     const safeDepth = maxQueueDepth == null ? null : Math.min(10_000_000, Math.max(1, Math.trunc(maxQueueDepth)));
     return this.transactionAsync(async () => {
       if (safeDepth != null && orgId && projectId) {
@@ -1135,6 +1164,15 @@ class PostgresStore {
         ? await this._fetchJsonRowsAsync(`SELECT dedupe_key AS key, id FROM ${this._qualified('jobs')} WHERE dedupe_key IN (${dedupeKeys.map(escapeSqlLiteral).join(',')})`)
         : [];
       const existingKeys = new Set(existing.map((row) => row.key));
+      const dependencyKeys = [...new Set(normalized.flatMap((job) => job.dependsOn))];
+      const externalDependencies = dependencyKeys.filter((dependency) => !batchDedupeKeys.has(dependency));
+      if (externalDependencies.length) {
+        const dependencyRows = await this._fetchJsonRowsAsync(`SELECT id, dedupe_key AS key FROM ${this._qualified('jobs')}
+          WHERE id IN (${externalDependencies.map(escapeSqlLiteral).join(',')})
+             OR dedupe_key IN (${externalDependencies.map(escapeSqlLiteral).join(',')})`);
+        const knownDependencies = new Set(dependencyRows.flatMap((row) => [row.id, row.key]).filter(Boolean));
+        if (externalDependencies.some((dependency) => !knownDependencies.has(dependency))) throw new Error('job dependency does not exist');
+      }
       const newKeys = new Set();
       const newCount = normalized.filter((job) => {
         if (!job.dedupeKey) return true;
@@ -1236,7 +1274,7 @@ class PostgresStore {
             FROM jsonb_array_elements_text(COALESCE(j.depends_on, '[]'::jsonb)) AS dependency(reference)
             JOIN ${this._qualified('jobs')} AS dependency_job
               ON dependency_job.id = dependency.reference OR dependency_job.dedupe_key = dependency.reference
-            WHERE dependency_job.status = 'failed'
+            WHERE dependency_job.id IS NULL OR dependency_job.status = 'failed'
           )
         RETURNING j.id
       ), ranked AS (

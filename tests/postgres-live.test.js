@@ -141,6 +141,19 @@ test('Postgres async lifecycle and HTTP burst remain correct under 1000 agents',
     const childClaim = (await src.jobs.claim({ workerId: 'dependency-worker-3', limit: 10 })).find((job) => job.id === childJob.id);
     assert.equal(childClaim.id, childJob.id);
     await src.jobs.complete({ id: childClaim.id, workerId: 'dependency-worker-3', leaseToken: childClaim.leaseToken, result: { ok: true } });
+    await assert.rejects(
+      src.jobs.enqueue({ kind: 'agent.missing-dependency', payload: {}, orgId: org.id, projectId: project.id, dependsOn: ['does-not-exist'] }),
+      /dependency does not exist/,
+    );
+    await assert.rejects(
+      src.jobs.enqueueBatch({
+        jobs: [
+          { kind: 'agent.cycle-a', dedupeKey: 'cycle-a', dependsOn: ['cycle-b'], orgId: org.id, projectId: project.id },
+          { kind: 'agent.cycle-b', dedupeKey: 'cycle-b', dependsOn: ['cycle-a'], orgId: org.id, projectId: project.id },
+        ],
+      }),
+      /dependencies contain a cycle/,
+    );
     const peerJob = await src.jobs.enqueue({ kind: 'agent.peer', payload: { node: 'primary' } });
     const peerClaim = (await peerSrc.jobs.claim({ workerId: 'peer-worker', limit: 1 }))[0];
     assert.equal(peerClaim.id, peerJob.id);
