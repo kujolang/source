@@ -93,8 +93,11 @@ audit event containing references and metadata but never secret values. The
 deployment resolver remains responsible for backing this seam with its rotating
 secret system and revocation policy. Worker bootstrap can load that adapter with
 `--secret-provider-module <path>`; the module must export
-`resolveSecretLease`, `resolveIdentity`, and `auditSecretLease` (or equivalent
-names on its default export). `--secret-lease-ms` bounds each lease.
+`resolveSecretLease`, `resolveIdentity`, `auditSecretLease`, and
+`revokeSecretLease` (or equivalent names on its default export).
+`--secret-lease-ms` bounds each lease. Completed action jobs revoke their lease
+before the workspace is released; a provider that cannot revoke is rejected by
+worker bootstrap.
 Worker startup calls the provider health check and fails closed before claiming
 jobs when it is unavailable or unhealthy.
 For a standard HTTPS deployment, `createHttpSecretBroker` / `HttpSecretProvider`

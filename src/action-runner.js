@@ -56,7 +56,7 @@ function safeEnvironment(env) {
 // recording secret values. Providers should implement rotation and revocation
 // behind `resolve` rather than handing Source a long-lived secret store.
 export class SecretLeaseBroker {
-  constructor({ resolve, identity, audit, healthCheck = null, leaseMs = 15 * 60_000 } = {}) {
+  constructor({ resolve, identity, audit, healthCheck = null, revoke = null, leaseMs = 15 * 60_000, maxActiveLeases = 10_000 } = {}) {
     if (typeof resolve !== 'function') throw new Error('secret broker resolve function is required');
     if (typeof audit !== 'function') throw new Error('secret broker audit function is required');
     if (typeof identity !== 'string' && typeof identity !== 'function') throw new Error('secret broker identity is required');
@@ -64,33 +64,77 @@ export class SecretLeaseBroker {
     this.identity = identity;
     this.audit = audit;
     this.healthCheck = typeof healthCheck === 'function' ? healthCheck : null;
+    this.revokeLease = typeof revoke === 'function' ? revoke : null;
     this.leaseMs = Math.min(60 * 60_000, Math.max(1_000, Math.trunc(leaseMs)));
+    this.maxActiveLeases = Math.min(100_000, Math.max(1, Math.trunc(maxActiveLeases)));
+    this.activeLeases = new Map();
+    this.counters = { issued: 0, denied: 0, healthChecks: 0, healthFailures: 0, revoked: 0 };
   }
 
   async checkHealth() {
-    if (!this.healthCheck) throw new Error('secret broker health check is not configured');
-    const healthy = await this.healthCheck();
-    if (healthy !== true && healthy?.ok !== true) throw new Error('secret broker health check failed');
-    return true;
+    this.counters.healthChecks += 1;
+    if (!this.healthCheck) {
+      this.counters.healthFailures += 1;
+      throw new Error('secret broker health check is not configured');
+    }
+    try {
+      const healthy = await this.healthCheck();
+      if (healthy !== true && healthy?.ok !== true) throw new Error('secret broker health check failed');
+      return true;
+    } catch (error) {
+      this.counters.healthFailures += 1;
+      throw error;
+    }
   }
 
-  async get(payload, job) {
+  _pruneLeases(now = Date.now()) {
+    for (const [leaseId, lease] of this.activeLeases) if (Date.parse(lease.expiresAt) <= now) this.activeLeases.delete(leaseId);
+  }
+
+  metrics() {
+    this._pruneLeases();
+    return { ...this.counters, activeLeases: this.activeLeases.size, maxActiveLeases: this.maxActiveLeases };
+  }
+
+  async issue(payload, job) {
     const resolvedIdentity = typeof this.identity === 'function' ? await this.identity(payload, job) : this.identity;
     if (typeof resolvedIdentity !== 'string' || !resolvedIdentity || resolvedIdentity.length > 256) throw new Error('secret broker identity is invalid');
     const requested = payload?.parameters?.secretRefs ?? payload?.parameters?.secrets ?? [];
     if (!Array.isArray(requested) || requested.length > 64 || requested.some((reference) => typeof reference !== 'string' || !reference || reference.length > 256)) throw new Error('secret references are invalid');
     const issuedAt = new Date();
     const expiresAt = new Date(issuedAt.getTime() + this.leaseMs).toISOString();
+    this._pruneLeases(issuedAt.getTime());
+    if (this.activeLeases.size >= this.maxActiveLeases) throw new Error('secret broker lease capacity exhausted');
+    const leaseId = randomBytes(24).toString('hex');
     try {
-      const supplied = await this.resolve({ identity: resolvedIdentity, references: requested, payload, job, expiresAt });
+      const supplied = await this.resolve({ identity: resolvedIdentity, references: requested, payload, job, expiresAt, leaseId });
       const environment = supplied?.env && typeof supplied.env === 'object' ? supplied.env : supplied;
       const safe = safeEnvironment(environment);
-      await this.audit({ event: 'secret_lease_issued', identity: resolvedIdentity, jobId: String(job?.id || ''), references: requested, issuedAt: issuedAt.toISOString(), expiresAt, keyCount: Object.keys(safe).length });
-      return safe;
+      this.activeLeases.set(leaseId, { identity: resolvedIdentity, jobId: String(job?.id || ''), references: requested, expiresAt });
+      this.counters.issued += 1;
+      await this.audit({ event: 'secret_lease_issued', leaseId, identity: resolvedIdentity, jobId: String(job?.id || ''), references: requested, issuedAt: issuedAt.toISOString(), expiresAt, keyCount: Object.keys(safe).length });
+      return { env: safe, leaseId };
     } catch (error) {
+      this.counters.denied += 1;
       await Promise.resolve(this.audit({ event: 'secret_lease_denied', identity: resolvedIdentity, jobId: String(job?.id || ''), references: requested, issuedAt: issuedAt.toISOString(), reason: error?.message ? 'provider_error' : 'provider_failure' })).catch(() => {});
       throw error;
     }
+  }
+
+  async get(payload, job) {
+    return (await this.issue(payload, job)).env;
+  }
+
+  async revoke(leaseId, reason = 'worker_finished') {
+    if (typeof leaseId !== 'string' || !/^[a-f0-9]{48}$/.test(leaseId)) throw new Error('secret lease ID is invalid');
+    const lease = this.activeLeases.get(leaseId);
+    if (!lease) return false;
+    if (!this.revokeLease) throw new Error('secret broker revocation is not configured');
+    await this.revokeLease({ leaseId, reason });
+    this.activeLeases.delete(leaseId);
+    this.counters.revoked += 1;
+    await this.audit({ event: 'secret_lease_revoked', leaseId, identity: lease.identity, jobId: lease.jobId, reason });
+    return true;
   }
 }
 
@@ -102,7 +146,8 @@ export async function loadSecretLeaseBroker({ modulePath, leaseMs = 15 * 60_000 
   const identity = provider.resolveIdentity || provider.identity;
   const audit = provider.auditSecretLease || provider.audit;
   const healthCheck = provider.checkHealth || provider.healthCheck;
-  return new SecretLeaseBroker({ resolve, identity, audit, healthCheck, leaseMs });
+  const revoke = provider.revokeSecretLease || provider.revoke;
+  return new SecretLeaseBroker({ resolve, identity, audit, healthCheck, revoke, leaseMs });
 }
 
 export class HttpSecretProvider {
@@ -116,12 +161,13 @@ export class HttpSecretProvider {
     const root = parsed.toString().endsWith('/') ? parsed.toString() : `${parsed}/`;
     this.endpoint = new URL('v1/leases', root);
     this.healthEndpoint = new URL('v1/health', root);
+    this.revokeEndpoint = new URL('v1/leases/', root);
     this.token = token;
     this.fetchImpl = fetchImpl;
     this.timeoutMs = Math.min(60_000, Math.max(100, Math.trunc(timeoutMs)));
   }
 
-  async resolve({ identity, references, expiresAt, job } = {}) {
+  async resolve({ identity, references, expiresAt, job, leaseId } = {}) {
     const token = typeof this.token === 'function' ? await this.token() : this.token;
     if (typeof token !== 'string' || !token || token.length > 16 * 1024) throw new Error('secret provider token is invalid');
     const controller = new AbortController();
@@ -132,7 +178,7 @@ export class HttpSecretProvider {
       response = await this.fetchImpl(this.endpoint, {
         method: 'POST',
         headers: { accept: 'application/json', 'content-type': 'application/json', authorization: `Bearer ${token}` },
-        body: JSON.stringify({ identity, references, expiresAt, jobId: String(job?.id || '') }),
+        body: JSON.stringify({ identity, references, expiresAt, leaseId, jobId: String(job?.id || '') }),
         signal: controller.signal,
       });
     } catch {
@@ -176,11 +222,34 @@ export class HttpSecretProvider {
       clearTimeout(timer);
     }
   }
+
+  async revoke({ leaseId, reason } = {}) {
+    if (typeof leaseId !== 'string' || !/^[a-f0-9]{48}$/.test(leaseId)) throw new Error('secret lease ID is invalid');
+    const token = typeof this.token === 'function' ? await this.token() : this.token;
+    if (typeof token !== 'string' || !token || token.length > 16 * 1024) throw new Error('secret provider token is invalid');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    timer.unref?.();
+    try {
+      const response = await this.fetchImpl(new URL(`${encodeURIComponent(leaseId)}/revoke`, this.revokeEndpoint), {
+        method: 'POST',
+        headers: { accept: 'application/json', authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ reason: typeof reason === 'string' ? reason.slice(0, 240) : 'revoked' }),
+        signal: controller.signal,
+      });
+      if (!response?.ok) throw new Error(`secret provider revocation rejected (${Number(response?.status) || 0})`);
+      return true;
+    } catch {
+      throw new Error('secret provider revocation failed');
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 }
 
 export function createHttpSecretBroker({ identity, audit, leaseMs, ...providerOptions } = {}) {
   const provider = new HttpSecretProvider(providerOptions);
-  return new SecretLeaseBroker({ identity, audit, leaseMs, resolve: provider.resolve.bind(provider), healthCheck: provider.checkHealth.bind(provider) });
+  return new SecretLeaseBroker({ identity, audit, leaseMs, resolve: provider.resolve.bind(provider), healthCheck: provider.checkHealth.bind(provider), revoke: provider.revoke.bind(provider) });
 }
 
 function redactSecretOutput(result, env) {
@@ -494,11 +563,15 @@ export function createGitHubActionsHandler({ runner, workspaceForJob, workspaceM
     const workspace = workspaceManager
       ? await workspaceManager.acquire(job)
       : await workspaceForJob(payload, job);
+    let leaseId = null;
     try {
-      const env = safeEnvironment(await (secretBroker ? secretBroker.get(payload, job) : secretProvider(payload, job)));
+      const leased = secretBroker?.issue ? await secretBroker.issue(payload, job) : null;
+      leaseId = leased?.leaseId || null;
+      const env = safeEnvironment(leased ? leased.env : await (secretBroker ? secretBroker.get(payload, job) : secretProvider(payload, job)));
       const result = await runner.run({ steps: parameters.steps }, { workspace, env });
       return redactSecretOutput(result, env);
     } finally {
+      if (leaseId && secretBroker?.revokeLease) await secretBroker.revoke(leaseId);
       if (workspaceManager) await workspaceManager.release(job);
     }
   };

@@ -166,6 +166,7 @@ test('GitHub handler redacts brokered secrets from runner output', async () => {
 test('secret lease broker binds identity, avoids caching, and audits without values', async () => {
   const events = [];
   let resolutions = 0;
+  const revoked = [];
   const broker = new SecretLeaseBroker({
     identity: async () => 'agent-42',
     resolve: async ({ identity, references }) => {
@@ -175,6 +176,7 @@ test('secret lease broker binds identity, avoids caching, and audits without val
       return { env: { TOKEN: `secret-${resolutions}`, NODE_OPTIONS: '--require unsafe' } };
     },
     audit: (event) => events.push(event),
+    revoke: async ({ leaseId, reason }) => revoked.push({ leaseId, reason }),
   });
   const runnerCalls = [];
   const handler = createGitHubActionsHandler({
@@ -189,14 +191,19 @@ test('secret lease broker binds identity, avoids caching, and audits without val
   assert.equal(second.stdout, '[REDACTED]');
   assert.equal(resolutions, 2);
   assert.deepEqual(runnerCalls.map((call) => call.env), [{ TOKEN: 'secret-1' }, { TOKEN: 'secret-2' }]);
-  assert.deepEqual(events.map((event) => event.event), ['secret_lease_issued', 'secret_lease_issued']);
+  assert.deepEqual(events.map((event) => event.event), ['secret_lease_issued', 'secret_lease_revoked', 'secret_lease_issued', 'secret_lease_revoked']);
   assert.equal(JSON.stringify(events).includes('secret-1'), false);
+  const lease = await broker.issue(payload, { id: 'J-revoke' });
+  assert.equal(await broker.revoke(lease.leaseId, 'rotation-drill'), true);
+  assert.equal(revoked.length, 3);
+  assert.deepEqual(revoked.at(-1), { leaseId: lease.leaseId, reason: 'rotation-drill' });
+  assert.equal(broker.metrics().revoked, 3);
 });
 
 test('secret provider module loader enforces the production adapter contract', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'source-secret-provider-'));
   const modulePath = path.join(root, 'provider.mjs');
-  await writeFile(modulePath, `export const resolveIdentity = async () => 'module-agent';\nexport const resolveSecretLease = async () => ({ TOKEN: 'module-secret' });\nexport const auditSecretLease = () => {};\nexport const checkHealth = async () => true;\n`, 'utf8');
+  await writeFile(modulePath, `export const resolveIdentity = async () => 'module-agent';\nexport const resolveSecretLease = async () => ({ TOKEN: 'module-secret' });\nexport const auditSecretLease = () => {};\nexport const checkHealth = async () => true;\nexport const revokeSecretLease = async () => true;\n`, 'utf8');
   const broker = await loadSecretLeaseBroker({ modulePath, leaseMs: 2_000 });
   assert.equal(await broker.checkHealth(), true);
   assert.deepEqual(await broker.get({ parameters: { secretRefs: [] } }, { id: 'J-module' }), { TOKEN: 'module-secret' });
@@ -229,6 +236,9 @@ test('HTTPS secret provider adapter rotates auth and enforces bounded lease resp
   await provider.checkHealth();
   assert.equal(tokenCalls, 2);
   assert.equal(request.url, 'https://secrets.example.test/api/v1/health');
+  await provider.revoke({ leaseId: 'e'.repeat(48), reason: 'rotation' });
+  assert.equal(tokenCalls, 3);
+  assert.equal(request.url, 'https://secrets.example.test/api/v1/leases/' + 'e'.repeat(48) + '/revoke');
   assert.throws(() => new HttpSecretProvider({ baseUrl: 'http://secrets.example.test', token: 'x' }), /HTTPS/);
   const broker = createHttpSecretBroker({
     baseUrl: 'https://secrets.example.test', token: 'x', identity: 'agent-1', audit: () => {},

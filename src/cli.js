@@ -373,6 +373,7 @@ export async function run(argv) {
           ? await (await import('./action-runner.js')).loadSecretLeaseBroker({ modulePath: path.resolve(secretProviderModule), leaseMs: Number(flag('--secret-lease-ms')) || 15 * 60_000 })
           : null;
         if (secretBroker) await secretBroker.checkHealth();
+        if (secretBroker && !secretBroker.revokeLease) fail('secret provider module must export revokeSecretLease or revoke');
         const loaded = await import(pathToFileURL(path.resolve(handlerModule)).href);
         const handlers = typeof loaded.createHandlers === 'function'
           ? await loaded.createHandlers({ actionRegistry, secretBroker })
