@@ -829,15 +829,16 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           if (!(await limiter.allowAsync(`jobbatch:${ip}:${orgId}:${projectId}`, limits.jobEnqueue))) {
             return json(res, 429, { error: 'rate limit exceeded' });
           }
-          const g = await guard(src, req, ACTIONS.enqueue_job, { org: orgId, project: projectId });
-          if (g) return json(res, g.status, g.body);
           if (!Array.isArray(body.jobs) || body.jobs.length < 1 || body.jobs.length > 100) {
             return json(res, 400, { error: 'jobs must contain 1-100 items' });
           }
-          const jobs = body.jobs.map((job) => {
+          const jobs = [];
+          for (const job of body.jobs) {
             if (!job || typeof job.kind !== 'string' || !/^[A-Za-z0-9_.:-]{1,120}$/.test(job.kind)) throw new Error('invalid job kind');
             if (Buffer.byteLength(JSON.stringify(job.payload ?? {})) > maxJobPayloadBytes) throw new Error('job payload too large');
-            return {
+            const g = await guard(src, req, ACTIONS.enqueue_job, { org: orgId, project: projectId, work: job.workId || undefined });
+            if (g) return json(res, g.status, g.body);
+            jobs.push({
               kind: job.kind,
               payload: job.payload ?? {},
               availableAt: job.availableAt,
@@ -846,8 +847,8 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
               dedupeKey: job.dedupeKey || null,
               orgId,
               projectId,
-            };
-          });
+            });
+          }
           const queued = await src.jobs.enqueueBatch({ jobs, maxQueueDepth: maxJobQueueDepth });
           return json(res, 202, { jobs: queued });
         }

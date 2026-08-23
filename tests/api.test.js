@@ -75,6 +75,26 @@ test('agents can enqueue a bounded job batch through one capability-gated reques
   });
 });
 
+test('batch enqueue enforces work-scoped capabilities for every item', async () => {
+  const { src, org, project, agent } = freshSource();
+  const firstWork = src.createWork({ orgId: org.id, projectId: project.id, intent: 'first', requester: agent.id });
+  const secondWork = src.createWork({ orgId: org.id, projectId: project.id, intent: 'second', requester: agent.id });
+  const capability = src.capabilities.issue({
+    principalId: agent.id,
+    scope: { org: org.id, project: project.id, work: firstWork.id },
+    allowed: ['enqueue_job'],
+  });
+  src.jobs.enqueueBatch = async ({ jobs }) => jobs.map((job, index) => ({ ...job, id: `J${index + 1}`, status: 'queued' }));
+  await withServer(src, async (base) => {
+    const response = await fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/jobs/batch`, {
+      method: 'POST',
+      headers: { ...auth(capability.credential), 'content-type': 'application/json' },
+      body: JSON.stringify({ jobs: [{ kind: 'agent.batch', workId: firstWork.id }, { kind: 'agent.batch', workId: secondWork.id }] }),
+    });
+    assert.equal(response.status, 403);
+  });
+});
+
 test('an agent can complete the workflow without HTML (capability-gated)', async () => {
   const { src, org, project, agent, service, human } = freshSource();
   const w = src.createWork({ orgId: org.id, projectId: project.id, intent: 'fix parser regression', requester: 'U1' });
