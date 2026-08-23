@@ -49,3 +49,7 @@ Action handlers can use `EphemeralWorkspaceManager` to apply a separate bounded
 workspace budget and automatically remove temporary workspaces on success or
 failure. This prevents abandoned action directories from consuming shared
 runner storage during large fan-out events.
+
+Evidence artifacts are limited to 64 MiB by default through `Source`'s
+`maxArtifactBytes` option (hard-capped at 512 MiB), protecting both worker
+memory and durable storage from oversized verification output.

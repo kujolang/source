@@ -43,6 +43,16 @@ test('evidence retains its underlying artifact and integrity', () => {
   assert.ok(stored.includes('full tool output'));
 });
 
+test('evidence artifacts are bounded before durable storage', () => {
+  const { src, org, project, service } = freshSource();
+  const work = src.createWork({ orgId: org.id, projectId: project.id, intent: 'artifact bound', requester: 'U1' });
+  src.claimWork({ orgId: org.id, projectId: project.id, workId: work.id, principalId: service.id });
+  const session = src.startSession({ orgId: org.id, projectId: project.id, workId: work.id, principalId: service.id, baseCommit: 'base' });
+  const change = src.submitChange({ orgId: org.id, projectId: project.id, workId: work.id, sessionId: session.id, baseCommit: 'base', headCommit: 'head' });
+  const bounded = new src.constructor(src.dataRoot, { store: src.store, gitRoot: src.gitRoot, maxArtifactBytes: 4 });
+  assert.throws(() => bounded.addEvidence({ orgId: org.id, projectId: project.id, changeId: change.id, subject: 'test', claim: 'bounded', type: 'eval', producer: service.id, artifact: '12345' }), /artifact exceeds 4 byte limit/);
+});
+
 test('tampered artifact is detected (integrity hash mismatch)', () => {
   const { src, org, project, agent, service } = freshSource();
   const { c } = setupChange(src, org, project, agent);

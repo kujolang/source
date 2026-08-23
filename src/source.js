@@ -39,12 +39,19 @@ const scryptAsync = promisify(scrypt);
 export class Source {
   // `store` is optional; defaults to the JSON-file store. Pass a SqliteStore
   // (see sqlite-store.js) for ACID transactions across records.
-  constructor(dataRoot, { store, gitRoot = process.env.SOURCE_GIT_ROOT || dataRoot } = {}) {
+  constructor(dataRoot, { store, gitRoot = process.env.SOURCE_GIT_ROOT || dataRoot, maxArtifactBytes = 64 * 1024 * 1024 } = {}) {
     this.dataRoot = dataRoot;
     this.gitRoot = gitRoot;
+    this.maxArtifactBytes = Math.min(512 * 1024 * 1024, Math.max(1, Math.trunc(maxArtifactBytes)));
     this.store = store ?? new Store(dataRoot);
     this.capabilities = new CapabilityService(this.store);
     this.jobs = new JobQueue(this.store);
+  }
+
+  _artifactBytes(artifact) {
+    const bytes = Buffer.isBuffer(artifact) ? artifact : Buffer.from(String(artifact), 'utf8');
+    if (bytes.length > this.maxArtifactBytes) throw new Error(`evidence artifact exceeds ${this.maxArtifactBytes} byte limit`);
+    return bytes;
   }
 
   _asyncWrite(rel, value) {
@@ -766,7 +773,7 @@ export class Source {
     const id = nextId(this.store, 'evidence');
     let artifactRef = null;
     if (artifact != null) {
-      const bytes = Buffer.isBuffer(artifact) ? artifact : Buffer.from(String(artifact), 'utf8');
+      const bytes = this._artifactBytes(artifact);
       artifactRef = this.store.putArtifact(bytes);
     }
     const evidence = createEvidence({ id, subject, claim, type, producer, artifactRef, result, provenance, environment, sourceRevision, validity });
@@ -785,7 +792,7 @@ export class Source {
     const id = await nextIdAsync(this.store, 'evidence');
     let artifactRef = null;
     if (artifact != null) {
-      const bytes = Buffer.isBuffer(artifact) ? artifact : Buffer.from(String(artifact), 'utf8');
+      const bytes = this._artifactBytes(artifact);
       artifactRef = typeof this.store.putArtifactAsync === 'function' ? await this.store.putArtifactAsync(bytes) : this.store.putArtifact(bytes);
     }
     const evidence = createEvidence({ id, subject, claim, type, producer, artifactRef, result, provenance, environment, sourceRevision, validity });
