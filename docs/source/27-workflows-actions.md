@@ -52,9 +52,13 @@ environment as untrusted step data; it never executes them in Source. The
 repository includes an explicit `IsolatedActionRunner` seam for operators that
 provision Podman or Docker. It runs only bounded `run` steps in a
 non-privileged, read-only, no-network-by-default container with CPU, memory,
-PID, output, and wall-clock limits; `uses` steps are rejected. Configure a
-separate workspace resolver and secret provider through
-`createGitHubActionsHandler`; workflow YAML is never a secret store. Container
+PID, output, and wall-clock limits. Configure a separate workspace resolver and
+secret provider through `createGitHubActionsHandler`; workflow YAML is never a
+secret store. Operators may provide an explicit, bounded action resolver to map
+pinned `uses` references to trusted run steps available in the runner image;
+unresolved or unconfigured actions fail closed. The resolver is the operator's
+compatibility boundary and must not fetch or execute remote action code
+implicitly. Container
 runtime provisioning, secrets brokering, and per-provider secret rotation
 remain deployment-specific work required before advertising drop-in
 `.github/workflows` compatibility. The

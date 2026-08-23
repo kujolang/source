@@ -20,10 +20,31 @@ test('isolated runner builds a bounded no-network container command', () => {
   assert.match(args.at(-1), /kujo check/);
 });
 
-test('isolated runner rejects composite actions and workspace escapes', () => {
+test('isolated runner requires resolved actions and rejects workspace escapes', () => {
   const runner = new IsolatedActionRunner({ image: 'kujo/runner:latest', workspaceRoot: '/srv/workspaces' });
-  assert.throws(() => runner.buildArgs({ steps: [{ uses: 'actions/checkout@v4' }] }, '/srv/workspaces/job-1'), /composite actions/);
+  assert.throws(() => runner.buildArgs({ steps: [{ uses: 'actions/checkout@v4' }] }, '/srv/workspaces/job-1'), /must be resolved/);
   assert.throws(() => runner.buildArgs({ steps: [{ run: 'echo unsafe' }] }, '/srv/other'), /workspace root/);
+});
+
+test('isolated runner expands only bounded operator-configured uses actions', async () => {
+  const calls = [];
+  const runner = new IsolatedActionRunner({
+    image: 'kujo/runner:latest', workspaceRoot: '/srv/workspaces',
+    actionResolver: async (action) => {
+      calls.push(action);
+      return [{ run: `kujo action ${action.with.target}` }];
+    },
+  });
+  const steps = await runner.resolveSteps([
+    { uses: 'kujo/setup@v1', with: { target: 'source' } },
+    { run: 'kujo check' },
+  ]);
+  assert.deepEqual(steps, [{ run: 'kujo action source' }, { run: 'kujo check' }]);
+  assert.deepEqual(calls[0].with, { target: 'source' });
+  await assert.rejects(
+    new IsolatedActionRunner({ image: 'kujo/runner:latest', workspaceRoot: '/srv/workspaces' }).resolveSteps([{ uses: 'actions/checkout@v4' }]),
+    /not configured/,
+  );
 });
 
 test('isolated runner bounds container admission independently of workspaces', async () => {

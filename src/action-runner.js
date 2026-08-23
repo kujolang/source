@@ -33,7 +33,7 @@ function workflowScript(steps) {
   if (!Array.isArray(steps) || steps.length < 1 || steps.length > 100) throw new Error('workflow job must contain 1-100 steps');
   const lines = ['set -eu'];
   for (const step of steps) {
-    if (step?.uses) throw new Error('GitHub composite actions are not enabled in the isolated runner');
+    if (step?.uses) throw new Error('GitHub action must be resolved before isolated execution');
     if (typeof step?.run !== 'string' || !step.run.trim()) throw new Error('isolated runner requires run steps');
     if (step.run.length > 16 * 1024) throw new Error('workflow run step is too large');
     lines.push(step.run);
@@ -119,7 +119,7 @@ export class EphemeralWorkspaceManager {
 }
 
 export class IsolatedActionRunner {
-  constructor({ runtime = 'podman', image, workspaceRoot, timeoutMs = 15 * 60_000, maxOutputBytes = 8 * 1024 * 1024, memory = '1g', cpus = 2, pidsLimit = 256, allowNetwork = false, user = '65532:65532', maxActive = 256, queue = 512, spawnProcess = spawn } = {}) {
+  constructor({ runtime = 'podman', image, workspaceRoot, timeoutMs = 15 * 60_000, maxOutputBytes = 8 * 1024 * 1024, memory = '1g', cpus = 2, pidsLimit = 256, allowNetwork = false, user = '65532:65532', maxActive = 256, queue = 512, actionResolver = null, spawnProcess = spawn } = {}) {
     if (runtime !== 'podman' && runtime !== 'docker') throw new Error('isolated runner runtime must be podman or docker');
     this.runtime = runtime;
     this.image = safeImage(image);
@@ -131,8 +131,35 @@ export class IsolatedActionRunner {
     this.pidsLimit = boundedInteger(pidsLimit, 256, 16, 10_000);
     this.allowNetwork = allowNetwork === true;
     this.user = safeImage(user);
+    this.actionResolver = typeof actionResolver === 'function' ? actionResolver : null;
     this.spawnProcess = typeof spawnProcess === 'function' ? spawnProcess : spawn;
     this.slots = new Semaphore({ capacity: boundedInteger(maxActive, 256, 1, 10_000), queue: boundedInteger(queue, 512, 0, 100_000) });
+  }
+
+  async resolveSteps(steps) {
+    if (!Array.isArray(steps) || steps.length < 1 || steps.length > 100) throw new Error('workflow job must contain 1-100 steps');
+    const resolved = [];
+    for (const step of steps) {
+      if (!step?.uses) {
+        resolved.push(step);
+        continue;
+      }
+      if (!this.actionResolver) throw new Error(`GitHub action is not configured: ${String(step.uses).slice(0, 500)}`);
+      if (typeof step.uses !== 'string' || step.uses.length > 500) throw new Error('GitHub action reference is invalid');
+      const actionSteps = await this.actionResolver({
+        uses: step.uses,
+        with: step.with && typeof step.with === 'object' ? step.with : {},
+        step,
+      });
+      if (!Array.isArray(actionSteps) || actionSteps.length < 1 || actionSteps.length > 20) throw new Error('resolved GitHub action must contain 1-20 run steps');
+      for (const actionStep of actionSteps) {
+        if (!actionStep || actionStep.uses || typeof actionStep.run !== 'string' || !actionStep.run.trim()) throw new Error('resolved GitHub action may only contain non-empty run steps');
+        if (actionStep.run.length > 16 * 1024) throw new Error('resolved GitHub action run step is too large');
+        resolved.push(actionStep);
+      }
+      if (resolved.length > 100) throw new Error('resolved workflow job contains too many steps');
+    }
+    return resolved;
   }
 
   buildArgs({ steps, envKeys = [], containerName = null }, workspace) {
@@ -147,13 +174,14 @@ export class IsolatedActionRunner {
   }
 
   async run({ steps }, { workspace, env = {} } = {}) {
+    const resolvedSteps = await this.resolveSteps(steps);
     let releaseSlot = await this.slots.acquire();
     if (!releaseSlot) throw new Error('isolated runner capacity exhausted');
     const safeEnv = safeEnvironment(env);
     const containerName = `source-action-${process.pid}-${Date.now()}-${randomBytes(6).toString('hex')}`;
     let child;
     try {
-      const args = this.buildArgs({ steps, envKeys: Object.keys(safeEnv), containerName }, workspace);
+      const args = this.buildArgs({ steps: resolvedSteps, envKeys: Object.keys(safeEnv), containerName }, workspace);
       child = this.spawnProcess(this.runtime, args, {
         detached: process.platform !== 'win32',
         stdio: ['ignore', 'pipe', 'pipe'],
