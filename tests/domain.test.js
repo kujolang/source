@@ -117,6 +117,11 @@ test('change fan-out and evidence relationships are bounded', () => {
   assert.throws(() => src.addEvidence({
     orgId: org.id, projectId: project.id, changeId: change.id, subject: 'bounded', claim: 'bounded', type: 'test', producer: agent.id,
   }), /evidence limit/);
+  change.decisions = Array.from({ length: 1_000 }, (_, index) => `D${index}`);
+  src.store.writeJson(`${src._projectRel(org.id, project.id)}/changes/${change.id}.json`, change);
+  assert.throws(() => src.makeDecision({
+    orgId: org.id, projectId: project.id, changeId: change.id, decision: 'rejected', decider: agent.id,
+  }), /decision limit/);
 });
 
 test('a change can be submitted and is tied to an exact base state', () => {

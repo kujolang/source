@@ -37,6 +37,7 @@ const DEFAULT_HUMAN_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_HUMAN_SESSION_ACTIONS = ['read_source', 'read_context', 'accept_change'];
 const MAX_CHANGE_REPOSITORIES = 1_000;
 const MAX_CHANGE_EVIDENCE = 1_000;
+const MAX_CHANGE_DECISIONS = 1_000;
 const MAX_PROJECT_REPOSITORIES = 10_000;
 const scryptAsync = promisify(scrypt);
 
@@ -955,6 +956,7 @@ export class Source {
   makeDecision({ orgId, projectId, changeId, decision, decider, reasoning = '' }) {
     const change = this.getChange(orgId, projectId, changeId);
     if (!change) throw new Error(`change not found: ${changeId}`);
+    if ((change.decisions || []).length >= MAX_CHANGE_DECISIONS) throw new Error('change decision limit exceeded');
     const policy = this.getPolicy(orgId, projectId);
     const deciderPrincipal = this.getPrincipal(decider);
     if (!deciderPrincipal) throw new Error(`principal not found: ${decider}`);
@@ -1029,6 +1031,7 @@ export class Source {
   async makeDecisionAsync({ orgId, projectId, changeId, decision, decider, reasoning = '' }) {
     const change = await this.getChangeAsync(orgId, projectId, changeId);
     if (!change) throw new Error(`change not found: ${changeId}`);
+    if ((change.decisions || []).length >= MAX_CHANGE_DECISIONS) throw new Error('change decision limit exceeded');
     const policy = await this.getPolicyAsync(orgId, projectId);
     const deciderPrincipal = await this.getPrincipalAsync(decider);
     if (!deciderPrincipal) throw new Error(`principal not found: ${decider}`);
@@ -1077,6 +1080,17 @@ export class Source {
   async getDecisionAsync(orgId, projectId, decisionId) {
     const rel = `${this._projectRel(orgId, projectId)}/decisions/${decisionId}.json`;
     return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.getDecision(orgId, projectId, decisionId);
+  }
+
+  async getDecisionManyAsync(orgId, projectId, decisionIds = []) {
+    if (!Array.isArray(decisionIds) || decisionIds.length > MAX_CHANGE_DECISIONS) throw new Error('change decisions exceed the bounded read limit');
+    const uniqueIds = [...new Set(decisionIds)];
+    const rel = `${this._projectRel(orgId, projectId)}/decisions`;
+    if (typeof this.store.readJsonManyAsync === 'function') {
+      const rows = await this.store.readJsonManyAsync(uniqueIds.map((id) => `${rel}/${id}.json`));
+      return rows.map((row) => row.json).filter(Boolean);
+    }
+    return Promise.all(uniqueIds.map((id) => this.getDecisionAsync(orgId, projectId, id))).then((items) => items.filter(Boolean));
   }
 
   // --- canonical state update (on accept) -------------------------------

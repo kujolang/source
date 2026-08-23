@@ -62,6 +62,9 @@ the same bounded concurrency.
 Missing optional session records in asynchronous Change submission also remain
 on the async store path rather than falling back to synchronous compatibility
 I/O.
+Change decision relationships are capped at 1,000 entries and decision
+listing uses one bounded bulk read, keeping review responses from creating a
+per-decision database round trip.
 Mutation-time limits also cap project repository membership at 10,000 entries
 and Change repository/evidence relationships at 1,000 entries, preventing a
 single tenant record from growing without bound.

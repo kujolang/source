@@ -1131,7 +1131,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
             if (g) return json(res, g.status, g.body);
             const c = await src.getChangeAsync(orgId, projectId, changeId);
             if (!c) return json(res, 404, { error: 'not found' });
-            const decisions = (await Promise.all((c.decisions || []).map((id) => src.getDecisionAsync(orgId, projectId, id)))).filter(Boolean);
+            const decisions = await src.getDecisionManyAsync(orgId, projectId, c.decisions || []);
             return json(res, 200, decisions);
           }
 

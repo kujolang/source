@@ -180,6 +180,19 @@ test('Postgres workflow records use one bounded bulk read', async () => {
   await assert.rejects(() => store.readJsonManyAsync(Array.from({ length: 1_001 }, (_, index) => `W${index}`)), /0-1000/);
 });
 
+test('decision reads use one bounded bulk read', async () => {
+  const { src, org, project } = freshSource();
+  let paths;
+  src.store.readJsonManyAsync = async (requested) => {
+    paths = requested;
+    return requested.map((path) => ({ path, json: { id: path.split('/').at(-1).replace('.json', '') } }));
+  };
+  const rows = await src.getDecisionManyAsync(org.id, project.id, ['D1', 'D1', 'D2']);
+  assert.deepEqual(rows.map((row) => row.id), ['D1', 'D2']);
+  assert.equal(paths.length, 2);
+  await assert.rejects(() => src.getDecisionManyAsync(org.id, project.id, Array.from({ length: 1_001 }, (_, index) => `D${index}`)), /bounded read/);
+});
+
 test('Postgres repository resolution uses a tenant-scoped indexed query', async () => {
   const store = Object.create(PostgresStore.prototype);
   let query = '';
