@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { createConnection } from 'node:net';
 import assert from 'node:assert/strict';
 import { KeyedSemaphore, Semaphore } from '../src/concurrency.js';
 import { RateLimiter } from '../src/ratelimit.js';
@@ -361,20 +362,48 @@ test('smart-HTTP Git remains responsive under concurrent requests', async () => 
   }
 });
 
-test('HTTP discovery withstands a thousand concurrent agent connections', async () => {
+test('HTTP discovery serves a thousand established concurrent connections', { timeout: 30_000 }, async () => {
   const { src } = freshSource();
-  const server = await startServer(src, { port: 0, maxConnections: 2_000 });
-  const url = `http://127.0.0.1:${server.address().port}/.well-known/source`;
+  const server = await startServer(src, { host: '127.0.0.1', port: 0, maxConnections: 2_000 });
+  const sockets = [];
+  let accepted = 0;
+  const allAccepted = new Promise((resolve) => {
+    server.on('connection', () => { if (++accepted === 1_000) resolve(); });
+  });
   let ticks = 0;
   const timer = setInterval(() => { ticks += 1; }, 1);
   try {
-    const responses = await Promise.all(Array.from({ length: 1_000 }, () => fetch(url)));
-    assert.ok(responses.every((response) => response.status === 200));
-    assert.ok(ticks > 0, 'event loop did not progress during the thousand-agent burst');
+    // Establish sockets in bounded batches to avoid measuring the host OS SYN
+    // backlog. All 1,000 sockets remain open before any request is sent.
+    for (let offset = 0; offset < 1_000; offset += 50) {
+      await Promise.all(Array.from({ length: 50 }, () => new Promise((resolve, reject) => {
+        const socket = createConnection({ host: '127.0.0.1', port: server.address().port });
+        sockets.push(socket);
+        socket.setTimeout(15_000, () => socket.destroy(new Error('discovery socket timeout')));
+        socket.once('error', reject);
+        socket.once('connect', resolve);
+      })));
+    }
+    await allAccepted;
+    assert.equal(await new Promise((resolve, reject) => server.getConnections((error, count) => error ? reject(error) : resolve(count))), 1_000);
+    const before = ticks;
+    const replies = sockets.map((socket) => new Promise((resolve, reject) => {
+      let reply = '';
+      socket.on('data', (chunk) => { reply += chunk.toString('utf8'); });
+      socket.once('error', reject);
+      socket.once('end', () => resolve(reply));
+    }));
+    for (const socket of sockets) socket.write('GET /.well-known/source HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n');
+    for (const reply of await Promise.all(replies)) {
+      assert.match(reply, /^HTTP\/1\.1 200 /);
+      assert.match(reply, /"api_version":"1"/);
+    }
+    assert.ok(ticks > before, 'event loop must progress while serving concurrent requests');
   } finally {
     clearInterval(timer);
+    for (const socket of sockets) socket.destroy();
     server.closeAllConnections?.();
-    server.close();
+    await new Promise((resolve) => server.close(resolve));
   }
 });
 
