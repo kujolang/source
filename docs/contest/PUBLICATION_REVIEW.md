@@ -1,7 +1,7 @@
 # Publication preparation
 
-The repository remains private. Changing visibility and submitting the entry are
-owner steps; nothing in this preparation publishes Source.
+Source is public as of 2026-10-13, following explicit owner authorization.
+The earlier review below preserves the scope and limitations of preparation.
 
 - MIT LICENSE was already tracked; the owner confirmed retaining MIT.
 - SiteKit's MIT notice and Departure Mono's OFL are retained. See
@@ -54,3 +54,26 @@ metadata before approving public exposure. If those records are unsuitable,
 choose a reviewed history rewrite or a clean publication repository; deleting
 files at HEAD does not remove historical disclosure. This bounded review is not
 an independent security assessment or a guarantee that no private data exists.
+
+## Publication executed — 2026-10-13
+
+The owner explicitly requested public visibility and merging PR #2. Both are
+complete; merge commit `996f9e4fbcf48af210e6932b794cbdae5e2d2467`. No history
+rewrite was performed. An anonymous HTTPS clone with credential helpers and
+global Git configuration disabled succeeded. Node 22.23.3 `npm ci`,
+`npm run demo:contest` and `npm run demo:hybrid` passed in that clone. The
+collaboration report records three clients, 177ms overlap and real conflict
+recovery; the hybrid remote remains emulated.
+
+Public visibility restored execution of GitHub Actions. Its first release gate
+exposed a database pagination bug: bulk hydration sorted full paths differently
+from the ID cursor order under the runner's database collation, counting 8,666
+rows from 5,000 Work items. Commit `64a559d180f9771d090e88bdef4e4c5c8928d356`
+preserves requested path order and adds a regression that fails before the fix.
+All 39 local concurrency tests pass.
+
+[CI run 38386336483](https://github.com/kujolang/source/actions/runs/38386336483)
+is green for both jobs: full deterministic suite, both rehearsals, audit,
+PostgreSQL 16 fleet, actual Docker build and two-container writer failover.
+This closes the CI/container gates; independent-host capacity and live Cloudflare
+verification remain separate. No official release or contest submission was made.

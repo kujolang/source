@@ -6,7 +6,7 @@ Workers/Artifacts account setup was deferred by the owner.
 
 ## Completed local preparation
 
-- [x] Establish the repository baseline, license and release status: private,
+- [x] Establish the repository baseline, license and release status: now public (2026-10-13),
   MIT, no official GitHub releases at review time.
 - [x] Implement authenticated Workers/Artifacts bootstrap, local tests and real
   remote push/clone smoke command (live execution is still blocked).
@@ -39,16 +39,17 @@ Workers/Artifacts account setup was deferred by the owner.
   create/push/independent clone. Then verify the implemented Source/Artifacts hybrid lifecycle live.
 - [ ] Re-run the collaboration flow against the actual cloud integration and
   preserve non-secret deployment/evidence/commit identifiers.
-- [ ] Restore GitHub Actions billing/spending availability and get remote checks
-  green; the workflow changes alone do not restore the account.
+- [x] Publish the repository and obtain green remote checks, including the
+  PostgreSQL fleet and container gates ([publication evidence](PUBLICATION_REVIEW.md)).
 - [x] Verify the local 5,000-request database profile at default concurrency 256
   with an isolated client process and an explicitly bounded connection pool.
 - [ ] Validate deployment cold-connect capacity from a separate host.
-- [ ] Run a real container build and two-container failover with a Docker daemon.
+- [x] Run a real container build and two-container failover in GitHub Actions.
 - [x] Complete local desktop and narrow-screen [browser QA](BROWSER_QA.md); fix
   repository tabs, open-work counts and page overflow.
-- [ ] Owner reviews public exposure, chooses the final entry commit, publishes
-  the repository, and verifies anonymous clone/run. Do not publish runtime data.
+- [x] Owner authorizes public exposure, publishes Source, merges PR #2 and
+  verifies anonymous clone/install/both rehearsals at `996f9e4`.
+- [ ] Freeze the final entry commit after live Cloudflare verification.
 - [ ] Record/export/review the final 5–10 minute video using genuine cloud footage.
 - [ ] Owner supplies contact/team/attendee details and confirms eligibility/terms.
 - [ ] Owner submits manually and retains the confirmation.

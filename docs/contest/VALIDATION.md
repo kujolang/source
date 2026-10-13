@@ -15,8 +15,8 @@ prepared on `feat/cloudflare-artifacts-bootstrap`, starting from main
 | Reviewed demo on Node 22.23.3 (2026-10-13) | Pass after lifecycle fixes; three clients overlap 712 ms and the actual conflict is recovered. |
 | Local PostgreSQL 14.20, 5,000 lifecycle participants | Pass at unchanged default concurrency 256, using an isolated client and bounded sockets. See database result below. |
 | Syntax lint and `git diff --check` | Pass; 76 JavaScript files syntax checked. |
-| GitHub Actions | Blocked before jobs start: billing/payment or spending-limit annotation. Local results are not remote CI success. |
-| Real Docker build and two-container failover | Not run: Docker daemon unavailable. Copied-layout check is not a container build. |
+| GitHub Actions | Green at `64a559d` after public visibility and pagination correction: [run 38386336483](https://github.com/kujolang/source/actions/runs/38386336483). |
+| Real Docker build and two-container failover | Both pass in the GitHub Actions release gate at `64a559d`; local Docker remains unavailable. |
 | Browser visual QA | Pass on 2026-10-13 with an available in-app browser: desktop and 390px viewport; count, repository tab and overflow fixes verified. See [bounded scope](BROWSER_QA.md). |
 | Workers + Artifacts live create/push/clone | Not run successfully: deploy returned Cloudflare 10403 requiring a paid plan; owner deferred setup. |
 
@@ -100,3 +100,9 @@ The updated Worker also bundles successfully with Wrangler 4.149.0
 No account activation, live deployment, public visibility change, remote container
 run or final video recording occurred. Submission prose and narration are drafts
 for owner review; the live segment is explicitly held for genuine evidence.
+
+## Public follow-up
+
+See [publication evidence](PUBLICATION_REVIEW.md#publication-executed--2026-10-13)
+for the anonymous clone, merge, collation regression and successful remote gates.
+Earlier unavailable/blocked results above describe their historical runs.
