@@ -306,6 +306,14 @@ deliveries require a provider signature and delivery ID and are replay-safe.
 Workflow dispatch is bounded to 1,000 jobs per event by default; operators can
 adjust the `maxWorkflowJobs` server option for a different controlled fan-out.
 
+## Cloudflare integration bootstrap
+
+The isolated [Workers and Artifacts bootstrap](cloudflare/artifacts-bootstrap/README.md)
+provides an authenticated repository-creation Worker and a Git push/clone smoke
+command. This is the first hybrid integration proof; the Source application
+lifecycle remains on Node/Postgres. Live Artifacts access must be verified
+separately from local tests.
+
 ## Architecture
 
 A **modular monolith** in Node.js (ESM), with a small native Postgres client
