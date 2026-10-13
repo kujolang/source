@@ -1,7 +1,8 @@
 # Source competition checklist
 
-Updated 2026-10-13. Local preparation is usable; **the contest submission is not
-ready** until the owner reviews the final video and completes the entry steps.
+Updated 2026-10-13. The technical submission package is ready and the owner has
+approved the final video. Required form details, eligibility/terms confirmation
+and manual submission remain.
 Workers Paid is active and the live bootstrap passes; the full three-client Source review, promotion and recovery flow also passes live.
 
 ## Completed local preparation
@@ -46,7 +47,6 @@ Workers Paid is active and the live bootstrap passes; the full three-client Sour
   PostgreSQL fleet and container gates ([publication evidence](PUBLICATION_REVIEW.md)).
 - [x] Verify the local 5,000-request database profile at default concurrency 256
   with an isolated client process and an explicitly bounded connection pool.
-- [ ] Validate deployment cold-connect capacity from a separate host.
 - [x] Run a real container build and two-container failover in GitHub Actions.
 - [x] Complete local desktop and narrow-screen [browser QA](BROWSER_QA.md); fix
   repository tabs, open-work counts and page overflow.
@@ -55,9 +55,12 @@ Workers Paid is active and the live bootstrap passes; the full three-client Sour
 - [x] Pin reviewed implementation `2184ece2b3b72a7eec0f352d4be84b1f73717b42`;
   live fixture provenance remains separately pinned in its report.
 - [x] Record and export the final 5–10 minute video with genuine cloud footage.
-- [ ] Owner watches/listens to the final video and approves it for submission.
+- [x] Owner approves the final video (2026-10-13: “the video looks good”).
 - [ ] Owner supplies contact/team/attendee details and confirms eligibility/terms.
 - [ ] Owner submits manually and retains the confirmation.
+
+Independent-host cold-connect capacity, broader security review and production
+certification remain roadmap work, not stated contest entry requirements.
 
 An official tagged release is optional for the contest; the reviewed submission
 commit is the required reproducibility reference. Do not create a release just
