@@ -28,12 +28,49 @@ path refuses repositories with existing branches, and credentials are absent fro
 Git configuration, command arguments and this evidence. The operator secret is
 installed in the Worker and held in the operator's local secret manager.
 
+## Full live Source lifecycle — verified
+
+The three-client live run passed on clean Source commit `10482dd`.
+The [lifecycle report](cloudflare-live-lifecycle.json) records the exact remote,
+commits, decisions, UI checks and audit events. Three separate scripted processes
+overlap by 1,290 ms. Each self-approval attempt returns HTTP 403. Source executes
+tests and diff checks, records scripted maintainer decisions, and promotes to
+live Artifacts. The seed cannot promote before acceptance; direct deletion of
+the local canonical branch is rejected.
+
+The live run deliberately throws after one successful remote push. Work remains
+accepted. A retry confirms the remote and closes Work without a second push.
+Stale proposals are rejected by the live bridge; documentation rebases cleanly,
+while settings.json produces a real conflict. The revised proposal is checked,
+accepted and promoted. An independent cloud clone matches commit
+`01ebfe8c6c5d550faa87fe67410c63974e42eade`, dark theme, page size 20 and updated
+documentation. All three client Work items close.
+
+### Reproduce
+
+Provide `SOURCE_ARTIFACTS_WORKER_URL` and `SOURCE_BOOTSTRAP_SECRET` privately, then:
+
+```sh
+npm ci
+npm run demo:cloudflare
+```
+
+Each run creates a new review fixture and retains it in the cloud. Private local
+state is under ignored `.contest-demo/run-*`; `live-creation.json` identifies the
+remote even if a later step fails. Inspect that repository before retrying an
+uncertain creation. The operator secret is excluded from forked client environments.
+Clients stage Git locally and use Source's scoped HTTP API for lifecycle actions.
+This does not measure public-internet contributor transport or hosted UI capacity.
+
 ## Remaining scope
 
-This proves the bootstrap transport, not Source's complete hosted lifecycle.
-Accepted-change promotion, stale/concurrent updates and interrupted-operation
-recovery still need live verification. Source remains a local Node application;
-this deployment does not host its UI or Postgres. Record the genuine cloud segment
-only after that lifecycle proof, then assemble the final 5–10 minute contest video.
-No submission, official release, subscription cancellation or fixture deletion
-was performed. Workers Paid continues until the owner cancels it.
+The Source Node application and its JSON store run locally; this is not a hosted
+UI/Postgres deployment. Contributors and maintainer decisions are scripted, not
+LLM-generated or human-reviewed. The lost acknowledgement is injected after a real
+push; it is not an observed Cloudflare outage. Concurrent remote-writer lease races
+remain covered by local contract tests, not by this sequential promotion rehearsal.
+
+Production load, independent security review, final owner video review and manual
+contest submission remain separate gates. No submission, official release,
+subscription cancellation or fixture deletion was performed. Workers Paid
+continues until the owner cancels it.

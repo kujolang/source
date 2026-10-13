@@ -18,12 +18,9 @@ and historical milestones; this file records current contest readiness.
 
 ## Required before contest entry
 
-1. Paid access, Worker deployment and real create/push/clone now pass
-   ([evidence](CLOUDFLARE_LIVE.md)). Verify the implemented Source review and
-   canonical Git flow against the real Artifacts service; local emulation is insufficient.
-2. Repeat the three-client flow against that integration and retain genuine cloud
-   evidence. Demonstrate any claimed LLM-agent behavior with real agents; the current
-   deterministic clients are explicitly scripted and are not an LLM demo.
+1. Paid access, bootstrap and full three-client live review/promotion now pass
+   ([evidence](CLOUDFLARE_LIVE.md)). Preserve the report with the entry commit.
+2. Keep scripted-client and simulated-review labels. No LLM-agent behavior is claimed.
 3. Replace the review cut’s local-cloud segment with genuine verified footage,
    freeze the final entry commit, fill owner/team details and submit manually.
 

@@ -2,8 +2,7 @@
 
 Updated 2026-10-13. Local preparation is usable; **the contest submission is not
 ready** until the mandatory live Cloudflare integration and owner steps are done.
-Workers Paid is active and the live bootstrap passes; the complete Source review
-and concurrent collaboration flow still needs live verification.
+Workers Paid is active and the live bootstrap passes; the full three-client Source review, promotion and recovery flow also passes live.
 
 ## Completed local preparation
 
@@ -42,8 +41,8 @@ and concurrent collaboration flow still needs live verification.
 
 - [x] Owner enables paid Workers/Artifacts; deploy and verify actual remote
   create/push/independent clone ([evidence](CLOUDFLARE_LIVE.md)).
-- [ ] Verify the implemented Source/Artifacts review and promotion lifecycle live.
-- [ ] Re-run the collaboration flow against the actual cloud integration and
+- [x] Verify the implemented Source/Artifacts review and promotion lifecycle live.
+- [x] Re-run the collaboration flow against the actual cloud integration and
   preserve non-secret deployment/evidence/commit identifiers.
 - [x] Publish the repository and obtain green remote checks, including the
   PostgreSQL fleet and container gates ([publication evidence](PUBLICATION_REVIEW.md)).

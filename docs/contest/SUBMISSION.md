@@ -34,12 +34,13 @@ emulating the Artifacts binding and remote service. It proves local integration
 and recovery behavior; it does not prove a deployed Cloudflare integration.
 Workers Paid is active. The deployed Worker has passed actual repository creation,
 Git push and independent clone with matching commit/content ([live evidence](CLOUDFLARE_LIVE.md)).
-The combined Source review and concurrent collaboration flow is still unverified
-live. See [architecture and runbook](HYBRID.md).
+The combined three-client Source review and promotion flow also passes live,
+including stale proposals, conflict resolution and injected lost-acknowledgement
+recovery. Source itself runs locally with a JSON store; Workers and canonical Git
+are live on Cloudflare. See [architecture and runbook](HYBRID.md).
 
-**Before entry:** replace this paragraph only with the exact deployed topology,
-verified URLs and successful remote behavior. Until then this mandatory criterion
-is unfinished and the project is not ready to submit.
+The linked report pins the tested source commit and cloud Git result. Owner
+review and manual submission remain pending.
 
 ## Why this approach
 

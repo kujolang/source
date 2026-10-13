@@ -1,8 +1,8 @@
 # Source / Workers / Artifacts hybrid
 
 The [live bootstrap](CLOUDFLARE_LIVE.md) now passes Worker repository creation,
-Git push and independent clone. The complete Source review/promotion lifecycle
-and recovery scenarios remain verified locally only. The local
+Git push and independent clone. The full three-client Source review/promotion lifecycle, stale proposals, real
+conflict and injected lost-acknowledgement recovery now pass live too. The local
 contract rehearsal uses real Source services, Worker handlers and Git processes,
 but substitutes a local bare repository for the Artifacts service. It cannot
 prove Cloudflare availability, Git compatibility, latency or deployment capacity.
@@ -145,5 +145,4 @@ API contract checked against Cloudflare's
 [Workers binding reference](https://developers.cloudflare.com/artifacts/api/workers-binding/)
 on 2026-10-13: `get()` returns a disposable capability, `info()` supplies metadata,
 and `createToken()` returns `plaintext` plus `expiresAt`. Live compatibility is
-verified for bootstrap creation, token minting, push and clone; the full lifecycle
-is still unverified live.
+verified for bootstrap creation, token minting, push and clone; the full three-client lifecycle also passes live (see the linked report).
