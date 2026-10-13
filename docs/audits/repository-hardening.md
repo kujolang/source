@@ -4,7 +4,7 @@
 
 - Repository: https://github.com/kujolang/source; branch: `main`.
 - Starting revision: `71b2d9574962d26cdcd415574f5158a7afd6914d`.
-- Ending implementation revision: `d94a2e8` (this report and accompanying operational documentation follow it).
+- Ending implementation/test revision: `289f8fee9342c487cbf4be5e5d3bcabdcb2fcc2d` (the final verification receipt is a documentation-only follow-up).
 - Purpose: Git-backed Work → Session → Change → Evidence → Decision → Canonical State collaboration, through HTTP, browser and CLI interfaces.
 - Integrations: Node.js, Git smart HTTP, JSON/SQLite/PostgreSQL storage, `pg`, `js-yaml`, Kujo Eval artifacts, isolated workflow containers, a secret-provider adapter, Cloudflare Workers and Artifacts.
 - Environment: macOS, Node 26.7.0, PostgreSQL 14 on an isolated local test port. CI uses Node 22 and PostgreSQL 16. No live deployment, credentials or external repositories were changed.
@@ -151,3 +151,16 @@ regression: its generic rejection assertion accidentally depended on the local
 container runtime being unavailable. The corrected test injects an environment
 read failure, checks that exact error and proves no runtime was spawned and no
 slot retained. It neither launches a real container nor weakens the assertion.
+
+### Completed CI receipt
+
+[Run 38460355433](https://github.com/kujolang/source/actions/runs/38460355433)
+passed on `289f8fee9342c487cbf4be5e5d3bcabdcb2fcc2d`: both `deterministic` and
+`kujo-release-gate` succeeded. In addition to the full test suite and demos,
+CI ran `npm run test:scale`, `docker build --tag source:local-audit .`,
+`npm run test:postgres` with 5,000 clients, and `npm run test:container` for
+two-container writer failover. Thus container verification is complete in CI,
+although the local Docker daemon remains unavailable. GitHub reported an
+upcoming runner-image migration and deprecated Node 20 action runtimes forced
+to Node 24; pinned checkout/setup actions still passed. Updating those action
+pins is a routine P2 compatibility follow-up, not a test failure.
