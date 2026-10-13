@@ -6,3 +6,7 @@ npm-debug.log
 tests
 docs
 *.md
+
+.contest-demo
+.contest-results
+cloudflare
