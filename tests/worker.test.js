@@ -225,3 +225,19 @@ test('worker shutdown interrupts an outstanding queue wakeup wait', async () => 
   await waitFor(() => typeof waiting === 'function');
   assert.equal(await worker.stop({ timeoutMs: 100 }), true);
 });
+
+test('shutdown cancels idle polling and outage backoff timers', async () => {
+  for (const outage of [false, true]) {
+    let called;
+    const started = new Promise((resolve) => { called = resolve; });
+    const worker = new SourceWorker({
+      queue: { claim: async () => { called(); if (outage) throw new Error('offline'); return []; } },
+      workerId: 'cancel-wait', pollMs: 60000, errorBackoffMs: 60000, jitterRatio: 0,
+    });
+    worker.start();
+    await started;
+    await new Promise(setImmediate);
+    assert.equal(await worker.stop({ timeoutMs: 1000 }), true);
+    assert.equal(worker._idleWaiters.size, 0);
+  }
+});

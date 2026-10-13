@@ -173,33 +173,45 @@ export class HttpSecretProvider {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     timer.unref?.();
-    let response;
     try {
-      response = await this.fetchImpl(this.endpoint, {
-        method: 'POST',
-        headers: { accept: 'application/json', 'content-type': 'application/json', authorization: `Bearer ${token}` },
-        body: JSON.stringify({ identity, references, expiresAt, leaseId, jobId: String(job?.id || '') }),
-        signal: controller.signal,
-      });
-    } catch {
-      throw new Error('secret provider request failed');
-    } finally {
-      clearTimeout(timer);
-    }
-    if (!response?.ok) throw new Error(`secret provider rejected lease (${Number(response?.status) || 0})`);
-    let body;
-    try {
-      const text = await response.text();
-      if (text.length > 1 * 1024 * 1024) throw new Error('response too large');
-      body = JSON.parse(text);
-    } catch {
-      throw new Error('secret provider response is invalid');
-    }
-    if (!body || typeof body !== 'object' || Array.isArray(body) || !body.env || typeof body.env !== 'object' || Array.isArray(body.env)) throw new Error('secret provider response is invalid');
-    const providerExpiry = Date.parse(body.expiresAt);
-    const requestedExpiry = Date.parse(expiresAt);
-    if (!Number.isFinite(providerExpiry) || providerExpiry <= Date.now() || providerExpiry > requestedExpiry) throw new Error('secret provider lease expiry is invalid');
-    return { env: body.env };
+      let response;
+      try {
+        response = await this.fetchImpl(this.endpoint, {
+          method: 'POST', redirect: 'error',
+          headers: { accept: 'application/json', 'content-type': 'application/json', authorization: `Bearer ${token}` },
+          body: JSON.stringify({ identity, references, expiresAt, leaseId, jobId: String(job?.id || '') }),
+          signal: controller.signal,
+        });
+      } catch { throw new Error('secret provider request failed'); }
+      if (!response?.ok) {
+        await response?.body?.cancel();
+        throw new Error(`secret provider rejected lease (${Number(response?.status) || 0})`);
+      }
+      let body;
+      try {
+        const reader = response.body.getReader();
+        const chunks = [];
+        let bytes = 0;
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            bytes += value.byteLength;
+            if (bytes > 1024 * 1024) {
+              await reader.cancel();
+              throw new Error('response too large');
+            }
+            chunks.push(value);
+          }
+        } finally { reader.releaseLock(); }
+        body = JSON.parse(Buffer.concat(chunks, bytes).toString('utf8'));
+      } catch { throw new Error('secret provider response is invalid'); }
+      if (!body || typeof body !== 'object' || Array.isArray(body) || !body.env || typeof body.env !== 'object' || Array.isArray(body.env)) throw new Error('secret provider response is invalid');
+      const providerExpiry = Date.parse(body.expiresAt);
+      const requestedExpiry = Date.parse(expiresAt);
+      if (!Number.isFinite(providerExpiry) || providerExpiry <= Date.now() || providerExpiry > requestedExpiry) throw new Error('secret provider lease expiry is invalid');
+      return { env: body.env };
+    } finally { clearTimeout(timer); }
   }
 
   async checkHealth() {
@@ -210,10 +222,11 @@ export class HttpSecretProvider {
     timer.unref?.();
     try {
       const response = await this.fetchImpl(this.healthEndpoint, {
-        method: 'GET',
+        method: 'GET', redirect: 'error',
         headers: { accept: 'application/json', authorization: `Bearer ${token}` },
         signal: controller.signal,
       });
+      await response?.body?.cancel();
       if (!response?.ok) throw new Error(`secret provider health rejected (${Number(response?.status) || 0})`);
       return true;
     } catch {
@@ -232,11 +245,12 @@ export class HttpSecretProvider {
     timer.unref?.();
     try {
       const response = await this.fetchImpl(new URL(`${encodeURIComponent(leaseId)}/revoke`, this.revokeEndpoint), {
-        method: 'POST',
+        method: 'POST', redirect: 'error',
         headers: { accept: 'application/json', authorization: `Bearer ${token}`, 'content-type': 'application/json' },
         body: JSON.stringify({ reason: typeof reason === 'string' ? reason.slice(0, 240) : 'revoked' }),
         signal: controller.signal,
       });
+      await response?.body?.cancel();
       if (!response?.ok) throw new Error(`secret provider revocation rejected (${Number(response?.status) || 0})`);
       return true;
     } catch {
@@ -479,9 +493,9 @@ export class IsolatedActionRunner {
 
   async run({ steps }, { workspace, env = {} } = {}) {
     const resolvedSteps = await this.resolveSteps(steps);
+    const safeEnv = safeEnvironment(env);
     let releaseSlot = await this.slots.acquire();
     if (!releaseSlot) throw new Error('isolated runner capacity exhausted');
-    const safeEnv = safeEnvironment(env);
     const containerName = `source-action-${process.pid}-${Date.now()}-${randomBytes(6).toString('hex')}`;
     let child;
     try {
@@ -520,6 +534,7 @@ export class IsolatedActionRunner {
       }, this.timeoutMs);
       timer.unref?.();
       const collect = (target, chunk) => {
+        if (settled) return;
         outputBytes += chunk.length;
         if (outputBytes > this.maxOutputBytes && !settled) {
           settled = true;
@@ -571,8 +586,11 @@ export function createGitHubActionsHandler({ runner, workspaceForJob, workspaceM
       const result = await runner.run({ steps: parameters.steps }, { workspace, env });
       return redactSecretOutput(result, env);
     } finally {
-      if (leaseId && secretBroker?.revokeLease) await secretBroker.revoke(leaseId);
-      if (workspaceManager) await workspaceManager.release(job);
+      try {
+        if (leaseId && secretBroker?.revokeLease) await secretBroker.revoke(leaseId);
+      } finally {
+        if (workspaceManager) await workspaceManager.release(job);
+      }
     }
   };
 }

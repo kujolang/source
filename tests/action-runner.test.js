@@ -220,11 +220,7 @@ test('HTTPS secret provider adapter rotates auth and enforces bounded lease resp
     token: async () => `rotated-token-${++tokenCalls}`,
     fetchImpl: async (url, options) => {
       request = { url: String(url), options };
-      return {
-        ok: true,
-        status: 200,
-        text: async () => JSON.stringify({ env: { TOKEN: 'provider-secret' }, expiresAt: new Date(Date.now() + 1_000).toISOString() }),
-      };
+      return Response.json({ env: { TOKEN: 'provider-secret' }, expiresAt: new Date(Date.now() + 1_000).toISOString() });
     },
   });
   const expiresAt = new Date(Date.now() + 2_000).toISOString();
@@ -242,7 +238,7 @@ test('HTTPS secret provider adapter rotates auth and enforces bounded lease resp
   assert.throws(() => new HttpSecretProvider({ baseUrl: 'http://secrets.example.test', token: 'x' }), /HTTPS/);
   const broker = createHttpSecretBroker({
     baseUrl: 'https://secrets.example.test', token: 'x', identity: 'agent-1', audit: () => {},
-    fetchImpl: async () => ({ ok: true, text: async () => JSON.stringify({ env: {}, expiresAt: new Date(Date.now() + 1_000).toISOString() }) }),
+    fetchImpl: async () => Response.json({ env: {}, expiresAt: new Date(Date.now() + 1_000).toISOString() }),
   });
   assert.deepEqual(await broker.get({ parameters: { secretRefs: [] } }, { id: 'J-http-broker' }), {});
 });
@@ -268,4 +264,42 @@ test('GitHub handler releases managed workspaces after runner failure', async ()
   });
   await assert.rejects(handler({ parameters: { steps: [{ run: 'false' }] } }, { id: 'J2' }), /runner failed/);
   assert.equal(manager.active.size, 0);
+});
+
+test('revocation failure still releases the action workspace', async () => {
+  let released = false;
+  const handler = createGitHubActionsHandler({
+    runner: { run: async () => ({ ok: true }) },
+    workspaceManager: { acquire: async () => '/workspace/job', release: async () => { released = true; } },
+    secretBroker: { get: async () => ({}), issue: async () => ({ env: {}, leaseId: 'a'.repeat(48) }), revokeLease: true, revoke: async () => { throw new Error('provider unavailable'); } },
+  });
+  await assert.rejects(handler({ parameters: { steps: [{ run: 'true' }] } }, { id: 'J1' }), /provider unavailable/);
+  assert.equal(released, true);
+});
+
+test('secret provider stops reading oversized bodies', async () => {
+  let cancelled = false;
+  let pulls = 0;
+  const provider = new HttpSecretProvider({ baseUrl: 'https://secrets.example.test', token: 'fixture', fetchImpl: async () => new Response(new ReadableStream({
+    pull(controller) { if (++pulls > 3) controller.close(); else controller.enqueue(new Uint8Array(1024 * 1024 + 1)); },
+    cancel() { cancelled = true; },
+  })) });
+  await assert.rejects(provider.resolve({ expiresAt: new Date(Date.now() + 10000).toISOString() }), /response is invalid/);
+  assert.equal(cancelled, true);
+});
+
+test('secret provider timeout covers a stalled response body', { timeout: 3000 }, async (t) => {
+  const { createServer } = await import('node:http');
+  const server = createServer((_req, res) => { res.writeHead(200, { 'content-type': 'application/json' }); res.write('{'); });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  const provider = new HttpSecretProvider({ baseUrl: `http://127.0.0.1:${server.address().port}`, token: 'fixture', timeoutMs: 100, allowInsecureLocalhost: true });
+  await assert.rejects(provider.resolve({ expiresAt: new Date(Date.now() + 10000).toISOString() }), /response is invalid/);
+});
+
+
+test('rejected runner environment does not consume execution capacity', async () => {
+  const runner = new IsolatedActionRunner({ image: 'kujo/runner:latest', workspaceRoot: '/srv/workspaces', maxActive: 1 });
+  await assert.rejects(runner.run({ steps: [{ run: 'true' }] }, { workspace: '/srv/workspaces/job', env: { NODE_OPTIONS: '--inspect' } }));
+  assert.equal(runner.slots.active, 0);
 });

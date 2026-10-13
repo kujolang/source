@@ -84,6 +84,8 @@ export function gitHttpBackend({
   contentLength = null,
   abortSignal = null,
   timeoutMs = 120_000,
+  maxStderrBytes = 1024 * 1024,
+  spawnProcess = spawn,
 }) {
   return new Promise((resolve, reject) => {
     const env = {
@@ -103,10 +105,12 @@ export function gitHttpBackend({
     // `git http-backend` copies HTTP_GIT_PROTOCOL into GIT_PROTOCOL.
     if (headers['git-protocol']) env.HTTP_GIT_PROTOCOL = headers['git-protocol'];
 
-    const child = spawn('git', [...(hooksPath ? ['-c', `core.hooksPath=${hooksPath}`] : []), 'http-backend'], { env, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawnProcess('git', [...(hooksPath ? ['-c', `core.hooksPath=${hooksPath}`] : []), 'http-backend'], { env, stdio: ['pipe', 'pipe', 'pipe'] });
     const stdout = [];
     const stderr = [];
     let outputBytes = 0;
+    let stderrBytes = 0;
+    let onInputData;
     let headerBuffer = Buffer.alloc(0);
     let streamed = false;
     let settled = false;
@@ -123,16 +127,26 @@ export function gitHttpBackend({
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
+      cleanup();
       stream?.onError?.(error);
       child.kill('SIGTERM');
       reject(error);
     };
 
+    const onAbort = () => fail(new Error('Git request was aborted'));
+    const cleanup = () => {
+      abortSignal?.removeEventListener('abort', onAbort);
+      if (input) {
+        input.unpipe(child.stdin);
+        if (onInputData) input.removeListener('data', onInputData);
+        input.removeListener('error', fail);
+      }
+    };
+    child.stdin.on('error', fail);
     if (abortSignal?.aborted) {
       fail(new Error('Git request was aborted'));
       return;
     }
-    const onAbort = () => fail(new Error('Git request was aborted'));
     abortSignal?.addEventListener('abort', onAbort, { once: true });
     timeout = setTimeout(() => fail(new Error('Git request timed out')), Math.max(1, timeoutMs));
     timeout.unref?.();
@@ -152,6 +166,7 @@ export function gitHttpBackend({
     };
 
     child.stdout.on('data', (c) => {
+      if (settled) return;
       outputBytes += c.length;
       if (outputBytes > maxOutputBytes) {
         fail(new Error('Git response exceeded configured output limit'));
@@ -169,13 +184,18 @@ export function gitHttpBackend({
       }
       emitBody(c);
     });
-    child.stderr.on('data', (c) => stderr.push(c));
+    child.stderr.on('data', (c) => {
+      if (settled) return;
+      stderrBytes += c.length;
+      if (stderrBytes > maxStderrBytes) return fail(new Error('Git stderr exceeded configured output limit'));
+      stderr.push(c);
+    });
     child.on('error', fail);
     child.on('close', (code) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
-      abortSignal?.removeEventListener('abort', onAbort);
+      cleanup();
       const errorText = Buffer.concat(stderr).toString('utf8');
       if (stream) {
         if (!streamed && headerBuffer.length) {
@@ -194,14 +214,16 @@ export function gitHttpBackend({
       resolve(parsed);
     });
     if (input) {
-      input.on('data', (chunk) => {
+      onInputData = (chunk) => {
         inputBytes += chunk.length;
         if (inputBytes > maxInputBytes) {
           input.unpipe(child.stdin);
           input.destroy();
           fail(new Error('Git request body exceeded configured input limit'));
         }
-      });
+      };
+      input.on('data', onInputData);
+      input.on('error', fail);
       input.pipe(child.stdin);
     } else {
       if (body) child.stdin.write(body);

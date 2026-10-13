@@ -1,7 +1,5 @@
 // Bounded worker runtime for durable Source jobs.
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
 export class SourceWorker {
   constructor({ queue, handlers = {}, workerId, concurrency = 8, leaseMs = 30_000, pollMs = 1_000, maxPollMs = 10_000, retryDelayMs = 1_000, maxAttempts = 5, projectBurst = 8, errorBackoffMs = 1_000, jitterRatio = 0.2, random = Math.random, handlerTimeoutMs = 15 * 60_000, shutdownTimeoutMs = 30_000, onError = null } = {}) {
     if (!queue) throw new Error('queue is required');
@@ -79,7 +77,7 @@ export class SourceWorker {
         failures += 1;
         this.counters.errors += 1;
         this._reportError(error);
-        await sleep(this._jitteredDelay(Math.min(60_000, this.errorBackoffMs * (2 ** Math.min(failures - 1, 6)))));
+        await this._wait(this._jitteredDelay(Math.min(60_000, this.errorBackoffMs * (2 ** Math.min(failures - 1, 6)))));
         continue;
       }
       if (!jobs.length) {
@@ -93,7 +91,7 @@ export class SourceWorker {
           await Promise.race([this.queue.waitForWork({ timeoutMs: delay }), stopWait]).catch(() => {});
           this._idleWaiters.delete(wakeStopWait);
         } else {
-          await sleep(delay);
+          await this._wait(delay);
         }
         idlePollMs = Math.min(this.maxPollMs, idlePollMs * 2);
         continue;
@@ -102,6 +100,19 @@ export class SourceWorker {
       idlePollMs = this.pollMs;
       await Promise.all(jobs.map((job) => this._runJob(job)));
     }
+  }
+
+  _wait(ms) {
+    if (this.stopping) return Promise.resolve();
+    return new Promise((resolve) => {
+      const finish = () => {
+        clearTimeout(timer);
+        this._idleWaiters.delete(finish);
+        resolve();
+      };
+      const timer = setTimeout(finish, ms);
+      this._idleWaiters.add(finish);
+    });
   }
 
   async _runJob(job) {

@@ -168,19 +168,16 @@ export function readEvalArtifacts(outputDir) {
       throw e;
     }
   };
-  const parse = (name) => {
-    const raw = read(name);
-    return raw == null ? null : JSON.parse(raw);
-  };
+  const summaryRaw = read('summary.json');
+  const manifestRaw = read('artifact-manifest.json');
+  const lastRunRaw = read('last_run.json');
+  const parse = (raw) => raw == null ? null : JSON.parse(raw);
   return {
-    summary: parse('summary.json'),
-    summaryRaw: read('summary.json'),
-    manifest: parse('artifact-manifest.json'),
-    manifestRaw: read('artifact-manifest.json'),
-    lastRun: parse('last_run.json'),
-    lastRunRaw: read('last_run.json'),
-    lastFailures: parse('last_failures.json'),
-    cliSummary: parse('cli-summary.json'),
+    summary: parse(summaryRaw), summaryRaw,
+    manifest: parse(manifestRaw), manifestRaw,
+    lastRun: parse(lastRunRaw), lastRunRaw,
+    lastFailures: parse(read('last_failures.json')),
+    cliSummary: parse(read('cli-summary.json')),
   };
 }
 

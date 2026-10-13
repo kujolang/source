@@ -202,3 +202,20 @@ test('normalizes the real eval/eval_results artifact when present', (t) => {
   assert.equal(d.validity, summary.status === 'PASS' ? 'valid' : 'invalid');
   assert.equal(d.result.status, summary.status);
 });
+
+test('Eval parsed evidence and retained raw proof come from one read per artifact', () => {
+  const original = fs.readFileSync;
+  const calls = new Map();
+  fs.readFileSync = (file) => {
+    const name = path.basename(file);
+    calls.set(name, (calls.get(name) || 0) + 1);
+    return JSON.stringify({ artifact: name, version: calls.get(name) });
+  };
+  try {
+    const result = readEvalArtifacts('/test-eval-artifacts');
+    assert.deepEqual(result.summary, JSON.parse(result.summaryRaw));
+    assert.deepEqual(result.manifest, JSON.parse(result.manifestRaw));
+    assert.deepEqual(result.lastRun, JSON.parse(result.lastRunRaw));
+    assert.equal([...calls.values()].reduce((sum, count) => sum + count, 0), 5);
+  } finally { fs.readFileSync = original; }
+});
