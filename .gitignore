@@ -9,3 +9,20 @@ node_modules/
 
 # Local engineering run archives
 .loop-engineering/
+
+# Local credentials and Cloudflare development state
+.env
+.env.*
+!.env.example
+!.env.*.example
+.dev.vars
+.dev.vars.*
+.wrangler/
+
+# Generated test output and editor/OS files
+coverage/
+.nyc_output/
+*.log
+.DS_Store
+*.swp
+*.swo

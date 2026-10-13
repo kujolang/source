@@ -13,3 +13,14 @@ cloudflare
 
 # Local engineering run archives
 .loop-engineering/
+
+# Keep local credentials and generated output out of build contexts
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+.wrangler
+coverage
+.nyc_output
+*.log
+.DS_Store
