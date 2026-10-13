@@ -23,10 +23,14 @@ binding.
 where the operator manages a certificate directly.
 
 ```bash
-source serve --host 0.0.0.0 --port 443 \
+source --store postgres serve --host 0.0.0.0 --port 8443 --writer-lease \
   --tls-key /etc/source/tls/privkey.pem \
   --tls-cert /etc/source/tls/fullchain.pem
 ```
+
+Set `SOURCE_DATABASE_URL` and shared durable Git storage before exposing this listener.
+The server binds `127.0.0.1` when `--host` is omitted. An explicit public bind
+requires the production safeguards described below.
 
 The Git transport and the API are served over the same HTTPS listener; no
 separate configuration is required.

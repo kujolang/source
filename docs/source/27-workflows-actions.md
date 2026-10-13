@@ -108,4 +108,6 @@ For a standard HTTPS deployment, `createHttpSecretBroker` / `HttpSecretProvider`
 POSTs identity and secret references to the provider over TLS, obtains a fresh
 rotating bearer token per lease, rejects oversized or overlong responses, and
 requires the provider to return an expiry no later than the requested lease.
-against the operator's secret system.
+The timeout covers the response body as well as headers; the body limit is 1 MiB.
+Redirects are rejected. Injected fetch implementations must return a standard
+Response with a readable body. Workspace cleanup still runs if lease revocation fails.
