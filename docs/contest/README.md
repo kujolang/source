@@ -45,7 +45,8 @@ Workers/Artifacts account setup was deferred by the owner.
   with an isolated client process and an explicitly bounded connection pool.
 - [ ] Validate deployment cold-connect capacity from a separate host.
 - [ ] Run a real container build and two-container failover with a Docker daemon.
-- [ ] Complete visual browser QA (browser control was unavailable here).
+- [x] Complete local desktop and narrow-screen [browser QA](BROWSER_QA.md); fix
+  repository tabs, open-work counts and page overflow.
 - [ ] Owner reviews public exposure, chooses the final entry commit, publishes
   the repository, and verifies anonymous clone/run. Do not publish runtime data.
 - [ ] Record/export/review the final 5–10 minute video using genuine cloud footage.

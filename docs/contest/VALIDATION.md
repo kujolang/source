@@ -17,7 +17,7 @@ prepared on `feat/cloudflare-artifacts-bootstrap`, starting from main
 | Syntax lint and `git diff --check` | Pass; 76 JavaScript files syntax checked. |
 | GitHub Actions | Blocked before jobs start: billing/payment or spending-limit annotation. Local results are not remote CI success. |
 | Real Docker build and two-container failover | Not run: Docker daemon unavailable. Copied-layout check is not a container build. |
-| Browser visual QA | Not run: no controllable browser surface available. Authenticated UI routes and assets were checked over HTTP. |
+| Browser visual QA | Pass on 2026-10-13 with an available in-app browser: desktop and 390px viewport; count, repository tab and overflow fixes verified. See [bounded scope](BROWSER_QA.md). |
 | Workers + Artifacts live create/push/clone | Not run successfully: deploy returned Cloudflare 10403 requiring a paid plan; owner deferred setup. |
 
 The three default skips were the real Spec dogfood fixture, real Eval artifact,

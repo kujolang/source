@@ -36,8 +36,9 @@ host-to-host deployment sizing and cold-connect capacity remain separate work.
 The Cloudflare package audit reports no vulnerabilities, and its unit tests are
 part of the default test run. No Cloudflare login, account change, deployment,
 repository creation or remote smoke operation was attempted during this review.
-Docker still has no running daemon, and browser inventory still exposes no
-controllable surfaces, so those environment-dependent gates remain open.
+At this earlier review, Docker and browser control were unavailable. The browser
+gate was subsequently completed; see [browser QA](BROWSER_QA.md). Docker remains
+unavailable.
 
 ## Hybrid follow-up review
 
@@ -53,5 +54,5 @@ preserves the historical exposure decision for the owner. The submission draft,
 architecture runbook and full narration distinguish local emulation from live
 verification. See [VALIDATION.md](VALIDATION.md) for the 224-test suite, final HTTP
 regressions, both rehearsals and the repeated default PostgreSQL profile.
-Live Cloudflare, remote CI, container failover and browser visual review remain
-outside these local results.
+Live Cloudflare, remote CI and container failover remain outside these local
+results. The later [browser review](BROWSER_QA.md) closes the local visual gate.

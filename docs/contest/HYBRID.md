@@ -135,8 +135,7 @@ clone independently and compare commits/content. Retain non-secret Worker URL,
 repository name, entry source commit, accepted commit IDs and verification report.
 Re-run the concurrent collaboration rehearsal against the real integration before
 claiming that combined cloud behavior. Record genuine footage only after those
-checks pass. Account activation, deployment, remote CI, Docker failover, browser
-QA, public exposure and manual entry remain separate gates.
+checks pass. Account activation, deployment, remote CI, Docker failover, public exposure and manual entry remain separate gates.
 
 API contract checked against Cloudflare's
 [Workers binding reference](https://developers.cloudflare.com/artifacts/api/workers-binding/)
