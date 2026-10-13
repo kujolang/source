@@ -342,7 +342,12 @@ test('Postgres async lifecycle and HTTP burst remain correct under a configurabl
       while (true) {
         const index = nextRequest++;
         if (index >= agentCount) return;
-        responseStatuses[index] = (await fetch(url)).status;
+        const response = await fetch(url).catch((error) => {
+          throw new Error(`discovery request ${index} failed: ${error.cause?.code || error.message}`, { cause: error });
+        });
+        // Consume bodies so the HTTP client can reuse its connections.
+        await response.arrayBuffer();
+        responseStatuses[index] = response.status;
       }
     }
     await Promise.all(Array.from({ length: httpConcurrency }, requestWorker));
