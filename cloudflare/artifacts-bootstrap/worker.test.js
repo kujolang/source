@@ -44,3 +44,31 @@ test('upstream errors are redacted and not retried', async () => {
   assert.equal(response.status, 502); assert.equal(calls, 1);
   assert.ok(!(await response.text()).includes('secret-token'));
 });
+
+test('mints a short-lived operator credential and disposes the repository capability', async () => {
+  const calls = [];
+  const repo = {
+    async info() { return { name: 'source-hybrid-one', remote: 'https://account.artifacts.cloudflare.net/git/source-bootstrap/source-hybrid-one.git' }; },
+    async createToken(...args) { calls.push(args); return { plaintext: 'art_v1_fixture', expiresAt: 12345 }; },
+    [Symbol.dispose]() { calls.push('disposed'); },
+  };
+  const request = new Request('https://worker.test/repos/source-hybrid-one/token', { method: 'POST', headers: { Authorization: `Bearer ${secret}` } });
+  const response = await worker.fetch(request, { SOURCE_BOOTSTRAP_SECRET: secret, ARTIFACTS: { async get(name) { calls.push(name); return repo; } } });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  assert.equal((await response.json()).token, 'art_v1_fixture');
+  assert.deepEqual(calls, ['source-hybrid-one', ['write', 300], 'disposed']);
+});
+
+test('token endpoint denies unauthenticated callers and redacts upstream failure', async () => {
+  let calls = 0, disposed = false;
+  const env = { SOURCE_BOOTSTRAP_SECRET: secret, ARTIFACTS: { async get() { calls++; return {
+    async info() { throw new Error('sensitive-upstream-value'); }, [Symbol.dispose]() { disposed = true; }
+  }; } } };
+  const request = (auth) => new Request('https://worker.test/repos/source-hybrid-one/token', { method: 'POST', headers: { Authorization: auth } });
+  assert.equal((await worker.fetch(request('wrong'), env)).status, 401);
+  assert.equal(calls, 0);
+  const response = await worker.fetch(request(`Bearer ${secret}`), env);
+  assert.equal(response.status, 502); assert.equal(disposed, true);
+  assert.ok(!(await response.text()).includes('sensitive-upstream-value'));
+});

@@ -37,14 +37,27 @@ export default {
     const path = new URL(request.url).pathname;
     if (path === '/healthz' && request.method === 'GET') return json({ ok: true });
     if (!await authorized(request, env.SOURCE_BOOTSTRAP_SECRET)) return json({ error: 'unauthorized' }, 401);
+    const tokenRoute = /^\/repos\/(source-(?:smoke|hybrid)-[a-z0-9-]{1,48})\/token$/.exec(path);
+    if (tokenRoute) {
+      if (request.method !== 'POST') return json({ error: 'method not allowed' }, 405);
+      let repo;
+      try {
+        repo = await env.ARTIFACTS.get(tokenRoute[1]);
+        const info = await repo.info();
+        const token = await repo.createToken('write', 300);
+        return json({ name: info.name, remote: info.remote, token: token.plaintext, expiresAt: token.expiresAt });
+      } catch {
+        return json({ error: 'Artifacts credential request failed' }, 502);
+      } finally { repo?.[Symbol.dispose]?.(); }
+    }
     if (path !== '/repos') return json({ error: 'not found' }, 404);
     if (request.method !== 'POST') return json({ error: 'method not allowed' }, 405);
     if (!request.headers.get('Content-Type')?.toLowerCase().startsWith('application/json')) return json({ error: 'JSON required' }, 415);
     let body;
     try { body = await boundedJson(request); }
     catch { return json({ error: 'invalid JSON or body exceeds 1024 bytes' }, 400); }
-    if (!body || typeof body.name !== 'string' || !/^source-smoke-[a-z0-9-]{1,48}$/.test(body.name)) {
-      return json({ error: 'name must start with source-smoke- and contain only lowercase letters, digits or hyphens' }, 400);
+    if (!body || typeof body.name !== 'string' || !/^source-(?:smoke|hybrid)-[a-z0-9-]{1,48}$/.test(body.name)) {
+      return json({ error: 'name must start with source-smoke- or source-hybrid- and contain only lowercase letters, digits or hyphens' }, 400);
     }
     try {
       const created = await env.ARTIFACTS.create(body.name, { setDefaultBranch: 'main' });

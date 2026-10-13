@@ -12,6 +12,7 @@ import { randomBytes, scrypt, scryptSync, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { Store } from './store.js';
 import { GitRepo } from './git.js';
+import { artifactsBinding, artifactsFromEnv, checkArtifactsProtection } from './integrations/artifacts.js';
 import { CapabilityService } from './capability.js';
 import {
   createProject,
@@ -44,8 +45,9 @@ const scryptAsync = promisify(scrypt);
 export class Source {
   // `store` is optional; defaults to the JSON-file store. Pass a SqliteStore
   // (see sqlite-store.js) for ACID transactions across records.
-  constructor(dataRoot, { store, gitRoot = process.env.SOURCE_GIT_ROOT || dataRoot, maxArtifactBytes = 64 * 1024 * 1024, canonicalRepoConcurrency = 8, canonicalConcurrency = 8, canonicalQueue = 256 } = {}) {
+  constructor(dataRoot, { store, artifacts = artifactsFromEnv(), gitRoot = process.env.SOURCE_GIT_ROOT || dataRoot, maxArtifactBytes = 64 * 1024 * 1024, canonicalRepoConcurrency = 8, canonicalConcurrency = 8, canonicalQueue = 256 } = {}) {
     this.dataRoot = dataRoot;
+    this.artifacts = artifacts;
     this.gitRoot = gitRoot;
     this.maxArtifactBytes = Math.min(512 * 1024 * 1024, Math.max(1, Math.trunc(maxArtifactBytes)));
     this.store = store ?? new Store(dataRoot);
@@ -346,11 +348,23 @@ export class Source {
     const repo = await this.getRepositoryAsync(orgId, projectId, repoId);
     if (!repo) throw new Error(`repository not found: ${repoId}`);
     if (name != null && !/^[A-Za-z0-9._-]{1,120}$/.test(String(name))) throw new Error('invalid repository name');
+    if (defaultBranch != null && (repo.artifacts || artifactsBinding(new GitRepo(repo.barePath)))) throw new Error('bound Artifacts default branch is immutable');
     if (defaultBranch != null && !/^[A-Za-z0-9._/-]{1,200}$/.test(String(defaultBranch))) throw new Error('invalid default branch');
     const updated = { ...repo, ...(name == null ? {} : { name: String(name) }), ...(defaultBranch == null ? {} : { defaultBranch: String(defaultBranch) }) };
     await this._asyncWrite(`${this._projectRel(orgId, projectId)}/repos/${repoId}.json`, updated);
     await this._asyncAudit({ event: 'repository.update', orgId, projectId, repoId });
     return updated;
+  }
+
+  async bindArtifactsRepositoryAsync({ orgId, projectId, repoId, name, createRemote = false }) {
+    if (!this.artifacts) throw new Error('Artifacts Worker configuration required');
+    const repository = await this.getRepositoryAsync(orgId, projectId, repoId);
+    if (!repository) throw new Error('repository not found');
+    if (repository.artifacts && repository.artifacts.name !== name) throw new Error('repository already bound to a different Artifacts repository');
+    const binding = await this.artifacts.bind(new GitRepo(repository.barePath), name, { createRemote, expectedBinding: repository.artifacts });
+    await this._asyncWrite(`${this._projectRel(orgId, projectId)}/repos/${repoId}.json`, { ...repository, artifacts: binding });
+    await this._asyncAudit({ event: 'repository.artifacts.bind', orgId, projectId, repoId, name });
+    return binding;
   }
 
   async getArtifactAsync(hash) {
@@ -362,7 +376,9 @@ export class Source {
   gitRepo(orgId, projectId, repoId) {
     const repo = this.getRepository(orgId, projectId, repoId);
     if (!repo) throw new Error(`repository not found: ${repoId}`);
-    return new GitRepo(repo.barePath);
+    const git = new GitRepo(repo.barePath);
+    git.artifacts = checkArtifactsProtection(git, repo.artifacts);
+    return git;
   }
 
   // Absolute path to the directory containing a project's bare repositories.
@@ -1239,6 +1255,7 @@ export class Source {
     }
     if (targets.length === 0) throw new Error('no repository changes to update');
 
+    if (targets.some((t) => this.gitRepo(orgId, projectId, t.repoId).artifacts)) throw new Error('Artifacts repositories require asynchronous canonical promotion');
     const results = [];
     for (const t of targets) {
       const git = this.gitRepo(orgId, projectId, t.repoId);
@@ -1402,7 +1419,11 @@ export class Source {
               continue;
             }
             const branch = await git.defaultBranchAsync();
-            const result = await git.fastForwardAsync(target.baseCommit, target.headCommit, branch);
+            const binding = git.artifacts;
+            const result = binding
+              ? (this.artifacts ? await this.artifacts.promote(git, binding, target.baseCommit, target.headCommit)
+                : { ok: false, reason: 'Artifacts Worker configuration required; local fallback refused' })
+              : await git.fastForwardAsync(target.baseCommit, target.headCommit, branch);
             await this._asyncAudit({ event: 'canonical.update', orgId, projectId, changeId, repoId: target.repoId, branch, ...result });
             results[index] = { repoId: target.repoId, ...result };
           }

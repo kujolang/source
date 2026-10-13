@@ -3,9 +3,9 @@
 This is the first hybrid integration proof: an authenticated Cloudflare Worker
 creates an Artifacts repository, then a local Git client pushes a commit and
 clones it into an independent directory. The smoke command checks both the
-commit SHA and file content. Source's Node/Postgres application is unchanged.
-This is an operator-only bootstrap, not the tenant-facing Source API or the
-complete Work/Change/Evidence/Decision integration.
+commit SHA and file content. Source's Node/Postgres review lifecycle now connects to this Worker through
+the operator-side [hybrid bridge](../../docs/contest/HYBRID.md). Local contract
+tests cover accepted promotion and recovery; live deployment remains unverified.
 
 ## Run
 
@@ -42,7 +42,7 @@ command. Repository credentials are passed to Git through its process environmen
 never written to Git config or included in command arguments.
 
 The Worker uses the `source-bootstrap` namespace. Artifacts creates a namespace
-on first repository creation. The Worker accepts only `source-smoke-*` names,
+on first repository creation. The Worker accepts only `source-smoke-*` and `source-hybrid-*` names,
 requires the operator bearer secret, bounds request bodies to 1 KiB, and marks
 credential responses `Cache-Control: no-store`. Upstream errors are redacted and
 creation is not automatically retried because its outcome may be uncertain.
@@ -52,12 +52,15 @@ For local development, put the secret in ignored `.dev.vars` and run `npm run de
 A live proof must use the deployed service or an explicitly configured remote
 Artifacts binding; a local emulator does not prove account access.
 
-## Boundaries and next integration
+## Operator boundary
 
-Agents must not receive the operator bootstrap secret. The next increment should
-map Source authorization and sessions to isolated Artifacts workspaces, enforce
-canonical-writer authority, and reconcile approved changes. No repository
-publication, contest submission, or production migration is part of this proof.
+Agents must not receive the operator secret or Artifacts write tokens.
+`POST /repos/:name/token` obtains a disposable repository capability, reads its
+metadata and mints a five-minute write token. The bridge pins the remote URL,
+uses an expected-tip Git push and reconciles uncertain outcomes. Source enforces
+review and protects the local canonical branch. See [HYBRID.md](../../docs/contest/HYBRID.md)
+for binding commands, recovery and the local proof. No public visibility change,
+account upgrade or live deployment was performed as part of that implementation.
 
 Before deleting retained smoke fixtures, inspect their names with
 `npx wrangler artifacts repos list --help` and use the CLI's repository deletion
@@ -71,7 +74,7 @@ References:
 
 ## Verified status on October 12 2026
 
-- Wrangler 4.149.0 authenticated to the Devio Digital account and reported
+- Wrangler 4.149.0 authenticated to the configured account and reported
   Workers and Artifacts write scopes.
 - All four Worker unit tests passed, JavaScript syntax checks passed, and
   `wrangler deploy --dry-run` successfully bundled the Artifacts binding.

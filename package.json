@@ -25,7 +25,8 @@
     "check:postgres-replication": "node scripts/check-postgres-replication.js",
     "demo:contest": "node scripts/contest/demo.js",
     "demo:serve": "node scripts/contest/serve.js",
-    "test:cloudflare": "npm --prefix cloudflare/artifacts-bootstrap test"
+    "test:cloudflare": "npm --prefix cloudflare/artifacts-bootstrap test",
+    "demo:hybrid": "node scripts/contest/hybrid.js"
   },
   "engines": {
     "node": ">=18"
