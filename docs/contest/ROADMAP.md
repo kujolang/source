@@ -21,11 +21,11 @@ and historical milestones; this file records current contest readiness.
 1. Paid access, bootstrap and full three-client live review/promotion now pass
    ([evidence](CLOUDFLARE_LIVE.md)). Preserve the report with the entry commit.
 2. Keep scripted-client and simulated-review labels. No LLM-agent behavior is claimed.
-3. Replace the review cut’s local-cloud segment with genuine verified footage,
-   freeze the final entry commit, fill owner/team details and submit manually.
+3. Review the completed [5:54 live-cloud film](video/README.md), fill owner/team
+   details and submit manually. Implementation checkpoint: `2184ece`.
 
 Publication, anonymous clone/rehearsals and PR #2 merge are complete. CI and real
-container failover pass at `64a559d`; see [publication evidence](PUBLICATION_REVIEW.md).
+container failover pass at `2184ece`; see [publication evidence](PUBLICATION_REVIEW.md).
 
 ## Beyond the contest
 

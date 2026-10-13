@@ -3,12 +3,13 @@
 Use Node.js 22 (validated with 22.23.3), npm and Git. No Kujo sibling checkout,
 Cloudflare account, PostgreSQL, Docker or model-provider key is required for this
 profile. Source is public; anonymous HTTPS clone/install/both rehearsals were
-verified on 2026-10-13. This checkpoint includes the CI pagination correction.
+verified on 2026-10-13. The checkpoint below includes the live-cloud demo,
+pagination correction and PostgreSQL job-claim race fix.
 
 ```sh
 git clone https://github.com/kujolang/source.git
 cd source
-git checkout 64a559d180f9771d090e88bdef4e4c5c8928d356
+git checkout 2184ece2b3b72a7eec0f352d4be84b1f73717b42
 npm ci
 npm run lint
 npm test
@@ -87,8 +88,13 @@ Only run the cloud procedure after the owner enables the needed account access.
 Run `npm run demo:hybrid` for the local Worker/Source/Git contract and interrupted
 push recovery proof. Its JSON explicitly says `liveCloudflare: false`.
 [HYBRID.md](HYBRID.md) describes the architecture, real binding commands and
-operator recovery. Cloudflare account setup remains deferred; do not interpret
-this command as a deployed integration check.
+operator recovery. This local command is not a deployed integration check.
+
+For the verified live profile, use `npm run demo:cloudflare` with
+`SOURCE_ARTIFACTS_WORKER_URL` and `SOURCE_BOOTSTRAP_SECRET` supplied securely in
+the environment. It creates a fresh remote repository and runs the three-client
+review, promotion and recovery flow. See [live evidence](CLOUDFLARE_LIVE.md) for
+verified deployment details and the distinction between local Source and cloud Git.
 
 ### Read the rehearsal as it runs
 

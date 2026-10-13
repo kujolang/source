@@ -52,30 +52,30 @@ change lands. The demo preserves both the stale attempt and the reviewed revisio
 so a reviewer can inspect how the final state was reached.
 
 The project is an early implementation with repeatable local evidence, not a
-production-certified hosted platform. Its next validation milestone is the real
-Cloudflare integration; subsequent work includes deployment-scale capacity,
+production-certified hosted platform. The live Cloudflare lifecycle is verified.
+Further work includes deployment-scale capacity,
 independent security review and operational recovery drills.
 
 ## Repository and run instructions
 
 Repository: https://github.com/kujolang/source (public; PR #2 merged).
 
-Implementation branch: `feat/cloudflare-artifacts-bootstrap`.
+Implementation branch: `main`. Reviewed implementation:
+`2184ece2b3b72a7eec0f352d4be84b1f73717b42` (green hosted CI).
 
-Run instructions: [RUNBOOK.md](RUNBOOK.md). Pin the actual reviewed submission
-commit before recording, and update these references after merge/publication.
+Run instructions: [RUNBOOK.md](RUNBOOK.md). The live report separately identifies
+the capture commit and remote Git result.
 The project uses MIT; third-party license notices accompany vendored assets.
 No official GitHub release was present when checked on 2026-10-12.
 
 ## Video
 
-A revised [3:13 local action cut](video/README.md) is delivered with Siren/v4 narration.
-It replaces the overview with recorded UI interactions and an actual stdout replay.
-It is below the final target length: add genuine live cloud footage before entry.
-Final live-cloud replacement and owner review remain pending. Required format:
-5–10 minutes, MP4/WebM/MOV, no more than 2 GiB. Use the
-[recording script](VIDEO_SCRIPT.md), replacing blocked sections with genuine
-completed behavior. Do not show tokens, account configuration or operator.json.
+The [5:54 live-cloud action film](video/README.md) includes Siren/v4 narration,
+recorded Source UI interactions, real command output and verified Workers/Artifacts
+promotion and recovery. The 1080p and smaller mobile copies are delivered locally;
+checksums, provenance and verification are in video/delivery-v3.json. Owner review
+and upload to the form remain pending. Required format: 5–10 minutes,
+MP4/WebM/MOV, no more than 2 GiB. No credentials appear in the film.
 
 ## Owner-supplied form details
 

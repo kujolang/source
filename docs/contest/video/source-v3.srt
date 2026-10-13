@@ -1,0 +1,291 @@
+1
+00:00:00,500 --> 00:00:05,820
+This is Source running locally. Let’s create a task. I enter the goal, add a
+
+2
+00:00:05,820 --> 00:00:10,340
+requirement, and say how we’ll check the result. Source saves it as a Work item.
+
+3
+00:00:10,340 --> 00:00:15,820
+Now I claim it and start a session. Watch the status change from open, to claimed,
+
+4
+00:00:15,820 --> 00:00:20,060
+to in progress. The session gives the work a record of who started it and where
+
+5
+00:00:20,060 --> 00:00:25,140
+it began. This task is a separate UI example; next we’ll run the three-client
+
+6
+00:00:25,140 --> 00:00:25,940
+rehearsal.
+
+7
+00:00:27,875 --> 00:00:32,795
+Here is the rehearsal running against real Git repositories and Source’s API.
+
+8
+00:00:32,795 --> 00:00:37,155
+The terminal shows output captured from that run, with pauses added so we can
+
+9
+00:00:37,155 --> 00:00:41,955
+read it. Three scripted clients start from the same commit. One changes the
+
+10
+00:00:41,955 --> 00:00:47,635
+theme. One updates the documentation. One changes the page size. They claim
+
+11
+00:00:47,635 --> 00:00:52,915
+separate tasks, start sessions, and submit proposals. Their execution intervals
+
+12
+00:00:52,915 --> 00:00:59,235
+overlap. Each client also tries to approve its own change. Source returns HTTP
+
+13
+00:00:59,235 --> 00:01:04,635
+403 for all three. These credentials can contribute code, but they cannot approve
+
+14
+00:01:04,635 --> 00:01:04,995
+it.
+
+15
+00:01:06,917 --> 00:01:11,437
+Back in the browser, I open a change from the rehearsal. The page shows the
+
+16
+00:01:11,437 --> 00:01:15,677
+request and the two commits being compared. Below that are the checks attached
+
+17
+00:01:15,677 --> 00:01:20,517
+to this proposal. The rehearsal ran the settings test and a Git diff check.
+
+18
+00:01:20,517 --> 00:01:25,477
+I evaluate the policy again, then scroll to the evidence. Both records are valid.
+
+19
+00:01:25,477 --> 00:01:30,477
+The decision has its own record and names the approver. In this demo, a script
+
+20
+00:01:30,477 --> 00:01:35,237
+plays the maintainer. The checks really ran; the human review is simulated.
+
+21
+00:01:37,167 --> 00:01:42,367
+Once the theme change lands, the other proposals have an old base. Source blocks
+
+22
+00:01:42,367 --> 00:01:46,607
+the stale update without moving the shared branch. The documentation client
+
+23
+00:01:46,607 --> 00:01:52,367
+rebases and submits a new proposal. The page-size client hits a real conflict:
+
+24
+00:01:52,367 --> 00:01:57,287
+both clients edited the same line in settings dot JSON. The recovery step keeps
+
+25
+00:01:57,287 --> 00:02:01,807
+the dark theme and sets the page size to twenty. It then reruns the checks and
+
+26
+00:02:01,807 --> 00:02:06,407
+submits the revised change. Only after the scripted maintainer accepts that
+
+27
+00:02:06,407 --> 00:02:09,007
+revision does Source advance the shared branch.
+
+28
+00:02:10,958 --> 00:02:15,998
+Now let’s inspect what landed. I open the repository, switch to History, and
+
+29
+00:02:15,998 --> 00:02:20,798
+select the page-size commit. The diff shows the change from ten to twenty while
+
+30
+00:02:20,798 --> 00:02:26,078
+keeping the dark theme. Back in Contents, I open the actual settings file. Both
+
+31
+00:02:26,078 --> 00:02:30,478
+changes are there. The earlier proposals, their evidence, and their decisions
+
+32
+00:02:30,478 --> 00:02:35,598
+remain in Source. This is the useful part: we can inspect the final code and
+
+33
+00:02:35,598 --> 00:02:37,278
+follow the work that produced it.
+
+34
+00:02:39,208 --> 00:02:43,768
+Now we can run the same collaboration flow against Cloudflare. Source still
+
+35
+00:02:43,768 --> 00:02:48,688
+runs on this computer. The deployed Worker controls access to an actual Artifacts
+
+36
+00:02:48,688 --> 00:02:52,528
+repository, which holds the shared Git branch. These lines are captured from
+
+37
+00:02:52,528 --> 00:02:57,208
+the live run. The Worker creates the repository. Source submits the starting
+
+38
+00:02:57,208 --> 00:03:01,888
+files as a proposal, checks them, records the maintainer decision, and promotes
+
+39
+00:03:01,888 --> 00:03:07,208
+the accepted commit. Trying to promote before acceptance fails. The local canonical
+
+40
+00:03:07,208 --> 00:03:11,448
+guard also rejects deletion of the shared branch. Contributors receive Source
+
+41
+00:03:11,448 --> 00:03:16,328
+credentials. They do not receive the Worker secret or the Artifacts write token.
+
+42
+00:03:18,250 --> 00:03:22,970
+Three separate client processes now start from that shared commit. Their work
+
+43
+00:03:22,970 --> 00:03:29,330
+overlaps, and all three attempts at self-approval return HTTP 403. Source checks
+
+44
+00:03:29,330 --> 00:03:34,010
+the theme proposal and the scripted maintainer accepts it. Then we test a failure
+
+45
+00:03:34,010 --> 00:03:38,770
+that is easy to miss: the cloud accepts the push, but Source does not receive
+
+46
+00:03:38,770 --> 00:03:43,290
+a success result. The harness deliberately throws an error after the real Git
+
+47
+00:03:43,290 --> 00:03:47,850
+push succeeds. Source leaves the Work item accepted, rather than calling it
+
+48
+00:03:47,850 --> 00:03:52,730
+finished. On retry, it reads the remote commit, confirms that the change already
+
+49
+00:03:52,730 --> 00:03:57,690
+landed, and closes the work. The trace confirms there was just one push.
+
+50
+00:03:59,625 --> 00:04:04,105
+Here is the Source record from that live run. I open the accepted change and
+
+51
+00:04:04,105 --> 00:04:08,585
+inspect its evidence and decision. The checks ran against the proposed files.
+
+52
+00:04:08,585 --> 00:04:13,465
+The decision identifies the scripted maintainer. The repository history shows
+
+53
+00:04:13,465 --> 00:04:18,225
+the commits that Source confirmed in Artifacts. This is a hybrid deployment:
+
+54
+00:04:18,225 --> 00:04:22,345
+the review application and its data are local, while the Worker and canonical
+
+55
+00:04:22,345 --> 00:04:27,225
+Git repository are on Cloudflare. The agents are scripted clients, and approval
+
+56
+00:04:27,225 --> 00:04:31,705
+is scripted too. We are testing the workflow and its boundaries, not claiming
+
+57
+00:04:31,705 --> 00:04:36,025
+that a language model performed the work or that a person reviewed each patch.
+
+58
+00:04:37,958 --> 00:04:43,158
+The remaining proposals now have an old base. The live bridge rejects them without
+
+59
+00:04:43,158 --> 00:04:48,238
+overwriting the remote branch. The documentation client rebases cleanly. The
+
+60
+00:04:48,238 --> 00:04:53,518
+page-size client reaches the same real conflict we saw earlier. After resolution,
+
+61
+00:04:53,518 --> 00:04:57,878
+it submits a revised change, reruns the checks, and receives a new decision.
+
+62
+00:04:57,878 --> 00:05:03,078
+Source promotes the accepted revision to Artifacts. Finally, a separate Git
+
+63
+00:05:03,078 --> 00:05:07,318
+clone downloads the cloud repository. Its commit matches Source's canonical
+
+64
+00:05:07,318 --> 00:05:12,838
+cache. The files contain the dark theme, page size twenty, and the review documentation.
+
+65
+00:05:12,838 --> 00:05:17,998
+All three client Work items are closed. The report preserves the remote address,
+
+66
+00:05:17,998 --> 00:05:20,518
+commit identifiers, and recovery checks.
+
+67
+00:05:22,458 --> 00:05:28,018
+Source is public and MIT licensed. The repository includes the local rehearsals,
+
+68
+00:05:28,018 --> 00:05:32,818
+the live integration command, and the verification report. This run proves the
+
+69
+00:05:32,818 --> 00:05:37,018
+review and promotion flow through real Workers and Artifacts, including stale
+
+70
+00:05:37,018 --> 00:05:41,898
+proposals and recovery after a lost acknowledgement. It does not establish production
+
+71
+00:05:41,898 --> 00:05:46,818
+capacity or replace a security review. The result is a working prototype you
+
+72
+00:05:46,818 --> 00:05:51,658
+can inspect: from a task, through a proposal and evidence, to an accepted commit
+
+73
+00:05:51,658 --> 00:05:52,538
+in the cloud.

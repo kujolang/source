@@ -1,37 +1,22 @@
-# Source in action — revision 2
+# Source in action — revision 3
 
-The revised local-demo cut is 3:12.708 (1920×1080, 24fps), narrated by
-ElevenLabs eleven_v4 / Siren. Its transcript was edited with orwell-writing.
+The current film is 5:53.958, 1920×1080 at 24fps, with ElevenLabs eleven_v4 / Siren
+narration edited with orwell-writing. App views fill their media stage. The first
+five chapters retain the local action demo. At 2:38.708, the film adds genuine
+Cloudflare Workers and Artifacts creation, reviewed promotion, recovery after an
+injected lost acknowledgment, and independent clone verification.
 
-The full app viewport fills the media stage. Footage shows creating a Work item,
-claiming it, starting a session, evaluating evidence, browsing commit history,
-opening a diff, and reading the final settings file. The terminal scenes replay
-actual output from `npm run demo:contest -- --trace`, with reading pauses added.
-Browser footage and terminal replay are separate local runs; their IDs may differ.
-The UI task is a separate example, not claimed to have completed in the rehearsal.
-See [revision notes](REVISION-2.md), narration-v2.json and source-v2.srt.
+The cloud terminal replays actual captured stdout with reading pauses. Browser
+footage shows the evidence, scripted maintainer decision and Git history from the
+same live run. Source UI and JSON state remain local. The Worker and canonical
+Git repository are live on Cloudflare; contributors and approvals are scripted.
+See [revision notes](REVISION-3.md), narration-v3.json, source-v3.srt and delivery-v3.json.
 
-Delivered locally: source-in-action-v2.mp4, source-in-action-v2-mobile.mp4,
-source-in-action-v2-editable.zip and source-in-action-transcript.md. Video binaries
-are not stored in Git. delivery-v2.json records their checksums and verification.
+Local deliverables: source-in-action-v3.mp4, source-in-action-v3-mobile.mp4,
+source-cloudflare-segment.mp4, source-in-action-v3-editable.zip, transcript and SRT.
+Video binaries are not in Git. Owner viewing/listening review and manual contest
+submission remain pending. No video upload or contest entry was performed.
 
-This is the local section of the review, not the final contest entry. It still
-needs genuine Workers/Artifacts footage and a total runtime of 5–10 minutes.
-Cloudflare setup remains deferred. No external video upload was performed.
-
-## Earlier cut (archived)
-
-# Source review cut — 2026-10-13
-
-Created a 5:48.792, 1920×1080, 24fps MP4 with ElevenLabs v4 Siren narration,
-burned-in captions, actual local UI captures and evidence-based graphics.
-The MP4 and complete editable HyperFrames ZIP were delivered to the owner as
-`source-review-cut.mp4` and `source-video-editable.zip`. These binaries are not
-stored in Git. delivery-manifest.json records the exact MP4 checksum and metrics;
-narration.json and source.srt retain spoken content and timing. QC.md records
-verification and its limits; RIGHTS.md identifies assets and provenance.
-
-This is a current-state review cut, not a completed live-cloud submission.
-Chapter 6 explicitly labels Artifacts emulation and deferred live verification.
-Replace that section after genuine Workers/Artifacts evidence exists, then
-review the final video and submit manually. No external upload was performed.
+Earlier cuts remain archived locally. [Revision 2](REVISION-2.md) was the 3:13
+local-only cut; the initial 5:49 overview is documented in QC.md. Their deferred
+cloud statements describe those historical cuts, not the current live result.

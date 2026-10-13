@@ -1,0 +1,62 @@
+[
+  {
+    "id": "v2-1",
+    "title": "Create and start work",
+    "visual": "create-work",
+    "text": "This is Source running locally. Let\u2019s create a task. I enter the goal, add a requirement, and say how we\u2019ll check the result. Source saves it as a Work item. Now I claim it and start a session. Watch the status change from open, to claimed, to in progress. The session gives the work a record of who started it and where it began. This task is a separate UI example; next we\u2019ll run the three-client rehearsal."
+  },
+  {
+    "id": "v2-2",
+    "title": "Run three clients",
+    "visual": "cli-start",
+    "text": "Here is the rehearsal running against real Git repositories and Source\u2019s API. The terminal shows output captured from that run, with pauses added so we can read it. Three scripted clients start from the same commit. One changes the theme. One updates the documentation. One changes the page size. They claim separate tasks, start sessions, and submit proposals. Their execution intervals overlap. Each client also tries to approve its own change. Source returns HTTP 403 for all three. These credentials can contribute code, but they cannot approve it."
+  },
+  {
+    "id": "v2-3",
+    "title": "Inspect the evidence",
+    "visual": "review",
+    "text": "Back in the browser, I open a change from the rehearsal. The page shows the request and the two commits being compared. Below that are the checks attached to this proposal. The rehearsal ran the settings test and a Git diff check. I evaluate the policy again, then scroll to the evidence. Both records are valid. The decision has its own record and names the approver. In this demo, a script plays the maintainer. The checks really ran; the human review is simulated."
+  },
+  {
+    "id": "v2-4",
+    "title": "Recover from a conflict",
+    "visual": "cli-end",
+    "text": "Once the theme change lands, the other proposals have an old base. Source blocks the stale update without moving the shared branch. The documentation client rebases and submits a new proposal. The page-size client hits a real conflict: both clients edited the same line in settings dot JSON. The recovery step keeps the dark theme and sets the page size to twenty. It then reruns the checks and submits the revised change. Only after the scripted maintainer accepts that revision does Source advance the shared branch."
+  },
+  {
+    "id": "v2-5",
+    "title": "Check the result",
+    "visual": "repository",
+    "text": "Now let\u2019s inspect what landed. I open the repository, switch to History, and select the page-size commit. The diff shows the change from ten to twenty while keeping the dark theme. Back in Contents, I open the actual settings file. Both changes are there. The earlier proposals, their evidence, and their decisions remain in Source. This is the useful part: we can inspect the final code and follow the work that produced it."
+  },
+  {
+    "id": "v3-6",
+    "title": "Connect the live cloud",
+    "visual": "cloud-start",
+    "text": "Now we can run the same collaboration flow against Cloudflare. Source still runs on this computer. The deployed Worker controls access to an actual Artifacts repository, which holds the shared Git branch. These lines are captured from the live run. The Worker creates the repository. Source submits the starting files as a proposal, checks them, records the maintainer decision, and promotes the accepted commit. Trying to promote before acceptance fails. The local canonical guard also rejects deletion of the shared branch. Contributors receive Source credentials. They do not receive the Worker secret or the Artifacts write token."
+  },
+  {
+    "id": "v3-7",
+    "title": "Recover a live push",
+    "visual": "cloud-recovery",
+    "text": "Three separate client processes now start from that shared commit. Their work overlaps, and all three attempts at self-approval return HTTP 403. Source checks the theme proposal and the scripted maintainer accepts it. Then we test a failure that is easy to miss: the cloud accepts the push, but Source does not receive a success result. The harness deliberately throws an error after the real Git push succeeds. Source leaves the Work item accepted, rather than calling it finished. On retry, it reads the remote commit, confirms that the change already landed, and closes the work. The trace confirms there was just one push."
+  },
+  {
+    "id": "v3-8",
+    "title": "Inspect the live review",
+    "visual": "cloud-review",
+    "text": "Here is the Source record from that live run. I open the accepted change and inspect its evidence and decision. The checks ran against the proposed files. The decision identifies the scripted maintainer. The repository history shows the commits that Source confirmed in Artifacts. This is a hybrid deployment: the review application and its data are local, while the Worker and canonical Git repository are on Cloudflare. The agents are scripted clients, and approval is scripted too. We are testing the workflow and its boundaries, not claiming that a language model performed the work or that a person reviewed each patch."
+  },
+  {
+    "id": "v3-9",
+    "title": "Verify the cloud result",
+    "visual": "cloud-result",
+    "text": "The remaining proposals now have an old base. The live bridge rejects them without overwriting the remote branch. The documentation client rebases cleanly. The page-size client reaches the same real conflict we saw earlier. After resolution, it submits a revised change, reruns the checks, and receives a new decision. Source promotes the accepted revision to Artifacts. Finally, a separate Git clone downloads the cloud repository. Its commit matches Source's canonical cache. The files contain the dark theme, page size twenty, and the review documentation. All three client Work items are closed. The report preserves the remote address, commit identifiers, and recovery checks."
+  },
+  {
+    "id": "v3-10",
+    "title": "Run and inspect Source",
+    "visual": "ending",
+    "text": "Source is public and MIT licensed. The repository includes the local rehearsals, the live integration command, and the verification report. This run proves the review and promotion flow through real Workers and Artifacts, including stale proposals and recovery after a lost acknowledgement. It does not establish production capacity or replace a security review. The result is a working prototype you can inspect: from a task, through a proposal and evidence, to an accepted commit in the cloud."
+  }
+]

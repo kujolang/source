@@ -8,8 +8,8 @@ repository alone. It is intentionally separate from implementation TODOs.
 As of 2026-10-13, the Node suite, local collaboration rehearsal, dependency
 audits, and isolated-client PostgreSQL profile pass on the reviewed contest
 branch. See [dated validation](docs/contest/VALIDATION.md) for exact scope.
-Hosted CI and actual Docker build/failover now pass at `64a559d` in
-[run 38386336483](https://github.com/kujolang/source/actions/runs/38386336483).
+Hosted CI and actual Docker build/failover now pass at `2184ece` in
+[run 38449005437](https://github.com/kujolang/source/actions/runs/38449005437).
 The local Docker daemon remains unavailable.
 Historical Kujo gate records are not a fresh certification of this branch.
 
@@ -17,11 +17,11 @@ Historical Kujo gate records are not a fresh certification of this branch.
 
 ### 1. Hosted CI execution
 
-- **Status:** verified on the GitHub-hosted runner at `64a559d`.
+- **Status:** verified on the GitHub-hosted runner at `2184ece`.
 - **Required evidence:** a successful GitHub-hosted run of `.github/workflows/ci.yml`
   proving the deterministic suite, 5,000-agent Postgres gate, and two-container
   writer-failover gate on the actual runner image.
-- **Evidence:** [successful run](https://github.com/kujolang/source/actions/runs/38386336483);
+- **Evidence:** [successful run](https://github.com/kujolang/source/actions/runs/38449005437);
   both deterministic and release-gate jobs passed.
 
 ## Open blockers

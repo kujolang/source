@@ -15,8 +15,8 @@ prepared on `feat/cloudflare-artifacts-bootstrap`, starting from main
 | Reviewed demo on Node 22.23.3 (2026-10-13) | Pass after lifecycle fixes; three clients overlap 712 ms and the actual conflict is recovered. |
 | Local PostgreSQL 14.20, 5,000 lifecycle participants | Pass at unchanged default concurrency 256, using an isolated client and bounded sockets. See database result below. |
 | Syntax lint and `git diff --check` | Pass; 76 JavaScript files syntax checked. |
-| GitHub Actions | Green at `64a559d` after public visibility and pagination correction: [run 38386336483](https://github.com/kujolang/source/actions/runs/38386336483). |
-| Real Docker build and two-container failover | Both pass in the GitHub Actions release gate at `64a559d`; local Docker remains unavailable. |
+| GitHub Actions | Green at `2184ece` after PostgreSQL claim-lock recheck correction: [run 38449005437](https://github.com/kujolang/source/actions/runs/38449005437). |
+| Real Docker build and two-container failover | Both pass in the GitHub Actions release gate at `2184ece`; local Docker remains unavailable. |
 | Browser visual QA | Pass on 2026-10-13 with an available in-app browser: desktop and 390px viewport; count, repository tab and overflow fixes verified. See [bounded scope](BROWSER_QA.md). |
 | Workers + Artifacts live create/push/clone | Not run successfully: deploy returned Cloudflare 10403 requiring a paid plan; owner deferred setup. |
 

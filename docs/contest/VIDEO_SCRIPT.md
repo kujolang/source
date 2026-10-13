@@ -1,3 +1,9 @@
+# Recording plan (historical draft)
+
+Superseded by the completed [revision 3 film](video/README.md). Current narration
+and timing are in video/narration-v3.json and video/source-v3.srt. The original
+plan below is retained for provenance; its deferred-cloud statements are historical.
+
 # Seven-minute recording plan
 
 Status: script only. Final recording waits for mandatory live Workers/Artifacts

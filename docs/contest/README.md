@@ -1,7 +1,7 @@
 # Source competition checklist
 
 Updated 2026-10-13. Local preparation is usable; **the contest submission is not
-ready** until the mandatory live Cloudflare integration and owner steps are done.
+ready** until the owner reviews the final video and completes the entry steps.
 Workers Paid is active and the live bootstrap passes; the full three-client Source review, promotion and recovery flow also passes live.
 
 ## Completed local preparation
@@ -22,7 +22,7 @@ Workers Paid is active and the live bootstrap passes; the full three-client Sour
   data; retain third-party license notices and correct the README's license claim.
 - [x] Add Node 22 CI steps for the local demo and Cloudflare unit tests.
 - [x] Prepare fresh-clone [runbook](RUNBOOK.md), [current roadmap](ROADMAP.md),
-  [submission draft](SUBMISSION.md) and [seven-minute script](VIDEO_SCRIPT.md).
+  [submission draft](SUBMISSION.md) and [current recorded narration](video/narration-v3.json).
 - [x] Record actual verification and limits in [VALIDATION.md](VALIDATION.md).
 - [x] Complete [PR 2 local review](PR_REVIEW.md), repair the fleet probe and
   client failure handling, and add regression coverage.
@@ -32,10 +32,8 @@ Workers Paid is active and the live bootstrap passes; the full three-client Sour
 - [x] Connect accepted Source changes to the [hybrid Artifacts bridge](HYBRID.md),
   including local contract tests for concurrent updates and uncertain-push recovery.
 - [x] Prepare complete narration and architecture explanation for owner review.
-- [x] Create a [3:13 local action cut](video/README.md) with ElevenLabs v4
-  Siren narration, recorded UI actions, actual command output, and plain narration.
-  The earlier 5:49 overview remains archived; the final contest cut still needs
-  live cloud footage and a total duration of 5–10 minutes.
+- [x] Create the [5:54 live-cloud action film](video/README.md), mobile copy,
+  separate Cloudflare segment, captions and editable project with Siren/v4 narration.
 
 ## Pending account, environment and owner gates
 
@@ -54,8 +52,10 @@ Workers Paid is active and the live bootstrap passes; the full three-client Sour
   repository tabs, open-work counts and page overflow.
 - [x] Owner authorizes public exposure, publishes Source, merges PR #2 and
   verifies anonymous clone/install/both rehearsals at `996f9e4`.
-- [ ] Freeze the final entry commit after live Cloudflare verification.
-- [ ] Record/export/review the final 5–10 minute video using genuine cloud footage.
+- [x] Pin reviewed implementation `2184ece2b3b72a7eec0f352d4be84b1f73717b42`;
+  live fixture provenance remains separately pinned in its report.
+- [x] Record and export the final 5–10 minute video with genuine cloud footage.
+- [ ] Owner watches/listens to the final video and approves it for submission.
 - [ ] Owner supplies contact/team/attendee details and confirms eligibility/terms.
 - [ ] Owner submits manually and retains the confirmation.
 
