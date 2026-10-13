@@ -143,3 +143,11 @@ Commands run from the Source checkout; logs under ignored `audit-results/hardeni
 | `docker info` | Blocked locally: Docker daemon not running; no local container-pass claim |
 
 The eight default-suite skips are six PostgreSQL-gated tests (covered by the live gate) and two optional sibling fixtures (Spec dogfood and Eval output). The separate live gate exercises PostgreSQL explicitly. CI also builds the pinned container and runs the two-container failover gate; its result must be checked on the pushed revision. No known regression from these changes remains in the checks completed here.
+
+### CI portability correction
+
+The first pushed CI run (`38460110198`) exposed an imprecise runner admission
+regression: its generic rejection assertion accidentally depended on the local
+container runtime being unavailable. The corrected test injects an environment
+read failure, checks that exact error and proves no runtime was spawned and no
+slot retained. It neither launches a real container nor weakens the assertion.

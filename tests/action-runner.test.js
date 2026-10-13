@@ -299,7 +299,10 @@ test('secret provider timeout covers a stalled response body', { timeout: 3000 }
 
 
 test('rejected runner environment does not consume execution capacity', async () => {
-  const runner = new IsolatedActionRunner({ image: 'kujo/runner:latest', workspaceRoot: '/srv/workspaces', maxActive: 1 });
-  await assert.rejects(runner.run({ steps: [{ run: 'true' }] }, { workspace: '/srv/workspaces/job', env: { NODE_OPTIONS: '--inspect' } }));
+  let spawned = false;
+  const runner = new IsolatedActionRunner({ image: 'kujo/runner:latest', workspaceRoot: '/srv/workspaces', maxActive: 1, spawnProcess: () => { spawned = true; throw new Error('unexpected runtime spawn'); } });
+  const env = Object.defineProperty({}, 'TOKEN', { enumerable: true, get() { throw new Error('environment unavailable'); } });
+  await assert.rejects(runner.run({ steps: [{ run: 'true' }] }, { workspace: '/srv/workspaces/job', env }), /environment unavailable/);
+  assert.equal(spawned, false);
   assert.equal(runner.slots.active, 0);
 });
