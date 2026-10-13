@@ -9,6 +9,14 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 
+// execFile prevents shell expansion; revision validation also prevents Git
+// from interpreting caller-controlled revisions as options (for example --output).
+function validateRevision(value) {
+  if (typeof value !== 'string' || !value || value.startsWith('-') || value.includes('\0') || value.length > 4096) {
+    throw new Error('invalid Git revision');
+  }
+}
+
 function run(args, opts = {}) {
   return execFileSync('git', args, {
     encoding: 'utf8',
@@ -42,6 +50,7 @@ export class GitRepo {
 
   // Resolve a ref to a commit hash (empty string if unborn).
   revParse(ref) {
+    validateRevision(ref);
     try {
       return run(['rev-parse', ref], { cwd: this.barePath });
     } catch {
@@ -71,6 +80,8 @@ export class GitRepo {
 
   // Does `ancestor` exist and is it an ancestor of `descendant`?
   isAncestor(ancestor, descendant) {
+    validateRevision(ancestor);
+    validateRevision(descendant);
     try {
       run(['merge-base', '--is-ancestor', ancestor, descendant], { cwd: this.barePath });
       return true;
@@ -103,6 +114,7 @@ export class GitRepo {
 
   // Does a commit exist in this repo?
   hasCommit(hash) {
+    validateRevision(hash);
     try {
       run(['cat-file', '-e', `${hash}^{commit}`], { cwd: this.barePath });
       return true;
@@ -113,6 +125,8 @@ export class GitRepo {
 
   // Diff stat between two commits (or empty tree).
   diffStat(base, head) {
+    if (base) validateRevision(base);
+    validateRevision(head);
     const args = ['diff', '--stat', '--no-renames'];
     if (base) args.push(base, head);
     else args.push(head);
@@ -125,6 +139,8 @@ export class GitRepo {
 
   // Full diff (patch) between two commits (or empty tree).
   diff(base, head) {
+    if (base) validateRevision(base);
+    validateRevision(head);
     const args = ['diff', '--no-renames'];
     if (base) args.push(base, head);
     else args.push(head);
@@ -137,6 +153,8 @@ export class GitRepo {
 
   // List changed files between base and head.
   changedFiles(base, head) {
+    if (base) validateRevision(base);
+    validateRevision(head);
     const args = ['diff', '--name-status', '--no-renames'];
     if (base) args.push(base, head);
     else args.push(head);
@@ -152,6 +170,7 @@ export class GitRepo {
   // not block the Node event loop. Synchronous methods remain for the CLI and
   // compatibility with the pure application-service tests.
   async revParseAsync(ref) {
+    validateRevision(ref);
     try { return await runAsync(['rev-parse', ref], { cwd: this.barePath }); } catch { return ''; }
   }
 
@@ -173,16 +192,19 @@ export class GitRepo {
   }
 
   async hasCommitAsync(hash) {
+    validateRevision(hash);
     try { await runAsync(['cat-file', '-e', `${hash}^{commit}`], { cwd: this.barePath }); return true; } catch { return false; }
   }
 
   async showFileAsync(ref, filePath) {
+    validateRevision(ref);
     if (typeof ref !== 'string' || !/^[A-Za-z0-9._/@-]{1,200}$/.test(ref)) throw new Error('invalid Git ref');
     if (typeof filePath !== 'string' || filePath.includes('..') || filePath.startsWith('/') || filePath.includes(':')) throw new Error('invalid repository file path');
     return runAsync(['show', `${ref}:${filePath}`], { cwd: this.barePath });
   }
 
   async listCommitsAsync(ref = 'HEAD', limit = 50) {
+    validateRevision(ref);
     if (typeof ref !== 'string' || !/^[A-Za-z0-9._/@-]{1,200}$/.test(ref)) throw new Error('invalid Git ref');
     const safeLimit = Math.min(100, Math.max(1, Math.trunc(Number(limit) || 50)));
     try {
@@ -197,6 +219,7 @@ export class GitRepo {
   }
 
   async listTreeAsync(ref = 'HEAD', directory = '') {
+    validateRevision(ref);
     if (typeof ref !== 'string' || !/^[A-Za-z0-9._/@-]{1,200}$/.test(ref)) throw new Error('invalid Git ref');
     if (typeof directory !== 'string' || directory.includes('..') || directory.startsWith('/') || directory.includes(':')) throw new Error('invalid repository path');
     const treeRef = directory ? `${ref}:${directory.replace(/\/$/, '')}` : ref;
@@ -218,6 +241,8 @@ export class GitRepo {
   }
 
   async isAncestorAsync(ancestor, descendant) {
+    validateRevision(ancestor);
+    validateRevision(descendant);
     try { await runAsync(['merge-base', '--is-ancestor', ancestor, descendant], { cwd: this.barePath }); return true; } catch { return false; }
   }
 
@@ -237,12 +262,16 @@ export class GitRepo {
   }
 
   async diffAsync(base, head) {
+    if (base) validateRevision(base);
+    validateRevision(head);
     const args = ['diff', '--no-renames'];
     if (base) args.push(base, head); else args.push(head);
     try { return await runAsync(args, { cwd: this.barePath }); } catch { return ''; }
   }
 
   async changedFilesAsync(base, head) {
+    if (base) validateRevision(base);
+    validateRevision(head);
     const args = ['diff', '--name-status', '--no-renames'];
     if (base) args.push(base, head); else args.push(head);
     try {

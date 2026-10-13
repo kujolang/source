@@ -233,6 +233,12 @@ function requestIdempotencyKey(req, orgId, projectId, index = '') {
   return `http:${createHash('sha256').update(`${orgId}\0${projectId}\0${key}\0${index}`).digest('hex')}`;
 }
 
+// External keys cannot reserve internal workflow keys or another tenant's keys.
+function jobDedupeKey(key, orgId, projectId, workId) {
+  if (!key) return null;
+  return `client:${createHash('sha256').update(JSON.stringify([orgId, projectId, workId || null, String(key)])).digest('hex')}`;
+}
+
 function readText(req, maxBytes = 1_000_000) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -520,12 +526,16 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
       res.setHeader('Retry-After', '1');
       return json(res, 503, { error: 'request capacity exhausted', retryable: true });
     }
-    if (req.aborted) return res.destroy();
-    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-    const pathname = url.pathname;
-    const fields = url.searchParams.get('fields') || undefined;
+    if (accounted || req.aborted || res.destroyed) {
+      releaseRequest();
+      releaseRequest = null;
+      return res.destroy();
+    }
 
     try {
+      const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+      const pathname = url.pathname;
+      const fields = url.searchParams.get('fields') || undefined;
       if ((req.method === 'GET' || req.method === 'HEAD') && staticAsset(res, pathname, req.method)) return;
       if (req.method === 'GET' && pathname === '/metrics') return metrics(res, state, src, gitSlots, gitTenantSlots, artifactSlots, requestSlots, server.secretBroker, server.writerLease);
       if (server.draining && pathname !== '/healthz' && pathname !== '/readyz') {
@@ -760,16 +770,23 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           return redirect(res, `/o/${encodeURIComponent(orgId)}/p/${encodeURIComponent(projectId)}/r/${encodeURIComponent(repo.id)}/tree/${encodeURIComponent(repo.defaultBranch)}`);
         }
         if (req.method === 'POST' && managementPath === 'work') {
-          const g = await guard(src, req, ACTIONS.manage_work, { org: orgId, project: projectId });
-          if (g) return loginPage(res, g.status, g.body.error);
+          const credential = await sessionCredential(src, req);
+          const auth = await authorizeRequestAsync(src.capabilities, req, ACTIONS.manage_work, { org: orgId, project: projectId, credential });
+          if (!auth.ok) return loginPage(res, auth.status, auth.error);
           const body = await readLoginBody(req);
           const split = (value) => String(value || '').split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean);
-          const work = await src.createWorkAsync({ orgId, projectId, intent: body.intent, requester: (await sessionCredential(src, req)) || 'web', requirements: split(body.requirements), acceptanceConditions: split(body.acceptanceConditions) });
+          const work = await src.createWorkAsync({ orgId, projectId, intent: body.intent, requester: auth.cap.principalId, requirements: split(body.requirements), acceptanceConditions: split(body.acceptanceConditions) });
           return redirect(res, `/o/${encodeURIComponent(orgId)}/p/${encodeURIComponent(projectId)}/w/${encodeURIComponent(work.id)}`);
         }
         if (req.method === 'POST' && managementPath === 'settings/members') {
-          const g = await guard(src, req, ACTIONS.manage_project, { org: orgId, project: projectId });
-          if (g) return loginPage(res, g.status, g.body.error);
+          const credential = await sessionCredential(src, req);
+          const auth = await authorizeRequestAsync(src.capabilities, req, ACTIONS.manage_org, { org: orgId, project: projectId, credential });
+          if (!auth.ok) return loginPage(res, auth.status, auth.error);
+          // Browser admin sessions are project-scoped. Their organization
+          // authority must still come from current organization membership.
+          if (auth.cap.scope?.project && (await src.getOrgMembershipAsync(orgId, auth.cap.principalId))?.role !== 'admin') {
+            return loginPage(res, 403, 'organization administrator required');
+          }
           const body = await readLoginBody(req);
           await src.addOrgMemberAsync({ orgId, principalId: body.principalId, role: body.role || 'member' });
           return redirect(res, `/o/${encodeURIComponent(orgId)}/p/${encodeURIComponent(projectId)}/settings`);
@@ -934,7 +951,6 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
         // anonymous read; private repos require read_source; push always
         // requires git_push. Enforced here, before delegating to git.
         const service = url.searchParams.get('service') || '';
-        const isWrite = service === 'git-receive-pack' || rest.includes('git-receive-pack');
 
         // Git only has three documented smart-HTTP path forms.  Passing an
         // arbitrary suffix to PATH_INFO would let Git normalize dot segments
@@ -949,6 +965,8 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           || decodedRest.includes('..') || decodedRest.includes('\\')) {
           return gitAuthError(res, 400, 'invalid Git path');
         }
+
+        const isWrite = service === 'git-receive-pack' || decodedRest.includes('git-receive-pack');
 
         // Rate-limit the write path (push) by client address.
         const ip = clientAddress(req, trustProxy);
@@ -1226,7 +1244,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
               availableAt: job.availableAt,
               workId: job.workId || null,
               maxAttempts: job.maxAttempts,
-              dedupeKey: job.dedupeKey || (requestKey ? `${requestKey}:${jobs.length}` : null),
+              dedupeKey: jobDedupeKey(job.dedupeKey, orgId, projectId, job.workId) || (requestKey ? `${requestKey}:${jobs.length}` : null),
               orgId,
               projectId,
             });
@@ -1262,7 +1280,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
               projectId,
               workId: body.workId || null,
               maxQueueDepth: maxJobQueueDepth,
-              dedupeKey: body.dedupeKey || requestKey,
+              dedupeKey: jobDedupeKey(body.dedupeKey, orgId, projectId, body.workId) || requestKey,
             });
           } catch (error) {
             if (error?.message === 'job queue depth exceeded') return json(res, 429, { error: error.message });
@@ -1394,7 +1412,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
             const g = await guard(src, req, ACTIONS.submit_evidence, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
             const body = await readBody(req, maxJsonBodyBytes);
-            const e = await src.addEvidenceAsync({ orgId, projectId, changeId, ...body });
+            const e = await src.addEvidenceAsync({ ...body, orgId, projectId, changeId });
             return json(res, 201, e);
           }
 
@@ -1428,10 +1446,11 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           }
 
           if (crest === '/decision' && req.method === 'POST') {
-            const g = await guard(src, req, ACTIONS.accept_change, { org: orgId, project: projectId });
-            if (g) return json(res, g.status, g.body);
+            const credential = await sessionCredential(src, req);
+            const auth = await authorizeRequestAsync(src.capabilities, req, ACTIONS.accept_change, { org: orgId, project: projectId, work: workId, credential });
+            if (!auth.ok) return json(res, auth.status, { error: auth.error });
             const body = await readBody(req, maxJsonBodyBytes);
-            const d = await src.makeDecisionAsync({ orgId, projectId, changeId, decision: body.decision, decider: body.decider, reasoning: body.reasoning });
+            const d = await src.makeDecisionAsync({ orgId, projectId, changeId, decision: body.decision, decider: auth.cap.principalId, reasoning: body.reasoning });
             return json(res, 201, d);
           }
         }
@@ -1530,7 +1549,7 @@ export function startServer(src, opts = {}) {
     server.once('error', reject);
     server.listen({
       port: opts.port ?? 8787,
-      host: opts.host,
+      host: opts.host || '127.0.0.1',
       backlog: opts.backlog ?? Math.max(511, opts.maxConnections ?? 10_000),
     }, () => resolve(server));
   });

@@ -88,6 +88,21 @@ export class Source {
     return typeof this.store.transactionAsync === 'function' ? this.store.transactionAsync(fn) : fn();
   }
 
+  async _projectMutationAsync(orgId, projectId, mutate) {
+    const release = await this.canonicalLocks.acquire(`${orgId}:${projectId}`);
+    if (!release) {
+      const error = new Error('project mutation admission exhausted');
+      error.code = 'CANONICAL_ADMISSION_EXHAUSTED';
+      throw error;
+    }
+    try {
+      return await this._asyncTransaction(async () => {
+        if (typeof this.store.lockProjectAsync === 'function') await this.store.lockProjectAsync(orgId, projectId);
+        return mutate();
+      });
+    } finally { release(); }
+  }
+
   // --- path helpers -----------------------------------------------------
   _orgRel(orgId) {
     return `orgs/${orgId}`;
@@ -261,19 +276,21 @@ export class Source {
   }
 
   async updateProjectAsync({ orgId, projectId, name, description = '', visibility = 'private' }) {
-    if (!['private', 'public'].includes(visibility)) throw new Error('invalid project visibility');
-    const project = await this.getProjectAsync(orgId, projectId);
-    if (!project) throw new Error(`project not found: ${projectId}`);
-    project.name = String(name || project.name).slice(0, 200);
-    project.description = String(description || '').slice(0, 10_000);
-    project.visibility = visibility;
-    if (Array.isArray(project.repositories)) {
-      const repos = await Promise.all(project.repositories.map((id) => this.getRepositoryAsync(orgId, projectId, id)));
-      await Promise.all(repos.filter(Boolean).map((repo) => this._asyncWrite(`${this._projectRel(orgId, projectId)}/repos/${repo.id}.json`, { ...repo, visibility })));
-    }
-    await this._asyncWrite(`${this._projectRel(orgId, projectId)}/project.json`, project);
-    await this._asyncAudit({ event: 'project.update', orgId, projectId, visibility });
-    return project;
+    return this._projectMutationAsync(orgId, projectId, async () => {
+      if (!['private', 'public'].includes(visibility)) throw new Error('invalid project visibility');
+      const project = await this.getProjectAsync(orgId, projectId);
+      if (!project) throw new Error(`project not found: ${projectId}`);
+      project.name = String(name || project.name).slice(0, 200);
+      project.description = String(description || '').slice(0, 10_000);
+      project.visibility = visibility;
+      if (Array.isArray(project.repositories)) {
+        const repos = await Promise.all(project.repositories.map((id) => this.getRepositoryAsync(orgId, projectId, id)));
+        await Promise.all(repos.filter(Boolean).map((repo) => this._asyncWrite(`${this._projectRel(orgId, projectId)}/repos/${repo.id}.json`, { ...repo, visibility })));
+      }
+      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/project.json`, project);
+      await this._asyncAudit({ event: 'project.update', orgId, projectId, visibility });
+      return project;
+    });
   }
 
   listProjects(orgId, { cursor, limit } = {}) {
@@ -320,19 +337,21 @@ export class Source {
   }
 
   async createRepositoryAsync({ orgId, projectId, name, defaultBranch = 'main' }) {
-    const project = await this.getProjectAsync(orgId, projectId);
-    if (!project) throw new Error(`project not found: ${projectId}`);
-    if (!Array.isArray(project.repositories) || project.repositories.length >= MAX_PROJECT_REPOSITORIES) throw new Error('project repository limit exceeded');
-    const id = await nextIdAsync(this.store, 'repository');
-    const repo = { id, projectId, name, defaultBranch, barePath: this._repoPath(orgId, projectId, id), visibility: project.visibility, createdAt: new Date().toISOString() };
-    new GitRepo(repo.barePath).init(defaultBranch);
-    project.repositories.push(id);
-    await this._asyncTransaction(async () => {
-      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/project.json`, project);
-      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/repos/${id}.json`, repo);
+    return this._projectMutationAsync(orgId, projectId, async () => {
+      const project = await this.getProjectAsync(orgId, projectId);
+      if (!project) throw new Error(`project not found: ${projectId}`);
+      if (!Array.isArray(project.repositories) || project.repositories.length >= MAX_PROJECT_REPOSITORIES) throw new Error('project repository limit exceeded');
+      const id = await nextIdAsync(this.store, 'repository');
+      const repo = { id, projectId, name, defaultBranch, barePath: this._repoPath(orgId, projectId, id), visibility: project.visibility, createdAt: new Date().toISOString() };
+      new GitRepo(repo.barePath).init(defaultBranch);
+      project.repositories.push(id);
+      await this._asyncTransaction(async () => {
+        await this._asyncWrite(`${this._projectRel(orgId, projectId)}/project.json`, project);
+        await this._asyncWrite(`${this._projectRel(orgId, projectId)}/repos/${id}.json`, repo);
+      });
+      await this._asyncAudit({ event: 'repository.create', orgId, projectId, repoId: id, name });
+      return repo;
     });
-    await this._asyncAudit({ event: 'repository.create', orgId, projectId, repoId: id, name });
-    return repo;
   }
 
   getRepository(orgId, projectId, repoId) {
@@ -345,15 +364,17 @@ export class Source {
   }
 
   async updateRepositoryAsync({ orgId, projectId, repoId, name, defaultBranch }) {
-    const repo = await this.getRepositoryAsync(orgId, projectId, repoId);
-    if (!repo) throw new Error(`repository not found: ${repoId}`);
-    if (name != null && !/^[A-Za-z0-9._-]{1,120}$/.test(String(name))) throw new Error('invalid repository name');
-    if (defaultBranch != null && (repo.artifacts || artifactsBinding(new GitRepo(repo.barePath)))) throw new Error('bound Artifacts default branch is immutable');
-    if (defaultBranch != null && !/^[A-Za-z0-9._/-]{1,200}$/.test(String(defaultBranch))) throw new Error('invalid default branch');
-    const updated = { ...repo, ...(name == null ? {} : { name: String(name) }), ...(defaultBranch == null ? {} : { defaultBranch: String(defaultBranch) }) };
-    await this._asyncWrite(`${this._projectRel(orgId, projectId)}/repos/${repoId}.json`, updated);
-    await this._asyncAudit({ event: 'repository.update', orgId, projectId, repoId });
-    return updated;
+    return this._projectMutationAsync(orgId, projectId, async () => {
+      const repo = await this.getRepositoryAsync(orgId, projectId, repoId);
+      if (!repo) throw new Error(`repository not found: ${repoId}`);
+      if (name != null && !/^[A-Za-z0-9._-]{1,120}$/.test(String(name))) throw new Error('invalid repository name');
+      if (defaultBranch != null && (repo.artifacts || artifactsBinding(new GitRepo(repo.barePath)))) throw new Error('bound Artifacts default branch is immutable');
+      if (defaultBranch != null && !/^[A-Za-z0-9._/-]{1,200}$/.test(String(defaultBranch))) throw new Error('invalid default branch');
+      const updated = { ...repo, ...(name == null ? {} : { name: String(name) }), ...(defaultBranch == null ? {} : { defaultBranch: String(defaultBranch) }) };
+      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/repos/${repoId}.json`, updated);
+      await this._asyncAudit({ event: 'repository.update', orgId, projectId, repoId });
+      return updated;
+    });
   }
 
   async bindArtifactsRepositoryAsync({ orgId, projectId, repoId, name, createRemote = false }) {
@@ -629,6 +650,7 @@ export class Source {
   }
 
   getHumanSession(sessionId) {
+    if (typeof sessionId !== 'string' || !/^[a-f0-9]{48}$/.test(sessionId)) return null;
     const session = typeof this.store.readHumanSession === 'function'
       ? this.store.readHumanSession(sessionId)
       : this.store.readJson(this._humanSessionRel(sessionId));
@@ -665,6 +687,7 @@ export class Source {
   }
 
   async getHumanSessionAsync(sessionId) {
+    if (typeof sessionId !== 'string' || !/^[a-f0-9]{48}$/.test(sessionId)) return null;
     const session = typeof this.store.readHumanSessionAsync === 'function'
       ? await this.store.readHumanSessionAsync(sessionId)
       : (typeof this.store.readJsonAsync === 'function'
@@ -684,6 +707,7 @@ export class Source {
   }
 
   revokeHumanSession(sessionId) {
+    if (typeof sessionId !== 'string' || !/^[a-f0-9]{48}$/.test(sessionId)) return null;
     if (typeof this.store.deleteHumanSession === 'function') {
       this.store.deleteHumanSession(sessionId);
       return;
@@ -696,6 +720,7 @@ export class Source {
   }
 
   async revokeHumanSessionAsync(sessionId) {
+    if (typeof sessionId !== 'string' || !/^[a-f0-9]{48}$/.test(sessionId)) return null;
     if (typeof this.store.deleteHumanSessionAsync === 'function') {
       await this.store.deleteHumanSessionAsync(sessionId);
       return;
@@ -776,13 +801,7 @@ export class Source {
       await this._asyncAudit({ event: 'work.claim', orgId, projectId, workId, principalId });
       return work;
     };
-    if (typeof this.store.lockProjectAsync === 'function' && typeof this.store.transactionAsync === 'function') {
-      return this.store.transactionAsync(async () => {
-        await this.store.lockProjectAsync(orgId, projectId);
-        return claim();
-      });
-    }
-    return claim();
+    return this._projectMutationAsync(orgId, projectId, claim);
   }
 
   assignWork({ orgId, projectId, workId, principalId }) {
@@ -811,18 +830,20 @@ export class Source {
   }
 
   async startSessionAsync({ orgId, projectId, workId, principalId, environment = {}, baseCommit = '' }) {
-    const work = await this.getWorkAsync(orgId, projectId, workId);
-    if (!work) throw new Error(`work not found: ${workId}`);
-    transitionWork(work, 'in_progress');
-    const id = await nextIdAsync(this.store, 'session');
-    const session = createSession({ id, workId, principal: principalId, environment, baseCommit });
-    work.sessions.push(id);
-    await this._asyncWriteMany([
-      [`${this._projectRel(orgId, projectId)}/sessions/${id}.json`, session],
-      [`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work],
-    ]);
-    await this._asyncAudit({ event: 'session.start', orgId, projectId, workId, sessionId: id, principalId });
-    return session;
+    return this._projectMutationAsync(orgId, projectId, async () => {
+      const work = await this.getWorkAsync(orgId, projectId, workId);
+      if (!work) throw new Error(`work not found: ${workId}`);
+      transitionWork(work, 'in_progress');
+      const id = await nextIdAsync(this.store, 'session');
+      const session = createSession({ id, workId, principal: principalId, environment, baseCommit });
+      work.sessions.push(id);
+      await this._asyncWriteMany([
+        [`${this._projectRel(orgId, projectId)}/sessions/${id}.json`, session],
+        [`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work],
+      ]);
+      await this._asyncAudit({ event: 'session.start', orgId, projectId, workId, sessionId: id, principalId });
+      return session;
+    });
   }
 
   getSession(orgId, projectId, sessionId) {
@@ -860,27 +881,29 @@ export class Source {
   }
 
   async submitChangeAsync({ orgId, projectId, workId, sessionId, baseCommit = '', headCommit = '', repositories = [], repositoryChanges = null }) {
-    if (!Array.isArray(repositories) || (repositoryChanges != null && !Array.isArray(repositoryChanges)) || repositories.length > MAX_CHANGE_REPOSITORIES || (repositoryChanges && repositoryChanges.length > MAX_CHANGE_REPOSITORIES)) throw new Error('change repository limit exceeded');
-    const work = await this.getWorkAsync(orgId, projectId, workId);
-    if (!work) throw new Error(`work not found: ${workId}`);
-    transitionWork(work, 'submitted');
-    const id = await nextIdAsync(this.store, 'change');
-    const change = createChange({ id, workId, sessionId, baseCommit, headCommit, repositories, repositoryChanges });
-    work.changes.push(id);
-    const session = sessionId
-      ? (typeof this.store.readJsonAsync === 'function'
-        ? await this.store.readJsonAsync(`${this._projectRel(orgId, projectId)}/sessions/${sessionId}.json`)
-        : this.getSession(orgId, projectId, sessionId))
-      : null;
-    if (session) session.changes.push(id);
-    const writes = [
-      [`${this._projectRel(orgId, projectId)}/changes/${id}.json`, change],
-      [`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work],
-    ];
-    if (session) writes.push([`${this._projectRel(orgId, projectId)}/sessions/${sessionId}.json`, session]);
-    await this._asyncWriteMany(writes);
-    await this._asyncAudit({ event: 'change.submit', orgId, projectId, workId, changeId: id, baseCommit, headCommit });
-    return change;
+    return this._projectMutationAsync(orgId, projectId, async () => {
+      if (!Array.isArray(repositories) || (repositoryChanges != null && !Array.isArray(repositoryChanges)) || repositories.length > MAX_CHANGE_REPOSITORIES || (repositoryChanges && repositoryChanges.length > MAX_CHANGE_REPOSITORIES)) throw new Error('change repository limit exceeded');
+      const work = await this.getWorkAsync(orgId, projectId, workId);
+      if (!work) throw new Error(`work not found: ${workId}`);
+      transitionWork(work, 'submitted');
+      const id = await nextIdAsync(this.store, 'change');
+      const change = createChange({ id, workId, sessionId, baseCommit, headCommit, repositories, repositoryChanges });
+      work.changes.push(id);
+      const session = sessionId
+        ? (typeof this.store.readJsonAsync === 'function'
+          ? await this.store.readJsonAsync(`${this._projectRel(orgId, projectId)}/sessions/${sessionId}.json`)
+          : this.getSession(orgId, projectId, sessionId))
+        : null;
+      if (session) session.changes.push(id);
+      const writes = [
+        [`${this._projectRel(orgId, projectId)}/changes/${id}.json`, change],
+        [`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work],
+      ];
+      if (session) writes.push([`${this._projectRel(orgId, projectId)}/sessions/${sessionId}.json`, session]);
+      await this._asyncWriteMany(writes);
+      await this._asyncAudit({ event: 'change.submit', orgId, projectId, workId, changeId: id, baseCommit, headCommit });
+      return change;
+    });
   }
 
   getChange(orgId, projectId, changeId) {
@@ -935,23 +958,25 @@ export class Source {
   }
 
   async addEvidenceAsync({ orgId, projectId, changeId, subject, claim, type, producer, artifact = null, result = null, provenance = {}, environment = {}, sourceRevision = null, validity = 'valid' }) {
-    const change = await this.getChangeAsync(orgId, projectId, changeId);
-    if (!change) throw new Error(`change not found: ${changeId}`);
-    if (change.evidence.length >= MAX_CHANGE_EVIDENCE) throw new Error('change evidence limit exceeded');
-    const id = await nextIdAsync(this.store, 'evidence');
-    let artifactRef = null;
-    if (artifact != null) {
-      const bytes = this._artifactBytes(artifact);
-      artifactRef = typeof this.store.putArtifactAsync === 'function' ? await this.store.putArtifactAsync(bytes) : this.store.putArtifact(bytes);
-    }
-    const evidence = createEvidence({ id, subject, claim, type, producer, artifactRef, result, provenance, environment, sourceRevision, validity });
-    change.evidence.push(id);
-    await this._asyncWriteMany([
-      [`${this._projectRel(orgId, projectId)}/evidence/${id}.json`, evidence],
-      [`${this._projectRel(orgId, projectId)}/changes/${change.id}.json`, change],
-    ]);
-    await this._asyncAudit({ event: 'evidence.add', orgId, projectId, changeId, evidenceId: id, type, claim, validity });
-    return evidence;
+    return this._projectMutationAsync(orgId, projectId, async () => {
+      const change = await this.getChangeAsync(orgId, projectId, changeId);
+      if (!change) throw new Error(`change not found: ${changeId}`);
+      if (change.evidence.length >= MAX_CHANGE_EVIDENCE) throw new Error('change evidence limit exceeded');
+      const id = await nextIdAsync(this.store, 'evidence');
+      let artifactRef = null;
+      if (artifact != null) {
+        const bytes = this._artifactBytes(artifact);
+        artifactRef = typeof this.store.putArtifactAsync === 'function' ? await this.store.putArtifactAsync(bytes) : this.store.putArtifact(bytes);
+      }
+      const evidence = createEvidence({ id, subject, claim, type, producer, artifactRef, result, provenance, environment, sourceRevision, validity });
+      change.evidence.push(id);
+      await this._asyncWriteMany([
+        [`${this._projectRel(orgId, projectId)}/evidence/${id}.json`, evidence],
+        [`${this._projectRel(orgId, projectId)}/changes/${change.id}.json`, change],
+      ]);
+      await this._asyncAudit({ event: 'evidence.add', orgId, projectId, changeId, evidenceId: id, type, claim, validity });
+      return evidence;
+    });
   }
 
   getEvidence(orgId, projectId, evidenceId) {
@@ -1060,18 +1085,20 @@ export class Source {
   }
 
   async evaluateChangeAsync({ orgId, projectId, changeId }) {
-    const change = await this.getChangeAsync(orgId, projectId, changeId);
-    if (!change) throw new Error(`change not found: ${changeId}`);
-    const policy = await this.getPolicyAsync(orgId, projectId);
-    const evidenceList = await this.getEvidenceManyAsync(orgId, projectId, change.evidence);
-    const evaluation = evaluateEvidence(policy, evidenceList);
-    const interpretation = interpret(evaluation);
-    if (change.reviewState === 'pending') {
-      transitionChange(change, 'in_review');
-      await this._asyncWrite(`${this._projectRel(orgId, projectId)}/changes/${change.id}.json`, change);
-    }
-    await this._asyncAudit({ event: 'policy.evaluate', orgId, projectId, changeId, ok: evaluation.ok, missing: evaluation.missing.length });
-    return { evaluation, interpretation, change };
+    return this._projectMutationAsync(orgId, projectId, async () => {
+      const change = await this.getChangeAsync(orgId, projectId, changeId);
+      if (!change) throw new Error(`change not found: ${changeId}`);
+      const policy = await this.getPolicyAsync(orgId, projectId);
+      const evidenceList = await this.getEvidenceManyAsync(orgId, projectId, change.evidence);
+      const evaluation = evaluateEvidence(policy, evidenceList);
+      const interpretation = interpret(evaluation);
+      if (change.reviewState === 'pending') {
+        transitionChange(change, 'in_review');
+        await this._asyncWrite(`${this._projectRel(orgId, projectId)}/changes/${change.id}.json`, change);
+      }
+      await this._asyncAudit({ event: 'policy.evaluate', orgId, projectId, changeId, ok: evaluation.ok, missing: evaluation.missing.length });
+      return { evaluation, interpretation, change };
+    });
   }
 
   // --- decision ---------------------------------------------------------
@@ -1151,49 +1178,51 @@ export class Source {
   }
 
   async makeDecisionAsync({ orgId, projectId, changeId, decision, decider, reasoning = '' }) {
-    const change = await this.getChangeAsync(orgId, projectId, changeId);
-    if (!change) throw new Error(`change not found: ${changeId}`);
-    if ((change.decisions || []).length >= MAX_CHANGE_DECISIONS) throw new Error('change decision limit exceeded');
-    const policy = await this.getPolicyAsync(orgId, projectId);
-    const deciderPrincipal = await this.getPrincipalAsync(decider);
-    if (!deciderPrincipal) throw new Error(`principal not found: ${decider}`);
-    if (decision === 'accepted' && !canApprove(policy, deciderPrincipal.type)) {
-      throw new Error(`principal type ${deciderPrincipal.type} may not accept (policy requires human)`);
-    }
-    const evidenceList = await this.getEvidenceManyAsync(orgId, projectId, change.evidence);
-    if (decision === 'accepted') {
-      const evaluation = evaluateEvidence(policy, evidenceList);
-      if (!evaluation.ok) throw new Error(`cannot accept: missing evidence (${evaluation.missing.map((m) => m.type).join(', ')})`);
-    }
-    const id = await nextIdAsync(this.store, 'decision');
-    const evidenceSnapshot = evidenceList.map((e) => ({ id: e.id, integrity: e.integrity }));
-    const decisionRecord = createDecision({
-      id, changeId, decision, decider, authority: 'policy', policyRef: policy.id,
-      evidenceSnapshot, reasoning, sourceState: change.headCommit, sourceStates: change.repositoryChanges,
+    return this._projectMutationAsync(orgId, projectId, async () => {
+      const change = await this.getChangeAsync(orgId, projectId, changeId);
+      if (!change) throw new Error(`change not found: ${changeId}`);
+      if ((change.decisions || []).length >= MAX_CHANGE_DECISIONS) throw new Error('change decision limit exceeded');
+      const policy = await this.getPolicyAsync(orgId, projectId);
+      const deciderPrincipal = await this.getPrincipalAsync(decider);
+      if (!deciderPrincipal) throw new Error(`principal not found: ${decider}`);
+      if (decision === 'accepted' && !canApprove(policy, deciderPrincipal.type)) {
+        throw new Error(`principal type ${deciderPrincipal.type} may not accept (policy requires human)`);
+      }
+      const evidenceList = await this.getEvidenceManyAsync(orgId, projectId, change.evidence);
+      if (decision === 'accepted') {
+        const evaluation = evaluateEvidence(policy, evidenceList);
+        if (!evaluation.ok) throw new Error(`cannot accept: missing evidence (${evaluation.missing.map((m) => m.type).join(', ')})`);
+      }
+      const id = await nextIdAsync(this.store, 'decision');
+      const evidenceSnapshot = evidenceList.map((e) => ({ id: e.id, integrity: e.integrity }));
+      const decisionRecord = createDecision({
+        id, changeId, decision, decider, authority: 'policy', policyRef: policy.id,
+        evidenceSnapshot, reasoning, sourceState: change.headCommit, sourceStates: change.repositoryChanges,
+      });
+      if (change.reviewState === 'pending') transitionChange(change, 'in_review');
+      change.decisionState = decisionToChangeState(decision);
+      if (decision === 'accepted') transitionChange(change, 'approved');
+      else if (decision === 'rejected') transitionChange(change, 'rejected');
+      else if (decision === 'revision_requested') transitionChange(change, 'changes_requested');
+      if (!change.decisions) change.decisions = [];
+      if (!change.decisions.includes(id)) change.decisions.push(id);
+      const work = await this.getWorkAsync(orgId, projectId, change.workId);
+      if (work) {
+        work.decisions.push(id);
+        if (work.status === 'submitted') transitionWork(work, 'in_review');
+        if (decision === 'accepted') transitionWork(work, 'accepted');
+        else if (decision === 'rejected') transitionWork(work, 'rejected');
+        else if (decision === 'revision_requested') transitionWork(work, 'revision_requested');
+      }
+      const writes = [
+        [`${this._projectRel(orgId, projectId)}/decisions/${id}.json`, decisionRecord],
+        [`${this._projectRel(orgId, projectId)}/changes/${change.id}.json`, change],
+      ];
+      if (work) writes.push([`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work]);
+      await this._asyncWriteMany(writes);
+      await this._asyncAudit({ event: 'decision.make', orgId, projectId, changeId, decisionId: id, decision, decider });
+      return decisionRecord;
     });
-    if (change.reviewState === 'pending') transitionChange(change, 'in_review');
-    change.decisionState = decisionToChangeState(decision);
-    if (decision === 'accepted') transitionChange(change, 'approved');
-    else if (decision === 'rejected') transitionChange(change, 'rejected');
-    else if (decision === 'revision_requested') transitionChange(change, 'changes_requested');
-    if (!change.decisions) change.decisions = [];
-    if (!change.decisions.includes(id)) change.decisions.push(id);
-    const work = await this.getWorkAsync(orgId, projectId, change.workId);
-    if (work) {
-      work.decisions.push(id);
-      if (work.status === 'submitted') transitionWork(work, 'in_review');
-      if (decision === 'accepted') transitionWork(work, 'accepted');
-      else if (decision === 'rejected') transitionWork(work, 'rejected');
-      else if (decision === 'revision_requested') transitionWork(work, 'revision_requested');
-    }
-    const writes = [
-      [`${this._projectRel(orgId, projectId)}/decisions/${id}.json`, decisionRecord],
-      [`${this._projectRel(orgId, projectId)}/changes/${change.id}.json`, change],
-    ];
-    if (work) writes.push([`${this._projectRel(orgId, projectId)}/work/${work.id}.json`, work]);
-    await this._asyncWriteMany(writes);
-    await this._asyncAudit({ event: 'decision.make', orgId, projectId, changeId, decisionId: id, decision, decider });
-    return decisionRecord;
   }
 
   getDecision(orgId, projectId, decisionId) {
@@ -1406,6 +1435,8 @@ export class Source {
     }
     try {
       const apply = async () => {
+        const current = await this.getChangeAsync(orgId, projectId, changeId);
+        if (!current || current.decisionState !== 'accepted') throw new Error('change is no longer accepted');
         const results = new Array(targets.length);
         let nextTarget = 0;
         const applyTarget = async () => {
