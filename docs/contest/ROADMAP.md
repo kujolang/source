@@ -18,8 +18,8 @@ and historical milestones; this file records current contest readiness.
 
 ## Required before contest entry
 
-1. Enable paid Workers/Artifacts access (owner deferred this); deploy the bootstrap
-   and pass real create/push/clone verification. Then verify the implemented Source review and
+1. Paid access, Worker deployment and real create/push/clone now pass
+   ([evidence](CLOUDFLARE_LIVE.md)). Verify the implemented Source review and
    canonical Git flow against the real Artifacts service; local emulation is insufficient.
 2. Repeat the three-client flow against that integration and retain genuine cloud
    evidence. Demonstrate any claimed LLM-agent behavior with real agents; the current

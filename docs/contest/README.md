@@ -2,14 +2,15 @@
 
 Updated 2026-10-13. Local preparation is usable; **the contest submission is not
 ready** until the mandatory live Cloudflare integration and owner steps are done.
-Workers/Artifacts account setup was deferred by the owner.
+Workers Paid is active and the live bootstrap passes; the complete Source review
+and concurrent collaboration flow still needs live verification.
 
 ## Completed local preparation
 
 - [x] Establish the repository baseline, license and release status: now public (2026-10-13),
   MIT, no official GitHub releases at review time.
 - [x] Implement authenticated Workers/Artifacts bootstrap, local tests and real
-  remote push/clone smoke command (live execution is still blocked).
+  remote push/clone smoke command; [live bootstrap passed](CLOUDFLARE_LIVE.md).
 - [x] Apply js-yaml 4.3.2 dependency fix and check runtime dependency audit.
 - [x] Build repeatable three-client fixture: separate processes, scoped API
   credentials, overlapping changes, executed evidence, denied agent approvals,
@@ -39,8 +40,9 @@ Workers/Artifacts account setup was deferred by the owner.
 
 ## Pending account, environment and owner gates
 
-- [ ] Owner enables paid Workers/Artifacts; deploy and verify actual remote
-  create/push/independent clone. Then verify the implemented Source/Artifacts hybrid lifecycle live.
+- [x] Owner enables paid Workers/Artifacts; deploy and verify actual remote
+  create/push/independent clone ([evidence](CLOUDFLARE_LIVE.md)).
+- [ ] Verify the implemented Source/Artifacts review and promotion lifecycle live.
 - [ ] Re-run the collaboration flow against the actual cloud integration and
   preserve non-secret deployment/evidence/commit identifiers.
 - [x] Publish the repository and obtain green remote checks, including the

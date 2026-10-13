@@ -1,0 +1,39 @@
+{
+  "ok": true,
+  "repository": "source-smoke-eaa1dc3c-9db5-4382-ad00-c9e2e00d213d",
+  "remote": "https://a083a2a33b2271724650a97a6f4a1cdc.artifacts.cloudflare.net/git/source-bootstrap/source-smoke-eaa1dc3c-9db5-4382-ad00-c9e2e00d213d.git",
+  "commit": "5d74444896ef7bfb31eafb5dab7b0d0cff42f390",
+  "verified": [
+    "worker-create",
+    "git-push",
+    "git-clone",
+    "commit-and-content-match",
+    "health",
+    "unauthenticated-401",
+    "source-bridge-live-credentials",
+    "nonempty-resume-rejected"
+  ],
+  "worker": "https://source-artifacts-bootstrap.devio-digital.workers.dev",
+  "verifiedAt": "2026-10-13T18:18:50.587Z",
+  "sourceCommit": "6d76755d0b4726ccbacb6b1c00c58f0f46cb0be7",
+  "workerVersion": "b171c348-eac7-430b-9275-f51f3e0cf692",
+  "recoveredFixture": {
+    "ok": true,
+    "repository": "source-smoke-fa9ec5c9-b232-4388-b90c-007e9ae470b6",
+    "remote": "https://a083a2a33b2271724650a97a6f4a1cdc.artifacts.cloudflare.net/git/source-bootstrap/source-smoke-fa9ec5c9-b232-4388-b90c-007e9ae470b6.git",
+    "commit": "cfa8b3d754ad818ef2465c6184338231ff2fbd56",
+    "verified": [
+      "worker-token-existing-repo",
+      "git-push",
+      "git-clone",
+      "commit-and-content-match",
+      "worker-create-confirmed-by-namespace-list",
+      "health",
+      "unauthenticated-401",
+      "source-bridge-live-credentials"
+    ],
+    "worker": "https://source-artifacts-bootstrap.devio-digital.workers.dev",
+    "verifiedAt": "2026-10-13T18:18:08.227Z",
+    "workerVersion": "b171c348-eac7-430b-9275-f51f3e0cf692"
+  }
+}

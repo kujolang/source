@@ -5,7 +5,8 @@ creates an Artifacts repository, then a local Git client pushes a commit and
 clones it into an independent directory. The smoke command checks both the
 commit SHA and file content. Source's Node/Postgres review lifecycle now connects to this Worker through
 the operator-side [hybrid bridge](../../docs/contest/HYBRID.md). Local contract
-tests cover accepted promotion and recovery; live deployment remains unverified.
+tests cover accepted promotion and recovery. The [live bootstrap](../../docs/contest/CLOUDFLARE_LIVE.md)
+passed on October 13; the full review lifecycle remains unverified live.
 
 ## Run
 
@@ -59,8 +60,8 @@ Agents must not receive the operator secret or Artifacts write tokens.
 metadata and mints a five-minute write token. The bridge pins the remote URL,
 uses an expected-tip Git push and reconciles uncertain outcomes. Source enforces
 review and protects the local canonical branch. See [HYBRID.md](../../docs/contest/HYBRID.md)
-for binding commands, recovery and the local proof. No public visibility change,
-account upgrade or live deployment was performed as part of that implementation.
+for binding commands, recovery and the local proof. The initial implementation did not deploy or upgrade the account. The owner
+subsequently enabled Workers Paid, and the bootstrap is now deployed.
 
 Before deleting retained smoke fixtures, inspect their names with
 `npx wrangler artifacts repos list --help` and use the CLI's repository deletion
@@ -85,3 +86,17 @@ References:
   Then rerun `wrangler whoami`, confirm Artifacts namespace access, install the
   bootstrap secret, deploy, and run the smoke command above. Account upgrades
   were not performed by this change.
+
+## Live proof on October 13 2026
+
+The paid-plan blocker above is resolved. See [deployment evidence](../../docs/contest/CLOUDFLARE_LIVE.md)
+and the credential-free JSON report. All six Worker and nine integration tests pass.
+
+If creation succeeded but the smoke client stopped before pushing, inspect the
+namespace first. Set `SOURCE_SMOKE_REPOSITORY` to that exact repository to obtain
+a fresh token and resume without creating a duplicate. Resume refuses repositories
+with existing branch refs. Never retry creation merely because its result was uncertain.
+
+Artifacts tokens are opaque strings. Source checks nonempty printable ASCII and
+a 4096-character bound; it does not assume an undocumented token prefix. Tokens
+remain restricted to the validated and pinned Artifacts remote.

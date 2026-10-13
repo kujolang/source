@@ -1,6 +1,8 @@
 # Source / Workers / Artifacts hybrid
 
-Implemented locally; live Cloudflare deployment remains deferred. The local
+The [live bootstrap](CLOUDFLARE_LIVE.md) now passes Worker repository creation,
+Git push and independent clone. The complete Source review/promotion lifecycle
+and recovery scenarios remain verified locally only. The local
 contract rehearsal uses real Source services, Worker handlers and Git processes,
 but substitutes a local bare repository for the Artifacts service. It cannot
 prove Cloudflare availability, Git compatibility, latency or deployment capacity.
@@ -54,7 +56,7 @@ conflict recovery. Neither local rehearsal is genuine cloud footage.
 
 ## Operator binding after account setup
 
-This section is a runbook, not evidence that deployment happened. First deploy
+This section describes binding Source to the deployed bootstrap. To reproduce deployment, deploy
 [the Worker](../../cloudflare/artifacts-bootstrap/README.md), configure its
 `SOURCE_BOOTSTRAP_SECRET`, and verify access to the intended namespace. Provide
 the same secret privately to the Source process through a secret manager. Set
@@ -143,4 +145,5 @@ API contract checked against Cloudflare's
 [Workers binding reference](https://developers.cloudflare.com/artifacts/api/workers-binding/)
 on 2026-10-13: `get()` returns a disposable capability, `info()` supplies metadata,
 and `createToken()` returns `plaintext` plus `expiresAt`. Live compatibility is
-still unverified.
+verified for bootstrap creation, token minting, push and clone; the full lifecycle
+is still unverified live.

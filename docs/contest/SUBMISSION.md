@@ -32,8 +32,10 @@ local cache. An interrupted push leaves Work open until a retry confirms it.
 The local contract rehearsal executes real Source, Worker handlers and Git while
 emulating the Artifacts binding and remote service. It proves local integration
 and recovery behavior; it does not prove a deployed Cloudflare integration.
-Account setup remains deferred, so live create/push/clone and the combined cloud
-collaboration flow are still unverified. See [architecture and runbook](HYBRID.md).
+Workers Paid is active. The deployed Worker has passed actual repository creation,
+Git push and independent clone with matching commit/content ([live evidence](CLOUDFLARE_LIVE.md)).
+The combined Source review and concurrent collaboration flow is still unverified
+live. See [architecture and runbook](HYBRID.md).
 
 **Before entry:** replace this paragraph only with the exact deployed topology,
 verified URLs and successful remote behavior. Until then this mandatory criterion
