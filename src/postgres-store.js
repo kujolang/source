@@ -816,12 +816,15 @@ class PostgresStore {
       return relPath;
     }))];
     if (!paths.length) return [];
-    return this._fetchJsonRowsAsync(`
+    const rows = await this._fetchJsonRowsAsync(`
       SELECT path, json
       FROM ${this._qualified('records')}
       WHERE path IN (${paths.map(escapeSqlLiteral).join(',')})
-      ORDER BY path
     `);
+    // Preserve the caller's cursor order. Locale collation of paths (including
+    // .json) can differ from the ID ordering used to select the page.
+    const byPath = new Map(rows.map((row) => [row.path, row]));
+    return paths.map((recordPath) => byPath.get(recordPath)).filter(Boolean);
   }
 
   async findRepositoryAsync(orgId, projectId, repoRef) {

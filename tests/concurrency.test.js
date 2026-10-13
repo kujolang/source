@@ -248,6 +248,15 @@ test('Postgres workflow records use one bounded bulk read', async () => {
   await assert.rejects(() => store.readJsonManyAsync(Array.from({ length: 1_002 }, (_, index) => `W${index}`)), /0-1001/);
 });
 
+test('Postgres bulk hydration preserves cursor order independent of database collation', async () => {
+  const store = Object.create(PostgresStore.prototype);
+  store._qualified = (name) => `"source"."${name}"`;
+  // Some locales sort W10.json before W1.json, unlike the corresponding IDs.
+  store._fetchJsonRowsAsync = async () => ['W10', 'W1', 'W2'].map((id) => ({ path: `work/${id}.json`, json: { id } }));
+  const rows = await store.readJsonManyAsync(['work/W1.json', 'work/missing.json', 'work/W10.json', 'work/W2.json', 'work/W1.json']);
+  assert.deepEqual(rows.map((row) => row.json.id), ['W1', 'W10', 'W2']);
+});
+
 test('decision reads use one bounded bulk read', async () => {
   const { src, org, project } = freshSource();
   let paths;
