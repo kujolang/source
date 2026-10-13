@@ -26,7 +26,8 @@
     "demo:contest": "node scripts/contest/demo.js",
     "demo:serve": "node scripts/contest/serve.js",
     "test:cloudflare": "npm --prefix cloudflare/artifacts-bootstrap test",
-    "demo:hybrid": "node scripts/contest/hybrid.js"
+    "demo:hybrid": "node scripts/contest/hybrid.js",
+    "demo:cloudflare": "node scripts/contest/demo.js --live-cloudflare --trace"
   },
   "engines": {
     "node": ">=18"
