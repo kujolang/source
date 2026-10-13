@@ -10,3 +10,6 @@ docs
 .contest-demo
 .contest-results
 cloudflare
+
+# Local engineering run archives
+.loop-engineering/

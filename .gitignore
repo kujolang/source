@@ -6,3 +6,6 @@ node_modules/
 .source/
 .contest-demo/
 .contest-results/
+
+# Local engineering run archives
+.loop-engineering/
