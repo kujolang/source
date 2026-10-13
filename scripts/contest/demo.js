@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { monitorClient } from './client-lifecycle.js';
 import { Source } from '../../src/source.js';
 import { startServer } from '../../src/api.js';
 
@@ -52,26 +53,16 @@ try {
     const directory = path.join(root, job.label); mkdirSync(directory);
     const child = fork(new URL('./client.js', import.meta.url), [], {stdio: ['ignore','pipe','pipe','ipc']});
     children.push(child);
-    let readyResolve, doneResolve, reject;
-    const ready = new Promise((resolve) => {readyResolve=resolve;});
-    const done = new Promise((resolve, fail) => {doneResolve=resolve;reject=fail;});
-    // Make startup failure observable while waiting for the all-ready barrier.
-    const readyOrFailure = Promise.race([ready, done.then(() => {throw new Error('client exited before ready');})]);
-    const timer = setTimeout(() => {child.kill();reject(new Error(`${job.label} timed out`));}, 60000);
-    child.on('error', reject);
-    child.on('exit', (code) => {clearTimeout(timer);if(code) reject(new Error(`${job.label} exited ${code}`));});
-    child.on('message', (m) => {
-      if(m.type==='ready') readyResolve(m);
-      if(m.type==='done') doneResolve({...m, workId: work.id, directory, principalId: principal.id});
-      if(m.type==='error') reject(new Error(m.message));
-    });
+    const { ready, done } = monitorClient(child, job.label);
     child.stdout.resume(); child.stderr.resume();
     child.send({...job, directory, api, barePath: repo.barePath, base, workId: work.id, principalId: principal.id, credential: capability.credential});
-    return {ready:readyOrFailure,done,child};
+    return {ready,done,child,workId:work.id,directory,principalId:principal.id};
   });
   await Promise.all(tasks.map(t=>t.ready));
   for(const task of tasks) task.child.send({type:'go'});
-  const results = await Promise.all(tasks.map(t=>t.done));
+  const results = await Promise.all(tasks.map(async (task) => ({
+    ...await task.done, workId: task.workId, directory: task.directory, principalId: task.principalId,
+  })));
   assert.ok(Math.max(...results.map(r=>r.started)) < Math.min(...results.map(r=>r.ended)), 'three execution intervals must overlap');
   const verify = async (changeId, directory, oldBase, head) => {
     const output = execFileSync(process.execPath, ['verify.mjs'], {cwd:directory,encoding:'utf8',timeout:10000});
@@ -104,6 +95,7 @@ try {
       conflict=true;
       assert.equal(result.label,'agent-pages');
       assert.ok(existsSync(path.join(result.directory,'.git','rebase-merge')));
+      assert.equal(git(result.directory,'diff','--name-only','--diff-filter=U'),'settings.json');
       writeFileSync(path.join(result.directory,'settings.json'),'{"theme":"dark","pageSize":20}\n');
       git(result.directory,'add','settings.json');
       git(result.directory,'rebase','--continue');
