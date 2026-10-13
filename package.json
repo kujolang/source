@@ -10,7 +10,7 @@
   "scripts": {
     "test": "node --test --test-concurrency=1",
     "test:scale": "node --test tests/concurrency.test.js",
-    "test:postgres": "node --test tests/postgres-live.test.js",
+    "test:postgres": "node --test --test-concurrency=1 tests/postgres-claims-live.test.js tests/postgres-live.test.js",
     "test:container": "bash scripts/container-cluster-smoke.sh",
     "test:worker": "node --test tests/worker.test.js",
     "lint": "node scripts/lint.js",

@@ -92,7 +92,8 @@ test('Postgres async lifecycle and HTTP burst remain correct under a configurabl
 
     const queued = await Promise.all(Array.from({ length: 100 }, (_, i) => src.jobs.enqueue({ kind: 'agent.batch', payload: { index: i } })));
     const claims = (await Promise.all(Array.from({ length: 8 }, (_, i) => src.jobs.claim({ workerId: `worker-${i}`, limit: 20 })))).flat();
-    assert.equal(new Set(claims.map((job) => job.id)).size, queued.length);
+    assert.equal(claims.length, queued.length, 'one concurrent claim wave must lease each ready job once');
+    assert.equal(new Set(claims.map((job) => job.id)).size, claims.length, 'workers must never share an active job lease');
   await Promise.all(claims.map((job) => src.jobs.complete({ id: job.id, workerId: job.workerId, leaseToken: job.leaseToken, result: { ok: true } })));
     await Promise.all([
       ...Array.from({ length: 20 }, (_, i) => src.jobs.enqueue({ kind: 'agent.fair.project', payload: { index: i }, orgId: org.id, projectId: project.id })),

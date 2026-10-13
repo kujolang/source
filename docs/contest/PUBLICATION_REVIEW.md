@@ -77,3 +77,20 @@ is green for both jobs: full deterministic suite, both rehearsals, audit,
 PostgreSQL 16 fleet, actual Docker build and two-container writer failover.
 This closes the CI/container gates; independent-host capacity and live Cloudflare
 verification remain separate. No official release or contest submission was made.
+
+## October 13 follow-up: PostgreSQL job-claim race
+
+CI run `38447642505` passed deterministic checks but failed the live fleet gate:
+concurrent claimers did not produce 100 distinct job leases. The ranked CTE used
+a statement snapshot; a row could be leased by another worker before the lock
+was acquired, while the locked join lacked its own eligibility predicate.
+
+The candidate query now rechecks status, availability and lease expiry on the
+locked `jobs` row. A new live regression runs 12 rounds of eight concurrent
+claimers and verifies unique active leases, complete coverage and successful
+completion by each lease owner. Restoring the old query predicate in a temporary
+runtime interceptor reproduces 153 lease results for 100 distinct jobs; the fixed
+query passes all 12 rounds. The full local PostgreSQL profile also passes 5,000
+requests at concurrency 256 with zero errors. `npm run test:postgres` includes
+both the claim regression and fleet test. This is distinct from the earlier
+pagination-ordering fix.

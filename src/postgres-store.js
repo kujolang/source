@@ -1516,7 +1516,11 @@ class PostgresStore {
         FROM ${this._qualified('jobs')} j
         JOIN ranked r ON r.id = j.id
         CROSS JOIN scope_count s
-        WHERE r.project_rank <= ${safeProjectBurst} OR s.scopes <= 1
+        WHERE (r.project_rank <= ${safeProjectBurst} OR s.scopes <= 1)
+          -- Recheck the lock target itself. A concurrent claimant may have
+          -- committed since ranked took its statement snapshot.
+          AND ((j.status = 'queued' AND j.available_at <= NOW())
+            OR (j.status = 'leased' AND j.leased_until < NOW() AND j.attempts < j.max_attempts))
         ORDER BY j.created_at, j.id
         FOR UPDATE OF j SKIP LOCKED
         LIMIT ${safeLimit}
