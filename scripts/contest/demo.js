@@ -8,6 +8,8 @@ import { monitorClient } from './client-lifecycle.js';
 import { Source } from '../../src/source.js';
 import { startServer } from '../../src/api.js';
 
+const trace = (...message) => { if (process.argv.includes('--trace')) console.log('[Source]', ...message); };
+
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
 const parent = path.join(repoRoot, '.contest-demo');
 mkdirSync(parent, { recursive: true, mode: 0o700 });
@@ -33,6 +35,7 @@ writeFileSync(path.join(seed, 'README.md'), '# Concurrent collaboration example\
 writeFileSync(path.join(seed, 'verify.mjs'), `import assert from 'node:assert/strict';\nimport {readFileSync} from 'node:fs';\nconst s=JSON.parse(readFileSync('settings.json'));\nassert.ok(['light','dark'].includes(s.theme));\nassert.ok(Number.isInteger(s.pageSize)&&s.pageSize>0&&s.pageSize<=100);\nconsole.log('settings contract passed');\n`);
 git(seed, 'add', '.'); git(seed, 'commit', '-m', 'Seed contest fixture'); git(seed, 'push', repo.barePath, 'main');
 const base = git(seed, 'rev-parse', 'HEAD');
+trace('Seed Git repository ready: light theme, page size 10.');
 const server = await startServer(src, {host: '127.0.0.1', port: 0});
 const origin = `http://127.0.0.1:${server.address().port}`;
 const api = `${origin}/api/v1/orgs/${org.id}/projects/${project.id}`;
@@ -59,11 +62,14 @@ try {
     return {ready,done,child,workId:work.id,directory,principalId:principal.id};
   });
   await Promise.all(tasks.map(t=>t.ready));
+  trace('Three clients claimed Work and started sessions.');
   for(const task of tasks) task.child.send({type:'go'});
   const results = await Promise.all(tasks.map(async (task) => ({
     ...await task.done, workId: task.workId, directory: task.directory, principalId: task.principalId,
   })));
   assert.ok(Math.max(...results.map(r=>r.started)) < Math.min(...results.map(r=>r.ended)), 'three execution intervals must overlap');
+  for (const r of results) trace(r.label, 'submitted', r.changeId, '| self-approval HTTP', r.unauthorizedApprovalStatus);
+  trace('Concurrent execution confirmed.');
   const verify = async (changeId, directory, oldBase, head) => {
     const output = execFileSync(process.execPath, ['verify.mjs'], {cwd:directory,encoding:'utf8',timeout:10000});
     git(directory, 'diff', '--check', oldBase, head);
@@ -71,11 +77,13 @@ try {
       await src.addEvidenceAsync({...scope,changeId,subject:'executed demo verification',claim,type,producer:verifier.id,artifact,result:{status:'pass'}});
     }
     assert.equal((await src.evaluateChangeAsync({...scope,changeId})).evaluation.ok,true);
+    trace(changeId, 'tests and diff check passed; policy evidence satisfied.');
   };
   const accept = async (changeId) => {
     const d=await src.makeDecisionAsync({...scope,changeId,decision:'accepted',decider:human.id,reasoning:'Scripted demo maintainer: executed verification passed; review is simulated.'});
     decisions.push(d.id);
     assert.equal((await src.updateCanonicalStateAsync({...scope,changeId,repoId:repo.id})).ok,true);
+    trace(changeId, 'accepted by scripted maintainer; canonical Git advanced.');
   };
   const first=results[0];
   await verify(first.changeId,first.directory,base,first.head);
@@ -86,6 +94,7 @@ try {
     await verify(result.changeId,result.directory,base,result.head);
     const stale=await src.gitRepo(org.id,project.id,repo.id).fastForwardAsync(base,result.head,'main');
     assert.equal(stale.ok,false);
+    trace(result.changeId, 'stale proposal blocked; canonical Git unchanged.');
     assert.equal(git(repo.barePath,'rev-parse','main'),tip,'stale change must not move canonical state');
     await src.makeDecisionAsync({...scope,changeId:result.changeId,decision:'revision_requested',decider:human.id,reasoning:'Canonical base advanced; retain original proposal and rebase.'});
     git(result.directory,'fetch','origin','main');
@@ -93,12 +102,14 @@ try {
     try {git(result.directory,'rebase','origin/main');}
     catch {
       conflict=true;
+      trace(result.label, 'rebase stopped on a real settings.json conflict.');
       assert.equal(result.label,'agent-pages');
       assert.ok(existsSync(path.join(result.directory,'.git','rebase-merge')));
       assert.equal(git(result.directory,'diff','--name-only','--diff-filter=U'),'settings.json');
       writeFileSync(path.join(result.directory,'settings.json'),'{"theme":"dark","pageSize":20}\n');
       git(result.directory,'add','settings.json');
       git(result.directory,'rebase','--continue');
+      trace('Conflict resolved: keep dark theme and page size 20.');
     }
     assert.equal(conflict,result.label==='agent-pages');
     const head=git(result.directory,'rev-parse','HEAD');
@@ -109,8 +120,10 @@ try {
     await accept(revised.id);
     recovery.push({originalChange:result.changeId,revisedChange:revised.id,staleRejected:true,mergeConflict:conflict});
   }
+  trace('Recovery complete; reading canonical files.');
   const final=JSON.parse(git(repo.barePath,'show','main:settings.json'));
   assert.deepEqual(final,{theme:'dark',pageSize:20});
+  trace('Canonical settings:', JSON.stringify(final));
   assert.match(git(repo.barePath,'show','main:README.md'),/evidence and review/);
   const login=await fetch(`${origin}/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({principalId:human.id,password,orgId:org.id,projectId:project.id,management:'1'})});
   assert.equal(login.status,200);
