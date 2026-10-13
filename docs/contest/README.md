@@ -1,6 +1,6 @@
 # Source competition checklist
 
-Updated 2026-10-12. Local preparation is usable; **the contest submission is not
+Updated 2026-10-13. Local preparation is usable; **the contest submission is not
 ready** until the mandatory live Cloudflare integration and owner steps are done.
 Workers/Artifacts account setup was deferred by the owner.
 
@@ -24,6 +24,8 @@ Workers/Artifacts account setup was deferred by the owner.
 - [x] Prepare fresh-clone [runbook](RUNBOOK.md), [current roadmap](ROADMAP.md),
   [submission draft](SUBMISSION.md) and [seven-minute script](VIDEO_SCRIPT.md).
 - [x] Record actual verification and limits in [VALIDATION.md](VALIDATION.md).
+- [x] Complete [PR 2 local review](PR_REVIEW.md), repair the fleet probe and
+  client failure handling, and add regression coverage.
 
 ## Pending account, environment and owner gates
 
@@ -33,8 +35,9 @@ Workers/Artifacts account setup was deferred by the owner.
   preserve non-secret deployment/evidence/commit identifiers.
 - [ ] Restore GitHub Actions billing/spending availability and get remote checks
   green; the workflow changes alone do not restore the account.
-- [ ] Verify the default 256-request database burst and deployment cold-connect
-  capacity; local 5,000-participant validation passed only at HTTP concurrency 64.
+- [x] Verify the local 5,000-request database profile at default concurrency 256
+  with an isolated client process and an explicitly bounded connection pool.
+- [ ] Validate deployment cold-connect capacity from a separate host.
 - [ ] Run a real container build and two-container failover with a Docker daemon.
 - [ ] Complete visual browser QA (browser control was unavailable here).
 - [ ] Owner reviews public exposure, chooses the final entry commit, publishes

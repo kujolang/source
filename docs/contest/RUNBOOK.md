@@ -67,16 +67,13 @@ an LLM-agent demonstration nor a Cloudflare integration demonstration.
 SOURCE_TEST_DATABASE_URL='postgresql://USER@127.0.0.1:5432/TEST_DB' \
   SOURCE_LIVE_AGENTS=5000 npm run test:postgres
 
-# Separately labeled local profile verified on this macOS host:
-SOURCE_TEST_DATABASE_URL='postgresql://USER@127.0.0.1:5432/TEST_DB' \
-  SOURCE_LIVE_AGENTS=5000 SOURCE_LIVE_HTTP_CONCURRENCY=64 npm run test:postgres
-
 # Build when a working Docker daemon is available.
 docker build --tag source:local-audit .
 # See .github/workflows/ci.yml for the two-container failover environment.
 ```
 
-The live Postgres test has 5,000 lifecycle participants but bounds HTTP fan-out
+The live Postgres test runs its HTTP load generator in a separate process with
+a private keep-alive pool. It has 5,000 lifecycle participants but bounds HTTP fan-out
 (default 256) and database connections. Do not call this 5,000 simultaneous network
 connections. Optional sibling-repository integration tests skip when fixtures are
 absent; the live database test skips without its DSN.
