@@ -107,3 +107,23 @@
 .source-page .sk-badge.missing { border-color: var(--sk-state-danger); color: var(--sk-state-danger); background: transparent; }
 @media (max-width: 60rem) { .source-project-title, .source-layout, .source-repository-header { grid-template-columns: 1fr; display: grid; align-items: start; } .source-header-actions { justify-content: start; } .source-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 40rem) { .source-page { padding-block: var(--sk-space-4); } .source-stats, .source-form-row, .source-clone-options { grid-template-columns: 1fr; } .source-tabs { overflow-x: auto; flex-wrap: nowrap; } .source-tabs a { white-space: nowrap; } .source-copy-row, .source-file-header { display: grid; } .source-file-panel { padding: var(--sk-space-3); } }
+
+/* Keep nested grid content inside the viewport; tables/code scroll locally. */
+.source-page { min-inline-size: 0; overflow-wrap: anywhere; }
+.source-page > *, .source-page .sk-grid > *, .source-page .sk-card > * { min-inline-size: 0; }
+.source-page pre { max-inline-size: 100%; overflow: auto; }
+.source-nav-links { min-inline-size: 0; flex-wrap: wrap; }
+@media (max-width: 40rem) {
+  .source-primary-nav { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .source-nav-divider { display: none; }
+  .source-nav-links { grid-column: 1 / -1; grid-row: 2; }
+  .source-nav__form { grid-column: 2; grid-row: 1; }
+}
+
+.source-repo-section[hidden] { display: none; }
+
+.source-page .sk-table { overflow-wrap: normal; }
+@media (max-width: 40rem) {
+  .source-section-heading { display: grid; }
+  .source-branch-select { min-inline-size: 0; max-inline-size: 100%; }
+}

@@ -20,28 +20,34 @@ scanning).
 
 ## Status
 
-- **200/200 non-skipped default tests pass** (one documented opt-in skip), including a dogfood test against the real `spec` Kujo
-- The local human-facing UI is vendored against Kujo SiteKit 1.0 (`assets/sitekit/`) with SiteKit tokens, components, theme behavior, and Departure Mono assets; Source-specific composition lives in `assets/source.css`.
-  repository, Kujo evidence-integration tests against real Eval/Spec/ShipCheck
-  artifacts, smart-HTTP clone/fetch/push tests (authenticated and anonymous),
-  `source submit` contribution-flow tests, capability-gated API auth tests,
-  Git-transport auth tests (401/403), SQLite store transaction/contract tests,
-  multi-tenant org-management/tenant-isolation tests, TLS/deployment tests
-  (HTTPS + `git clone` over HTTPS), multi-repository Change tests, rate-limiting
-  tests, and credential-scanning tests.
-- Runtime dependency: `pg` for pooled Postgres production storage. Node.js ≥ 18
-  and `git` on PATH are also required. The SQLite backend requires Node ≥ 22.5
-  (`node:sqlite`); the JSON store works on Node ≥ 18.
-- Deterministic-first: no LLM is required for any operation in the slice.
-- The live Postgres profile has been verified at 5,000 concurrent agents locally;
-  CI continuously certifies the 5,000-agent gate and two-container writer
-  failover gate on every release-gate run.
+Source is an experimental, self-hosted implementation with working Git transport,
+capability-scoped API access, evidence/policy checks, review decisions, a human UI,
+and JSON, SQLite and Postgres storage. It is not a hosted production service.
+
+- Run the [three-client local rehearsal](docs/contest/RUNBOOK.md) to reproduce
+  concurrent proposals, denied agent approvals, stale-base rejection, actual Git
+  conflict recovery and final evidence-backed promotion. Clients and approvals
+  are scripted; no LLM or Cloudflare account is needed for this local profile.
+- Use Node.js 22 and Git for the contest runbook. SQLite uses `node:sqlite`;
+  production deployments use Postgres and durable Git storage.
+- See the dated [validation record](docs/contest/VALIDATION.md) for exact results
+  and skips. Local checks are distinct from GitHub Actions, container failover
+  and production capacity validation.
+- The [Workers/Artifacts hybrid bridge](docs/contest/HYBRID.md) connects accepted
+  Changes to remote canonical promotion and retry recovery. Local contract tests
+  pass; account setup and live Cloudflare verification remain deferred.
+- The [contest checklist](docs/contest/README.md) and [current roadmap](docs/contest/ROADMAP.md)
+  distinguish completed local work from remaining submission gates.
 
 ## Quick start
 
 ```bash
-# Run the test suite (includes the dogfood test against ../spec)
+# Install pinned dependencies and run tests (optional sibling fixtures may skip)
+npm ci
 npm test
+
+# Repeatable three-client local contest rehearsal
+npm run demo:contest
 
 # Run the live Postgres scale gate when a test database is available
 SOURCE_TEST_DATABASE_URL='postgresql://source:password@db/source' npm run test:postgres
@@ -91,9 +97,8 @@ node bin/source.js serve --port 8787
 node bin/source.js serve --host 0.0.0.0 --port 443 \
   --tls-key /path/to/privkey.pem --tls-cert /path/to/fullchain.pem
 
-JSON and SQLite stores are single-node backends. Exposed `serve` bindings
-require Postgres and writer fencing by default; `--allow-unsafe-local-store` is reserved for
-intentional local testing.
+# JSON and SQLite stores are single-node backends. Exposed serve bindings
+# require Postgres and writer fencing; --allow-unsafe-local-store is for local testing.
 
 # Production storage: use a pooled Postgres backend for multi-process serving
 SOURCE_DATABASE_URL='postgres://source:password@db/source' \
@@ -111,7 +116,7 @@ git clone http://source:<credential>@localhost:8787/git/O1/P1/R1.git
 node bin/source.js submit --url http://localhost:8787 --credential <credential>
 ```
 
-Repository-level acceptance criteria live in `[.spec.yml](.spec.yml)`. The
+Repository-level acceptance criteria live in [.spec.yml](.spec.yml). The
 portable checks are available through `npm run lint`, `npm run format:check`,
 and `npm test`; the GitHub Actions workflow mirrors those deterministic checks
 while Source's own Kujo release gate remains the authoritative ecosystem gate.
@@ -198,7 +203,7 @@ retried with bounded attempts. This is the worker-plane seam
 for batch workflows that should not run inside request handlers.
 Workers back off and report transient queue/database failures instead of
 terminating, while leases allow abandoned jobs to be recovered by another
-terminating. Idle polls and outage backoff include bounded jitter, preventing a
+worker. Idle polls and outage backoff include bounded jitter, preventing a
 large worker fleet from synchronizing claim storms. Shutdown drains for 30 seconds by default; a hung handler then leaves
 its lease to expire so another worker can recover the job. Handlers also have a
 15-minute execution timeout by default and receive an `AbortSignal`; tune it
@@ -306,6 +311,15 @@ deliveries require a provider signature and delivery ID and are replay-safe.
 Workflow dispatch is bounded to 1,000 jobs per event by default; operators can
 adjust the `maxWorkflowJobs` server option for a different controlled fan-out.
 
+## Cloudflare integration bootstrap
+
+The isolated [Workers and Artifacts bootstrap](cloudflare/artifacts-bootstrap/README.md)
+provides an authenticated repository-creation Worker and a Git push/clone smoke
+command. The [hybrid bridge](docs/contest/HYBRID.md) adds accepted-change
+promotion, conditional Git updates and interrupted-push reconciliation. Run
+`npm run demo:hybrid` for the local contract proof. The application lifecycle
+remains on Node/Postgres; live Artifacts access must be verified separately.
+
 ## Architecture
 
 A **modular monolith** in Node.js (ESM), with a small native Postgres client
@@ -365,4 +379,5 @@ The full architecture, domain model, threat model, and MVP scope are in
 
 ## License
 
-Licensing is intentionally undecided (see `01-product-interpretation.md`).
+Source is licensed under [MIT](LICENSE). Vendored asset licenses are listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

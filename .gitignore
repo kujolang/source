@@ -1,3 +1,11 @@
 audit-results/
 node_modules/
 .eval_results/
+
+# Runtime state and private local demo credentials
+.source/
+.contest-demo/
+.contest-results/
+
+# Local engineering run archives
+.loop-engineering/

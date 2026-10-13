@@ -1,7 +1,7 @@
 {
   "name": "source",
   "version": "0.1.0",
-  "description": "Source — agent-first software-development and collaboration platform built around Git",
+  "description": "Source \u2014 agent-first software-development and collaboration platform built around Git",
   "type": "module",
   "private": true,
   "bin": {
@@ -22,13 +22,17 @@
     "replicate:git": "node scripts/replicate-git.js",
     "replicate:postgres": "node scripts/replicate-postgres.js",
     "drill:failover": "node scripts/failover-drill.js",
-    "check:postgres-replication": "node scripts/check-postgres-replication.js"
+    "check:postgres-replication": "node scripts/check-postgres-replication.js",
+    "demo:contest": "node scripts/contest/demo.js",
+    "demo:serve": "node scripts/contest/serve.js",
+    "test:cloudflare": "npm --prefix cloudflare/artifacts-bootstrap test",
+    "demo:hybrid": "node scripts/contest/hybrid.js"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
-    "js-yaml": "^4.3.1",
+    "js-yaml": "^4.3.2",
     "pg": "^8.23.0"
   }
 }

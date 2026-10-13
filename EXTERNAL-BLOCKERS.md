@@ -5,11 +5,12 @@ repository alone. It is intentionally separate from implementation TODOs.
 
 ## Status
 
-Source's local implementation gates are passing, including the 5,000-agent
-Postgres profile, Docker writer failover, full Node test suite, dependency
-audit, Kujo Eval, Concord, Fence, and ShipCheck. The items below remain open
-because they require external infrastructure, credentials, or organizational
-evidence.
+As of 2026-10-13, the Node suite, local collaboration rehearsal, dependency
+audits, and isolated-client PostgreSQL profile pass on the reviewed contest
+branch. See [dated validation](docs/contest/VALIDATION.md) for exact scope.
+Docker failover and hosted CI have not been verified in this preparation:
+the Docker daemon is unavailable and GitHub Actions is account-blocked.
+Historical Kujo gate records are not a fresh certification of this branch.
 
 ## Open blockers
 

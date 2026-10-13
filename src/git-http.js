@@ -68,6 +68,7 @@ function parseCgiResponse(raw) {
 // the callbacks, preserving backpressure and avoiding packfile-sized buffers.
 export function gitHttpBackend({
   projectRoot,
+  hooksPath = null,
   pathInfo,
   queryString = '',
   method = 'GET',
@@ -96,12 +97,13 @@ export function gitHttpBackend({
       CONTENT_LENGTH: String(contentLength ?? (body ? body.length : 0)),
       REMOTE_ADDR: remoteAddr,
     };
+    delete env.SOURCE_BOOTSTRAP_SECRET;
     if (remoteUser) env.REMOTE_USER = remoteUser;
     // Protocol v2 negotiation: the client sends `Git-Protocol: version=2`.
     // `git http-backend` copies HTTP_GIT_PROTOCOL into GIT_PROTOCOL.
     if (headers['git-protocol']) env.HTTP_GIT_PROTOCOL = headers['git-protocol'];
 
-    const child = spawn('git', ['http-backend'], { env, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn('git', [...(hooksPath ? ['-c', `core.hooksPath=${hooksPath}`] : []), 'http-backend'], { env, stdio: ['pipe', 'pipe', 'pipe'] });
     const stdout = [];
     const stderr = [];
     let outputBytes = 0;

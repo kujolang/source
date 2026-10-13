@@ -10,6 +10,7 @@ RUN npm ci --omit=dev --ignore-scripts
 COPY bin ./bin
 COPY src ./src
 COPY scripts ./scripts
+COPY assets ./assets
 
 RUN mkdir -p /var/lib/source/data /var/lib/source/git \
   && chown -R node:node /app /var/lib/source

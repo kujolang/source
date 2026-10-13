@@ -1,0 +1,28 @@
+{
+  "profile": "postgres-live-http",
+  "clientProcess": "isolated",
+  "requests": 5000,
+  "concurrency": 256,
+  "maxSockets": 256,
+  "completed": 5000,
+  "ok": true,
+  "errors": 0,
+  "statuses": {
+    "200": 5000
+  },
+  "eventLoopTicks": 25,
+  "peakActive": 256,
+  "activeAtEnd": 0,
+  "latencyMs": {
+    "p50": 628.0264550000002,
+    "p95": 1353.813357000001,
+    "p99": 2446.903946,
+    "max": 3288.557503
+  },
+  "date": "2026-10-13",
+  "runtime": "Node 22.23.3",
+  "database": "PostgreSQL 14.20",
+  "sourceCommit": "3029fd2497046126702ffc06f0727fc2b8da6763",
+  "wholeTestDurationMs": 160579.844611,
+  "scope": "Local loopback, separate load-client process; no Cloudflare or production capacity claim"
+}

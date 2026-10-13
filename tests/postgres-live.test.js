@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -336,17 +338,19 @@ test('Postgres async lifecycle and HTTP burst remain correct under a configurabl
     assert.ok(claimedWebhookJobs.some((job) => job.id === webhookDispatch.workflows[0].jobs[0].id));
     await Promise.all([...claimedApiJobs, ...claimedWebhookJobs].map((job) => src.jobs.complete({ id: job.id, workerId: job.workerId, leaseToken: job.leaseToken, result: { ok: true } })));
     const url = `http://127.0.0.1:${server.address().port}/.well-known/source`;
-    const responseStatuses = [];
-    let nextRequest = 0;
-    async function requestWorker() {
-      while (true) {
-        const index = nextRequest++;
-        if (index >= agentCount) return;
-        responseStatuses[index] = (await fetch(url)).status;
-      }
-    }
-    await Promise.all(Array.from({ length: httpConcurrency }, requestWorker));
-    assert.equal(responseStatuses.filter((status) => status === 200).length, agentCount);
+    // Keep load generation off the serving event loop. A same-process client
+    // can starve connection acceptance on this host, even on a plain HTTP server.
+    const { stdout } = await promisify(execFile)(process.execPath, [
+      fileURLToPath(new URL('../scripts/load.js', import.meta.url)),
+      '--url', url, '--requests', String(agentCount), '--concurrency', String(httpConcurrency),
+    ], { timeout: 120_000, env: { ...process.env, SOURCE_LOAD_BEARER: '' } });
+    const burst = JSON.parse(stdout);
+    assert.equal(burst.completed, agentCount);
+    assert.equal(burst.peakActive, httpConcurrency);
+    assert.equal(burst.errors, 0, JSON.stringify(burst));
+    assert.equal(burst.statuses[200], agentCount);
+    assert.ok(burst.eventLoopTicks > 0);
+    console.log(JSON.stringify({ profile: 'postgres-live-http', clientProcess: 'isolated', ...burst }));
 
     peerServer = await startServer(peerSrc, { port: 0, maxConnections: 2_000 });
     const peerUrl = `http://127.0.0.1:${peerServer.address().port}/.well-known/source`;

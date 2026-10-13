@@ -6,3 +6,10 @@ npm-debug.log
 tests
 docs
 *.md
+
+.contest-demo
+.contest-results
+cloudflare
+
+# Local engineering run archives
+.loop-engineering/

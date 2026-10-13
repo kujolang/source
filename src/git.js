@@ -85,16 +85,19 @@ export class GitRepo {
     const tip = this.revParse(branch);
     if (!tip) {
       // Unborn branch: create it at head.
-      run(['update-ref', `refs/heads/${branch}`, head], { cwd: this.barePath });
+      try { run(['update-ref', `refs/heads/${branch}`, head, '0'.repeat(head.length)], { cwd: this.barePath }); }
+      catch { return { ok: false, reason: 'canonical ref changed concurrently' }; }
       return { ok: true, reason: 'created' };
     }
+    if (tip === head) return { ok: true, reason: 'already canonical' };
     if (!this.isAncestor(base, tip)) {
       return { ok: false, reason: 'non-fast-forward: base is not an ancestor of current tip' };
     }
     if (!this.isAncestor(tip, head)) {
       return { ok: false, reason: 'head does not descend from current tip' };
     }
-    run(['update-ref', `refs/heads/${branch}`, head], { cwd: this.barePath });
+    try { run(['update-ref', `refs/heads/${branch}`, head, tip], { cwd: this.barePath }); }
+    catch { return { ok: false, reason: 'canonical ref changed concurrently' }; }
     return { ok: true, reason: 'fast-forwarded' };
   }
 
@@ -221,12 +224,15 @@ export class GitRepo {
   async fastForwardAsync(base, head, branch) {
     const tip = await this.revParseAsync(branch);
     if (!tip) {
-      await runAsync(['update-ref', `refs/heads/${branch}`, head], { cwd: this.barePath });
+      try { await runAsync(['update-ref', `refs/heads/${branch}`, head, '0'.repeat(head.length)], { cwd: this.barePath }); }
+      catch { return { ok: false, reason: 'canonical ref changed concurrently' }; }
       return { ok: true, reason: 'created' };
     }
+    if (tip === head) return { ok: true, reason: 'already canonical' };
     if (!(await this.isAncestorAsync(base, tip))) return { ok: false, reason: 'non-fast-forward: base is not an ancestor of current tip' };
     if (!(await this.isAncestorAsync(tip, head))) return { ok: false, reason: 'head does not descend from current tip' };
-    await runAsync(['update-ref', `refs/heads/${branch}`, head], { cwd: this.barePath });
+    try { await runAsync(['update-ref', `refs/heads/${branch}`, head, tip], { cwd: this.barePath }); }
+    catch { return { ok: false, reason: 'canonical ref changed concurrently' }; }
     return { ok: true, reason: 'fast-forwarded' };
   }
 

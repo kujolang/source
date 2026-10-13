@@ -22,10 +22,12 @@
 // `23-tls-deployment.md`).
 
 import http from 'node:http';
+import path from 'node:path';
 import https from 'node:https';
 import { readFileSync } from 'node:fs';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { Source } from './source.js';
+import { checkArtifactsProtection } from './integrations/artifacts.js';
 import { renderOrgIndexAsync, renderIndexAsync, renderProjectAsync, renderWorkAsync, renderChangeAsync, renderLogin, renderRepositoryAsync, renderBlobAsync, renderCommitAsync, renderRepositorySettingsAsync, renderActionsAsync, renderActionDetailAsync, renderSettingsAsync, managementPage, esc } from './web.js';
 import { gitHttpBackend } from './git-http.js';
 import { ACTIONS, authorizeRequest, authorizeRequestAsync, authorizeGit, authorizeGitAsync, bearerCredential } from './auth.js';
@@ -844,7 +846,8 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           } else if (action === 'canonical') {
             const g = await guard(src, req, ACTIONS.accept_change, { org: orgId, project: projectId });
             if (g) return loginPage(res, g.status, g.body.error);
-            await src.updateCanonicalStateAsync({ orgId, projectId, changeId });
+            const promotion = await src.updateCanonicalStateAsync({ orgId, projectId, changeId });
+            if (!promotion.ok) return html(res, 409, managementPage('Canonical promotion pending', `<h1>Canonical promotion pending</h1><pre>${esc(JSON.stringify(promotion, null, 2))}</pre><p>Inspect the result, then retry the accepted Change or submit a revision.</p>`));
           }
           return redirect(res, `/o/${encodeURIComponent(orgId)}/p/${encodeURIComponent(projectId)}/c/${encodeURIComponent(changeId)}`);
         }
@@ -971,6 +974,9 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           isWrite,
           });
         if (!auth.ok) return gitAuthError(res, auth.status, auth.error);
+        let artifacts;
+        try { artifacts = checkArtifactsProtection(repo, repo.artifacts); }
+        catch { return gitAuthError(res, 503, 'repository transport requires operator recovery'); }
         const declaredLength = Number(req.headers['content-length']);
         if (Number.isFinite(declaredLength) && declaredLength > maxGitBodyBytes) {
           return gitAuthError(res, 413, 'request body too large');
@@ -1008,6 +1014,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           let streamed = false;
           const result = await gitHttpBackend({
           projectRoot: src.reposRoot(orgId, projectId),
+          hooksPath: artifacts ? path.resolve(repo.barePath, 'hooks') : null,
           pathInfo: `/${repo.id}.git${decodedRest}`,
           queryString: url.search ? url.search.slice(1) : '',
           method: req.method,
