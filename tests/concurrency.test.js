@@ -367,9 +367,14 @@ test('HTTP discovery serves a thousand established concurrent connections', { ti
   const server = await startServer(src, { host: '127.0.0.1', port: 0, maxConnections: 2_000 });
   const sockets = [];
   let accepted = 0;
-  const allAccepted = new Promise((resolve) => {
-    server.on('connection', () => { if (++accepted === 1_000) resolve(); });
+  let acceptanceTimer;
+  const allAccepted = new Promise((resolve, reject) => {
+    acceptanceTimer = setTimeout(() => reject(new Error('server acceptance timed out')), 15_000);
+    server.on('connection', () => {
+      if (++accepted === 1_000) { clearTimeout(acceptanceTimer); resolve(); }
+    });
   });
+  allAccepted.catch(() => {}); // Observe failure during socket establishment too.
   let ticks = 0;
   const timer = setInterval(() => { ticks += 1; }, 1);
   try {
@@ -401,6 +406,7 @@ test('HTTP discovery serves a thousand established concurrent connections', { ti
     assert.ok(ticks > before, 'event loop must progress while serving concurrent requests');
   } finally {
     clearInterval(timer);
+    clearTimeout(acceptanceTimer);
     for (const socket of sockets) socket.destroy();
     server.closeAllConnections?.();
     await new Promise((resolve) => server.close(resolve));
