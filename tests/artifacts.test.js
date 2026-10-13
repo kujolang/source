@@ -113,3 +113,16 @@ test('same operator binding can be resumed, and cannot change the pinned remote'
   assert.ok(f.src.gitRepo(f.scope.orgId, f.scope.projectId, f.repo.id));
   await assert.rejects(f.src.bindArtifactsRepositoryAsync({ ...f.scope, repoId: f.repo.id, name: 'source-hybrid-other' }), /already bound/);
 });
+
+
+test('opaque provider tokens work while unsafe and oversized credentials are rejected', async () => {
+  const remote = 'https://account.artifacts.cloudflare.net/git/source-bootstrap/source-hybrid-test.git';
+  const bridgeFor = (token) => new ArtifactsBridge({ url: 'https://worker.example', secret: 'x'.repeat(32),
+    fetchImpl: async () => Response.json({ name: 'source-hybrid-test', remote, token }) });
+  for (const token of ['opaque:provider:token-123', 'art_v1_fixture', 'base64+token/value==']) {
+    assert.equal((await bridgeFor(token).credentials('source-hybrid-test', remote)).token, token);
+  }
+  for (const token of ['', null, {}, 'x'.repeat(4097), 'a b', 'a\r\nInjected: header', 'a\u0000b', 'aé']) {
+    await assert.rejects(bridgeFor(token).credentials('source-hybrid-test', remote), /unexpected Artifacts credential/);
+  }
+});

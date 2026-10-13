@@ -4,22 +4,25 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { isArtifactsToken } from '../../src/integrations/artifacts.js';
 
 const url = new URL(process.env.SOURCE_BOOTSTRAP_URL || 'http://localhost:8787');
 if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))) throw new Error('Use HTTPS or loopback HTTP');
 const secret = process.env.SOURCE_BOOTSTRAP_SECRET;
 if (!secret || secret.length < 32) throw new Error('SOURCE_BOOTSTRAP_SECRET must contain at least 32 characters');
-const name = `source-smoke-${randomUUID()}`;
-const response = await fetch(new URL('/repos', url), {
+const existing = process.env.SOURCE_SMOKE_REPOSITORY;
+const name = existing || `source-smoke-${randomUUID()}`;
+if (!/^source-smoke-[a-z0-9-]{1,48}$/.test(name)) throw new Error('Invalid smoke repository name');
+const response = await fetch(new URL(existing ? `/repos/${name}/token` : '/repos', url), {
   method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30000),
   headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' },
   body: JSON.stringify({ name })
 });
-if (response.status !== 201) throw new Error(`Repository creation returned HTTP ${response.status}; inspect upstream state before retrying`);
+if (response.status !== (existing ? 200 : 201)) throw new Error(`Repository request for ${name} returned HTTP ${response.status}; inspect upstream state before retrying`);
 const created = await response.json();
 const remote = new URL(created.remote);
 if (remote.protocol !== 'https:' || !remote.hostname.endsWith('.artifacts.cloudflare.net') || remote.username || remote.password || remote.search) throw new Error('Unexpected Artifacts remote');
-if (typeof created.token !== 'string' || !created.token.startsWith('art_v1_')) throw new Error('Missing Artifacts credential');
+if (created.name !== name || !isArtifactsToken(created.token)) throw new Error(`Invalid Artifacts credential for ${name}; repository retained`);
 const root = mkdtempSync(path.join(tmpdir(), 'source-artifacts-'));
 const writer = path.join(root, 'writer'), clone = path.join(root, 'clone');
 const gitEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null',
@@ -29,6 +32,7 @@ const git = (args, cwd) => execFileSync('git', ['-c', 'core.hooksPath=/dev/null'
   cwd, env: gitEnv, encoding: 'utf8', timeout: 60000, stdio: ['ignore', 'pipe', 'pipe']
 }).trim();
 try {
+  if (existing && git(['ls-remote', '--heads', remote.href], root)) throw new Error('Existing smoke repository is not empty');
   mkdirSync(writer);
   git(['init', '-b', 'main'], writer);
   git(['config', 'user.name', 'Source integration smoke'], writer);
@@ -41,7 +45,7 @@ try {
   git(['clone', '--branch', 'main', remote.href, clone], root);
   const head = git(['rev-parse', 'HEAD'], writer);
   if (head !== git(['rev-parse', 'HEAD'], clone) || readFileSync(path.join(clone, 'README.md'), 'utf8') !== content) throw new Error('Clone verification failed');
-  console.log(JSON.stringify({ ok: true, repository: name, remote: remote.href, commit: head, verified: ['worker-create', 'git-push', 'git-clone', 'commit-and-content-match'] }, null, 2));
+  console.log(JSON.stringify({ ok: true, repository: name, remote: remote.href, commit: head, verified: [existing ? 'worker-token-existing-repo' : 'worker-create', 'git-push', 'git-clone', 'commit-and-content-match'] }, null, 2));
 } catch {
   // Git errors may contain credentials. Report only the repository identifier.
   throw new Error(`Git verification failed for ${name}; remote repository retained for inspection`);

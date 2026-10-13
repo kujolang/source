@@ -17,6 +17,11 @@ while read old new ref; do
 done
 `;
 
+// Artifacts credentials are opaque; validate header safety, not a provider prefix.
+export function isArtifactsToken(value) {
+  return typeof value === 'string' && /^[\x21-\x7e]{1,4096}$/.test(value);
+}
+
 function remoteUrl(value, name) {
   const url = new URL(value);
   if (url.protocol !== 'https:' || !/^[a-z0-9-]+\.artifacts\.cloudflare\.net$/.test(url.hostname)
@@ -103,7 +108,7 @@ export class ArtifactsBridge {
     const value = await this.request(`/repos/${name}/token`, {});
     const remote = remoteUrl(value.remote, name);
     if (value.name !== name || (expectedRemote && expectedRemote !== remote)
-        || typeof value.token !== 'string' || !/^art_v1_[^\s\r\n]{1,4096}$/.test(value.token)) throw new Error('unexpected Artifacts credential response');
+        || !isArtifactsToken(value.token)) throw new Error('unexpected Artifacts credential response');
     return { remote, token: value.token };
   }
 
