@@ -2,13 +2,13 @@
 
 Use Node.js 22 (validated with 22.23.3), npm and Git. No Kujo sibling checkout,
 Cloudflare account, PostgreSQL, Docker or model-provider key is required for this
-profile. This repository currently requires GitHub access; anonymous reproduction
-must be rechecked after the owner publishes it.
+profile. Source is public; anonymous HTTPS clone/install/both rehearsals were
+verified on 2026-10-13. This checkpoint includes the CI pagination correction.
 
 ```sh
-git clone git@github.com:kujolang/source.git
+git clone https://github.com/kujolang/source.git
 cd source
-git checkout feat/cloudflare-artifacts-bootstrap
+git checkout 64a559d180f9771d090e88bdef4e4c5c8928d356
 npm ci
 npm run lint
 npm test

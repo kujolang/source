@@ -55,7 +55,7 @@ independent security review and operational recovery drills.
 
 ## Repository and run instructions
 
-Repository: https://github.com/kujolang/source (currently private).
+Repository: https://github.com/kujolang/source (public; PR #2 merged).
 
 Implementation branch: `feat/cloudflare-artifacts-bootstrap`.
 

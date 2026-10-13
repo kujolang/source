@@ -56,3 +56,6 @@ verification. See [VALIDATION.md](VALIDATION.md) for the 224-test suite, final H
 regressions, both rehearsals and the repeated default PostgreSQL profile.
 Live Cloudflare, remote CI and container failover remain outside these local
 results. The later [browser review](BROWSER_QA.md) closes the local visual gate.
+
+Publication follow-up: PR #2 is merged. Remote CI and actual Docker failover now
+pass after the pagination correction; see [publication evidence](PUBLICATION_REVIEW.md).

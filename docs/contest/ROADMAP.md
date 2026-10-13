@@ -24,10 +24,11 @@ and historical milestones; this file records current contest readiness.
 2. Repeat the three-client flow against that integration and retain genuine cloud
    evidence. Demonstrate any claimed LLM-agent behavior with real agents; the current
    deterministic clients are explicitly scripted and are not an LLM demo.
-3. Retain the existing MIT license, review publication/history, publish the repo
-   and verify a clean anonymous clone can follow the runbook.
-4. Restore GitHub Actions availability; run remote checks and container failover.
-5. Record the final 5–10 minute video; fill owner/team details and submit manually.
+3. Replace the review cut’s local-cloud segment with genuine verified footage,
+   freeze the final entry commit, fill owner/team details and submit manually.
+
+Publication, anonymous clone/rehearsals and PR #2 merge are complete. CI and real
+container failover pass at `64a559d`; see [publication evidence](PUBLICATION_REVIEW.md).
 
 ## Beyond the contest
 
