@@ -66,7 +66,9 @@ No official GitHub release was present when checked on 2026-10-12.
 
 ## Video
 
-Pending. Record 5–10 minutes, MP4/WebM/MOV, no more than 2 GiB. Use the
+A [5:49 review cut](video/README.md) is delivered, with Siren/v4 narration.
+Final live-cloud replacement and owner review remain pending. Required format:
+5–10 minutes, MP4/WebM/MOV, no more than 2 GiB. Use the
 [recording script](VIDEO_SCRIPT.md), replacing blocked sections with genuine
 completed behavior. Do not show tokens, account configuration or operator.json.
 

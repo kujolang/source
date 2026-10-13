@@ -1,0 +1,327 @@
+1
+00:00:01,000 --> 00:00:05,400
+Git gives us a durable history of code. When several agents contribute
+
+2
+00:00:05,400 --> 00:00:09,560
+at once, we also need to know what each one was asked to do, what
+
+3
+00:00:09,560 --> 00:00:13,080
+it checked, and who allowed the result to become the shared version.
+
+4
+00:00:13,080 --> 00:00:17,640
+Source connects those records. In this demonstration, we will follow
+
+5
+00:00:17,640 --> 00:00:21,880
+work from a task to a proposed commit, inspect its evidence, and see
+
+6
+00:00:21,880 --> 00:00:24,520
+what happens when another change lands first.
+
+7
+00:00:27,458 --> 00:00:33,098
+This project has three tasks: enable a dark theme, improve the documentation,
+
+8
+00:00:33,098 --> 00:00:37,698
+and increase the page size. Three separate clients work on them concurrently.
+
+9
+00:00:37,698 --> 00:00:42,498
+These clients are scripted. They demonstrate the collaboration protocol;
+
+10
+00:00:42,498 --> 00:00:45,618
+they are not a demonstration of a language model deciding what to
+
+11
+00:00:45,618 --> 00:00:50,498
+build. Each client receives a scoped Source capability. It can obtain
+
+12
+00:00:50,498 --> 00:00:55,058
+its context, create its proposal and supply evidence. That capability
+
+13
+00:00:55,058 --> 00:00:59,258
+does not let it approve its own work. The session records which task
+
+14
+00:00:59,258 --> 00:01:02,418
+the contributor claimed and the source state it started from.
+
+15
+00:01:05,375 --> 00:01:09,295
+Here is the repeatable rehearsal. The three clients run in separate
+
+16
+00:01:09,295 --> 00:01:13,775
+processes, and these start and end times show that their work overlaps.
+
+17
+00:01:13,775 --> 00:01:17,695
+Each client makes real Git commits and submits a Change linked to
+
+18
+00:01:17,695 --> 00:01:21,935
+its Work and Session. Each also attempts an approval that its credentials
+
+19
+00:01:21,935 --> 00:01:26,975
+do not authorize. All three requests are denied. That is an observable
+
+20
+00:01:26,975 --> 00:01:30,495
+boundary in this fixture, not just a button hidden in the interface.
+
+21
+00:01:30,495 --> 00:01:34,735
+These timings demonstrate overlap on this machine; they are not a
+
+22
+00:01:34,735 --> 00:01:36,575
+production capacity benchmark.
+
+23
+00:01:39,500 --> 00:01:43,580
+Now we can inspect the first proposal. Its evidence includes checks
+
+24
+00:01:43,580 --> 00:01:47,820
+that actually ran against the proposed source. The policy evaluation
+
+25
+00:01:47,820 --> 00:01:52,180
+shows which requirements have been met. Evidence, policy evaluation
+
+26
+00:01:52,180 --> 00:01:56,300
+and approval are separate records. A passing check does not give the
+
+27
+00:01:56,300 --> 00:02:00,380
+contributor authority to accept its own Change. The rehearsal now
+
+28
+00:02:00,380 --> 00:02:04,260
+acts as the maintainer and records an acceptance. This approval is
+
+29
+00:02:04,260 --> 00:02:07,980
+scripted so that another person can reproduce the flow. In normal
+
+30
+00:02:07,980 --> 00:02:11,580
+use, the human review interface lets a maintainer examine the work
+
+31
+00:02:11,580 --> 00:02:15,100
+and make that decision. Acceptance makes the Change eligible for
+
+32
+00:02:15,100 --> 00:02:19,180
+canonical promotion. Source still checks the Git relationship before
+
+33
+00:02:19,180 --> 00:02:22,860
+moving the shared branch. The proposed commit must fit the current
+
+34
+00:02:22,860 --> 00:02:27,020
+history. The resulting canonical commit is recorded alongside the
+
+35
+00:02:27,020 --> 00:02:30,380
+decision and evidence, so we can trace the outcome back to the original
+
+36
+00:02:30,380 --> 00:02:31,100
+task.
+
+37
+00:02:34,042 --> 00:02:37,842
+The remaining proposals were made against the earlier version. We
+
+38
+00:02:37,842 --> 00:02:41,722
+retain them so that the original attempt stays inspectable. A stale
+
+39
+00:02:41,722 --> 00:02:46,042
+proposal cannot simply replace the canonical tip. The documentation
+
+40
+00:02:46,042 --> 00:02:50,682
+change can be rebased independently. The page-size change is different:
+
+41
+00:02:50,682 --> 00:02:54,762
+it edits the same settings line as the theme change. Git reports an
+
+42
+00:02:54,762 --> 00:02:59,202
+actual unmerged path. The scripted client resolves that conflict,
+
+43
+00:02:59,202 --> 00:03:03,802
+produces a new commit, runs fresh checks and submits a revised Change.
+
+44
+00:03:03,802 --> 00:03:07,642
+The reviewed revision now preserves both intended settings: dark
+
+45
+00:03:07,642 --> 00:03:11,642
+theme and a page size of twenty. The documentation remains present
+
+46
+00:03:11,642 --> 00:03:15,962
+too. We have a final code state, but we also have the path that led
+
+47
+00:03:15,962 --> 00:03:20,522
+to it: the stale attempt, the revision, its new evidence and the later
+
+48
+00:03:20,522 --> 00:03:24,762
+decision. Source makes that history available for review instead of
+
+49
+00:03:24,762 --> 00:03:27,802
+treating the last passing result as the whole story.
+
+50
+00:03:30,750 --> 00:03:34,430
+The implemented hybrid path keeps Source's application and review
+
+51
+00:03:34,430 --> 00:03:38,950
+lifecycle in Node. A Cloudflare Worker is the operator endpoint for
+
+52
+00:03:38,950 --> 00:03:43,150
+creating Artifacts repositories and obtaining short-lived Git credentials.
+
+53
+00:03:43,150 --> 00:03:46,670
+The accepted-change bridge publishes to Artifacts with an expected
+
+54
+00:03:46,670 --> 00:03:50,710
+remote tip, then confirms the commit before updating the local cache
+
+55
+00:03:50,710 --> 00:03:55,310
+and closing the Work. The local contract rehearsal shown here executes
+
+56
+00:03:55,310 --> 00:03:59,550
+Source, the Worker handlers and real Git. Its Artifacts binding and
+
+57
+00:03:59,550 --> 00:04:03,910
+remote service are emulated. It proves our local integration behavior,
+
+58
+00:04:03,910 --> 00:04:06,990
+including recovery when a push succeeds but its acknowledgement is
+
+59
+00:04:06,990 --> 00:04:11,070
+lost. It does not prove that Cloudflare is deployed or working for
+
+60
+00:04:11,070 --> 00:04:15,750
+this account. That live verification remains deferred. The operator
+
+61
+00:04:15,750 --> 00:04:19,470
+retains the Artifacts write credentials. Contributors use Source's
+
+62
+00:04:19,470 --> 00:04:23,310
+staging branches and scoped permissions. A direct push to the local
+
+63
+00:04:23,310 --> 00:04:27,150
+canonical branch is rejected; accepted changes use the controlled
+
+64
+00:04:27,150 --> 00:04:28,270
+promotion path.
+
+65
+00:04:31,208 --> 00:04:35,048
+The human interface brings these records together. Starting from a
+
+66
+00:04:35,048 --> 00:04:39,848
+Work item, a reviewer can inspect its Changes, evidence and decisions,
+
+67
+00:04:39,848 --> 00:04:43,768
+then open the repository state that resulted. The goal is to make
+
+68
+00:04:43,768 --> 00:04:47,368
+a multi-contributor outcome understandable without reconstructing
+
+69
+00:04:47,368 --> 00:04:52,008
+it from scattered terminal sessions. Source uses the MIT license,
+
+70
+00:04:52,008 --> 00:04:55,688
+and the runbook describes the repeatable local rehearsals and their
+
+71
+00:04:55,688 --> 00:05:00,008
+limits. Source is now public on GitHub, and pull request two has been
+
+72
+00:05:00,008 --> 00:05:04,328
+merged. The publication checkpoint is commit nine nine six f nine
+
+73
+00:05:04,328 --> 00:05:08,728
+e four. The runbook pins the local rehearsal commands so that another
+
+74
+00:05:08,728 --> 00:05:10,808
+reviewer can reproduce the same behavior.
+
+75
+00:05:13,750 --> 00:05:18,550
+Source is an early implementation with repeatable local checks. Production
+
+76
+00:05:18,550 --> 00:05:22,790
+use needs more evidence: the actual deployment's capacity, independent
+
+77
+00:05:22,790 --> 00:05:27,030
+security review and operational recovery drills. Those are separate
+
+78
+00:05:27,030 --> 00:05:31,590
+from this local demo. The useful result today is a reviewable collaboration
+
+79
+00:05:31,590 --> 00:05:36,110
+flow around Git: bounded contributors, explicit evidence, permitted
+
+80
+00:05:36,110 --> 00:05:40,070
+decisions and canonical updates that respect concurrent work. The
+
+81
+00:05:40,070 --> 00:05:43,990
+repository and runbook show how to reproduce the verified behavior
+
+82
+00:05:43,990 --> 00:05:46,870
+and which steps still require live infrastructure.

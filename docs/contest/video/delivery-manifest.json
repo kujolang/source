@@ -1,0 +1,74 @@
+{
+  "title": "Source \u2014 Follow the evidence",
+  "kind": "current-state review cut",
+  "width": 1920,
+  "height": 1080,
+  "fps": 24,
+  "duration_seconds": 348.8,
+  "voice_provider": "ElevenLabs",
+  "voice_model": "eleven_v4",
+  "voice_id": "eXpIbVcVbLo8ZJQDlDnl",
+  "voice_name": "Siren",
+  "live_cloudflare_verified": false,
+  "public_rehearsal_commit": "996f9e4fbcf48af210e6932b794cbdae5e2d2467",
+  "ci_verified_commit": "64a559d180f9771d090e88bdef4e4c5c8928d356",
+  "ci_run": "https://github.com/kujolang/source/actions/runs/38386336483",
+  "chapters": [
+    {
+      "id": "chapter-1",
+      "title": "Intent becomes reviewable work",
+      "start": 0,
+      "duration": 26.458333333333332
+    },
+    {
+      "id": "chapter-2",
+      "title": "Bounded contributors",
+      "start": 26.458333333333332,
+      "duration": 37.916666666666664
+    },
+    {
+      "id": "chapter-3",
+      "title": "Actual concurrent proposals",
+      "start": 64.375,
+      "duration": 34.125
+    },
+    {
+      "id": "chapter-4",
+      "title": "Evidence and a decision",
+      "start": 98.5,
+      "duration": 54.541666666666664
+    },
+    {
+      "id": "chapter-5",
+      "title": "Stale results and conflict recovery",
+      "start": 153.04166666666666,
+      "duration": 56.708333333333336
+    },
+    {
+      "id": "chapter-6",
+      "title": "Hybrid boundary: current-status rehearsal",
+      "start": 209.75,
+      "duration": 60.458333333333336
+    },
+    {
+      "id": "chapter-7",
+      "title": "A reviewer can reproduce the result",
+      "start": 270.2083333333333,
+      "duration": 42.541666666666664
+    },
+    {
+      "id": "chapter-8",
+      "title": "Honest next steps",
+      "start": 312.75,
+      "duration": 36.041666666666664
+    }
+  ],
+  "video_file": "source-review-cut.mp4",
+  "sha256": "30cd0de7fb593794d0fcdc2e051dc887af32c5855da5ffd4524748b4914301d8",
+  "bytes": 16420155,
+  "audio_lufs": -16.11,
+  "audio_true_peak_dbtp": -1.23,
+  "decoded_video_frames": 8371,
+  "black_intervals_detected": false,
+  "human_listening_review": "not performed by assistant; review before submission"
+}
