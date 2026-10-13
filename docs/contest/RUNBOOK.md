@@ -81,3 +81,11 @@ absent; the live database test skips without its DSN.
 For cloud prerequisites and the real remote push/clone smoke procedure, see
 [Workers/Artifacts bootstrap](../../cloudflare/artifacts-bootstrap/README.md).
 Only run the cloud procedure after the owner enables the needed account access.
+
+## Hybrid contract rehearsal
+
+Run `npm run demo:hybrid` for the local Worker/Source/Git contract and interrupted
+push recovery proof. Its JSON explicitly says `liveCloudflare: false`.
+[HYBRID.md](HYBRID.md) describes the architecture, real binding commands and
+operator recovery. Cloudflare account setup remains deferred; do not interpret
+this command as a deployed integration check.

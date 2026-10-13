@@ -1,0 +1,24 @@
+{
+  "ok": true,
+  "mode": "local-contract-only",
+  "liveCloudflare": false,
+  "commit": "4aa7c6781503f6b6dcfe88fb0b32b3ecddf7de0a",
+  "work": "W1",
+  "change": "C1",
+  "verified": [
+    "Worker-create-and-short-lived-token-contract",
+    "staged-Git-proposal",
+    "unaccepted-promotion-denied",
+    "agent-approval-denied",
+    "direct-canonical-push-denied",
+    "evidence-and-maintainer-decision",
+    "uncertain-push-does-not-close-Work",
+    "retry-reconciles-without-repush",
+    "independent-clone-commit-and-content"
+  ],
+  "workStatus": "closed",
+  "limitation": "Artifacts binding and remote URL are emulated; Source, Worker handlers, credentials protocol and Git operations execute locally.",
+  "sourceCommit": "d91ebc691840313593db296b8470b8db625591e8",
+  "runtime": "Node 22.23.3",
+  "date": "2026-10-13"
+}

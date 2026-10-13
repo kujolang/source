@@ -1,0 +1,28 @@
+{
+  "profile": "postgres-live-http",
+  "clientProcess": "isolated",
+  "requests": 5000,
+  "concurrency": 256,
+  "maxSockets": 256,
+  "completed": 5000,
+  "ok": true,
+  "errors": 0,
+  "statuses": {
+    "200": 5000
+  },
+  "eventLoopTicks": 29,
+  "peakActive": 256,
+  "activeAtEnd": 0,
+  "latencyMs": {
+    "p50": 114.82846499999982,
+    "p95": 264.2914639999999,
+    "p99": 572.5347489999999,
+    "max": 598.0955700000001
+  },
+  "sourceCommit": "d91ebc691840313593db296b8470b8db625591e8",
+  "date": "2026-10-13",
+  "runtime": "Node 22.23.3",
+  "database": "PostgreSQL 14.20",
+  "wholeTestDurationMs": 47730.820365,
+  "scope": "Local loopback; existing PostgreSQL lifecycle/load regression after hybrid integration, not a live Artifacts or production capacity test"
+}

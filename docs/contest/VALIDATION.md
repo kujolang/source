@@ -7,14 +7,14 @@ prepared on `feat/cloudflare-artifacts-bootstrap`, starting from main
 | Check | Observed result |
 | --- | --- |
 | Root dependency install and `npm audit --omit=dev --audit-level=high` | Pass, zero reported vulnerabilities after js-yaml 4.3.2 update. |
-| Node 22.23.3 default test suite | 214 tests: 211 pass, zero failures, three optional skips (2026-10-13). |
+| Node 22.23.3 default test suite | 224 tests: 221 pass, zero failures, three optional skips (2026-10-13). |
 | New Docker COPY-layout regression (Node 22.23.3) | Pass in the default suite; serving modules import and CSS/font routes return nonempty 200 responses from copied files. |
 | Real Kujo sibling fixture checks (Node 22.23.3) | Both passed on 2026-10-12 with local Spec/Eval inputs; these unchanged optional fixtures were not rerun in the 2026-10-13 pass. |
-| Cloudflare bootstrap unit tests | Four pass. These test binding behavior with a stub; they do not prove a deployed service. |
+| Cloudflare bootstrap unit tests | Six pass. These test creation, token contracts, authorization and disposal with a stub; they do not prove a deployed service. |
 | Clean-clone `npm ci` and `npm run demo:contest` (Node 22.23.3) | Pass from commit `4d188fbce81ab67caf72a684eb8222e34bde5db5`; three clients overlap by 632 ms, all three approval attempts return 403, both stale proposals are rejected, one real conflict is recovered. |
 | Reviewed demo on Node 22.23.3 (2026-10-13) | Pass after lifecycle fixes; three clients overlap 712 ms and the actual conflict is recovered. |
 | Local PostgreSQL 14.20, 5,000 lifecycle participants | Pass at unchanged default concurrency 256, using an isolated client and bounded sockets. See database result below. |
-| Syntax lint and `git diff --check` | Pass; 71 JavaScript files syntax checked. |
+| Syntax lint and `git diff --check` | Pass; 76 JavaScript files syntax checked. |
 | GitHub Actions | Blocked before jobs start: billing/payment or spending-limit annotation. Local results are not remote CI success. |
 | Real Docker build and two-container failover | Not run: Docker daemon unavailable. Copied-layout check is not a container build. |
 | Browser visual QA | Not run: no controllable browser surface available. Authenticated UI routes and assets were checked over HTTP. |
@@ -70,3 +70,33 @@ See [PUBLICATION_REVIEW.md](PUBLICATION_REVIEW.md). The limited history scan and
 license cleanup do not substitute for the owner's private-content review.
 This is a locally verified prototype preparation, not production certification
 or a completed competition entry.
+
+## Hybrid follow-up — 2026-10-13
+
+Runtime commit `d91ebc691840313593db296b8470b8db625591e8` adds accepted Source promotion through the
+Worker/Artifacts contract. The full Node 22.23.3 suite passes 221/224 tests with
+three documented optional skips. The final HTTP integration change was also
+checked with all 22 Artifacts, smart-HTTP and UI tests passing.
+
+`npm run demo:hybrid` passes: actual Source lifecycle, Worker handlers, Git push,
+lost-acknowledgement recovery without a second push, and independent clone with
+matching commit/content. The binding and remote are emulated. See the
+[local hybrid evidence](evidence/hybrid-local.json) and [operator runbook](HYBRID.md).
+The eight hybrid tests additionally exercise a competing remote update, local
+compare-and-swap, missing configuration/bindings, hook recovery, authorization,
+credential persistence checks, URL substitution rejection and HTTP failure feedback.
+
+The existing three-client rehearsal also passes with 827 ms overlap and a real
+conflict recovered. PostgreSQL's 5,000-request profile passes again at concurrency
+256, with 5,000 HTTP 200 responses and zero errors (47.7 seconds for the full
+lifecycle test). The temporary cluster was stopped afterwards. This
+[separate regression result](evidence/postgres-hybrid-regression.json) retains the
+prior diagnostic evidence rather than replacing it. It does not test Artifacts
+against PostgreSQL or certify multi-writer hybrid deployment behavior.
+
+The updated Worker also bundles successfully with Wrangler 4.149.0
+`deploy --dry-run`; that command performs no deployment.
+
+No account activation, live deployment, public visibility change, remote container
+run or final video recording occurred. Submission prose and narration are drafts
+for owner review; the live segment is explicitly held for genuine evidence.

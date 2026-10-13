@@ -22,16 +22,36 @@ UI exposes work, Changes, evidence and the resulting repository state.
 
 ## Cloudflare usage — current truthful status
 
-The proposed hybrid design places the edge/bootstrap API on Cloudflare Workers
-and repository hosting on Cloudflare Artifacts; Node/Postgres retains Source's
-application and review/evidence lifecycle. An authenticated repository-creation
-Worker and a Git create/push/clone smoke command are implemented and locally
-checked. Live deployment is currently blocked by the account's paid-plan
-requirement. The integrated Source-to-Artifacts lifecycle has not been verified.
+The hybrid implementation keeps Source's application, Git staging, review and
+evidence lifecycle in Node, with Postgres available for hosted state. A Cloudflare
+Worker creates Artifacts repositories and issues short-lived operator credentials.
+Only an accepted Source Change enters canonical promotion: the bridge verifies
+ancestry, pushes with an expected remote tip, confirms the result and updates the
+local cache. An interrupted push leaves Work open until a retry confirms it.
+
+The local contract rehearsal executes real Source, Worker handlers and Git while
+emulating the Artifacts binding and remote service. It proves local integration
+and recovery behavior; it does not prove a deployed Cloudflare integration.
+Account setup remains deferred, so live create/push/clone and the combined cloud
+collaboration flow are still unverified. See [architecture and runbook](HYBRID.md).
 
 **Before entry:** replace this paragraph only with the exact deployed topology,
 verified URLs and successful remote behavior. Until then this mandatory criterion
 is unfinished and the project is not ready to submit.
+
+## Why this approach
+
+Git is the durable source record. Source adds the context needed to decide whether
+a proposed commit should become canonical: the task, the producing session, its
+evidence and a permitted review decision. That distinction matters when several
+contributors work at once and when a passing result becomes stale after another
+change lands. The demo preserves both the stale attempt and the reviewed revision,
+so a reviewer can inspect how the final state was reached.
+
+The project is an early implementation with repeatable local evidence, not a
+production-certified hosted platform. Its next validation milestone is the real
+Cloudflare integration; subsequent work includes deployment-scale capacity,
+independent security review and operational recovery drills.
 
 ## Repository and run instructions
 

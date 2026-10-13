@@ -27,10 +27,16 @@ Workers/Artifacts account setup was deferred by the owner.
 - [x] Complete [PR 2 local review](PR_REVIEW.md), repair the fleet probe and
   client failure handling, and add regression coverage.
 
+- [x] Review reachable publication history and remove internal run archives from
+  the current tree; retain an explicit owner exposure decision for historical data.
+- [x] Connect accepted Source changes to the [hybrid Artifacts bridge](HYBRID.md),
+  including local contract tests for concurrent updates and uncertain-push recovery.
+- [x] Prepare complete narration and architecture explanation for owner review.
+
 ## Pending account, environment and owner gates
 
 - [ ] Owner enables paid Workers/Artifacts; deploy and verify actual remote
-  create/push/independent clone. Then finish the Source/Artifacts hybrid lifecycle.
+  create/push/independent clone. Then verify the implemented Source/Artifacts hybrid lifecycle live.
 - [ ] Re-run the collaboration flow against the actual cloud integration and
   preserve non-secret deployment/evidence/commit identifiers.
 - [ ] Restore GitHub Actions billing/spending availability and get remote checks

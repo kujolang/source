@@ -38,3 +38,20 @@ part of the default test run. No Cloudflare login, account change, deployment,
 repository creation or remote smoke operation was attempted during this review.
 Docker still has no running daemon, and browser inventory still exposes no
 controllable surfaces, so those environment-dependent gates remain open.
+
+## Hybrid follow-up review
+
+The operator-side bridge now connects accepted Changes to the Worker and Artifacts
+Git contract. Local and remote canonical updates use expected-tip checks; retry
+reconciles a successful remote push whose acknowledgement was lost. The receive
+hook rejects direct canonical pushes, stored binding metadata prevents local
+fallback after a restore, and failed UI promotion returns HTTP 409 instead of a
+success-looking redirect. Token-bearing upstream errors are redacted.
+
+The publication follow-up removes tracked internal run archives at HEAD and
+preserves the historical exposure decision for the owner. The submission draft,
+architecture runbook and full narration distinguish local emulation from live
+verification. See [VALIDATION.md](VALIDATION.md) for the 224-test suite, final HTTP
+regressions, both rehearsals and the repeated default PostgreSQL profile.
+Live Cloudflare, remote CI, container failover and browser visual review remain
+outside these local results.

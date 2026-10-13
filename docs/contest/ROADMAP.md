@@ -1,6 +1,6 @@
 # Source current roadmap
 
-As of 2026-10-12. Earlier numbered architecture documents describe design intent
+As of 2026-10-13. Earlier numbered architecture documents describe design intent
 and historical milestones; this file records current contest readiness.
 
 ## Implemented locally
@@ -13,13 +13,14 @@ and historical milestones; this file records current contest readiness.
 - Operational building blocks: readiness, metrics, writer fencing, backup and recovery tooling.
 - Repeatable three-process contest rehearsal with real commits, executed evidence,
   rejected unauthorized approvals, independent rebase and actual merge conflict recovery.
-- Authenticated Cloudflare bootstrap Worker and remote Git smoke command, tested locally.
+- Authenticated Cloudflare Worker, remote Git smoke command and accepted-change
+  hybrid bridge; local contract rehearsal covers remote races and retry recovery.
 
 ## Required before contest entry
 
 1. Enable paid Workers/Artifacts access (owner deferred this); deploy the bootstrap
-   and pass real create/push/clone verification. Then connect the Source review and
-   canonical Git flow to the Artifacts repository through the hybrid boundary.
+   and pass real create/push/clone verification. Then verify the implemented Source review and
+   canonical Git flow against the real Artifacts service; local emulation is insufficient.
 2. Repeat the three-client flow against that integration and retain genuine cloud
    evidence. Demonstrate any claimed LLM-agent behavior with real agents; the current
    deterministic clients are explicitly scripted and are not an LLM demo.

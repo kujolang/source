@@ -33,8 +33,9 @@ and JSON, SQLite and Postgres storage. It is not a hosted production service.
 - See the dated [validation record](docs/contest/VALIDATION.md) for exact results
   and skips. Local checks are distinct from GitHub Actions, container failover
   and production capacity validation.
-- Workers/Artifacts bootstrap code exists, but live deployment is blocked by the
-  account's paid-plan requirement. The hybrid integration is unfinished.
+- The [Workers/Artifacts hybrid bridge](docs/contest/HYBRID.md) connects accepted
+  Changes to remote canonical promotion and retry recovery. Local contract tests
+  pass; account setup and live Cloudflare verification remain deferred.
 - The [contest checklist](docs/contest/README.md) and [current roadmap](docs/contest/ROADMAP.md)
   distinguish completed local work from remaining submission gates.
 
@@ -314,9 +315,10 @@ adjust the `maxWorkflowJobs` server option for a different controlled fan-out.
 
 The isolated [Workers and Artifacts bootstrap](cloudflare/artifacts-bootstrap/README.md)
 provides an authenticated repository-creation Worker and a Git push/clone smoke
-command. This prepares the first hybrid integration proof; the Source application
-lifecycle remains on Node/Postgres. Live Artifacts access must be verified
-separately from local tests.
+command. The [hybrid bridge](docs/contest/HYBRID.md) adds accepted-change
+promotion, conditional Git updates and interrupted-push reconciliation. Run
+`npm run demo:hybrid` for the local contract proof. The application lifecycle
+remains on Node/Postgres; live Artifacts access must be verified separately.
 
 ## Architecture
 
