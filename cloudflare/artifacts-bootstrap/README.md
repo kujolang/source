@@ -68,3 +68,17 @@ References:
 - https://developers.cloudflare.com/artifacts/get-started/workers/
 - https://developers.cloudflare.com/artifacts/api/workers-binding/
 - https://developers.cloudflare.com/artifacts/concepts/namespaces/
+
+## Verified status on October 12 2026
+
+- Wrangler 4.149.0 authenticated to the Devio Digital account and reported
+  Workers and Artifacts write scopes.
+- All four Worker unit tests passed, JavaScript syntax checks passed, and
+  `wrangler deploy --dry-run` successfully bundled the Artifacts binding.
+- Namespace listing returned access denied (10004). The live deployment then
+  returned the actionable blocker: **Artifacts requires a paid Workers plan**
+  (10403). No successful Worker deployment or live Git push/clone is claimed.
+- The account owner must enable the appropriate plan in Cloudflare billing.
+  Then rerun `wrangler whoami`, confirm Artifacts namespace access, install the
+  bootstrap secret, deploy, and run the smoke command above. Account upgrades
+  were not performed by this change.
