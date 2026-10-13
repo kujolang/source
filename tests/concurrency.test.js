@@ -171,7 +171,7 @@ test('Postgres canonical promotion lock uses the project row', async () => {
   store._qualified = (name) => `"source"."${name}"`;
   store._runAsync = async (sql) => { calls.push(sql); return ''; };
   await store.lockProjectAsync('O1', 'P1');
-  assert.match(calls[0], /WHERE org_id = 'O1' AND id = 'P1'/);
+  assert.match(calls[0], /WHERE org_id = E'O1' AND id = E'P1'/);
   assert.match(calls[0], /FOR UPDATE/);
 });
 
@@ -181,7 +181,7 @@ test('Postgres synchronous canonical promotion exposes the same project lock pri
   store._qualified = (name) => `"source"."${name}"`;
   store._run = (sql) => { calls.push(sql); return ''; };
   store.lockProject('O1', 'P1');
-  assert.match(calls[0], /WHERE org_id = 'O1' AND id = 'P1'/);
+  assert.match(calls[0], /WHERE org_id = E'O1' AND id = E'P1'/);
   assert.match(calls[0], /FOR UPDATE/);
 });
 
@@ -244,7 +244,7 @@ test('Postgres workflow records use one bounded bulk read', async () => {
   store._fetchJsonRowsAsync = async (sql) => { query = sql; return [{ path: 'workflows/W1.json', json: { id: 'W1' } }]; };
   const rows = await store.readJsonManyAsync(['workflows/W1.json', 'workflows/W1.json']);
   assert.deepEqual(rows, [{ path: 'workflows/W1.json', json: { id: 'W1' } }]);
-  assert.match(query, /path IN \('workflows\/W1\.json'\)/);
+  assert.match(query, /path IN \(E'workflows\/W1\.json'\)/);
   await assert.rejects(() => store.readJsonManyAsync(Array.from({ length: 1_002 }, (_, index) => `W${index}`)), /0-1001/);
 });
 
@@ -277,8 +277,8 @@ test('Postgres repository resolution uses a tenant-scoped indexed query', async 
   store._fetchJsonRowsAsync = async (sql) => { query = sql; return [{ json: { id: 'R1', name: 'main' } }]; };
   assert.deepEqual(await store.findRepositoryAsync('O1', 'P1', 'main'), { id: 'R1', name: 'main' });
   assert.match(query, /kind = 'repository'/);
-  assert.match(query, /org_id = 'O1'/);
-  assert.match(query, /project_id = 'P1'/);
+  assert.match(query, /org_id = E'O1'/);
+  assert.match(query, /project_id = E'P1'/);
   assert.match(query, /json->>'name'/);
 });
 

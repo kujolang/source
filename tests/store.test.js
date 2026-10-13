@@ -4,7 +4,8 @@
 // provides ACID transactions (the JSON store's documented gap), and that the
 // full vertical slice runs identically on both backends.
 
-import { test } from 'node:test';
+import { test, after } from 'node:test';
+import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -19,10 +20,17 @@ function tmp() {
   return mkdtempSync(path.join(tmpdir(), 'source-store-'));
 }
 
-const PG_DSN = process.env.SOURCE_DATABASE_URL || process.env.DATABASE_URL;
+const PG_DSN = process.env.SOURCE_TEST_DATABASE_URL;
+
+const testSchemas = [];
+after(() => {
+  for (const schema of testSchemas) execFileSync('psql', ['-d', PG_DSN, '-v', 'ON_ERROR_STOP=1', '-c', `DROP SCHEMA IF EXISTS "${schema}" CASCADE`], { stdio: 'ignore' });
+});
 
 function newUniqueSchema() {
-  return `source_test_${Date.now()}_${Math.random().toString(16).slice(2)}`.replace(/\W/g, '');
+  const schema = `source_test_${Date.now()}_${Math.random().toString(16).slice(2)}`.replace(/\W/g, '');
+  testSchemas.push(schema);
+  return schema;
 }
 
 function buildRelationshipFixture(src) {

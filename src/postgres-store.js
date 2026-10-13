@@ -24,9 +24,9 @@ function escapeSqlLiteral(value) {
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
   if (Buffer.isBuffer(value)) {
-    return `E'\\x${value.toString('hex')}'::bytea`;
+    return `decode('${value.toString('hex')}', 'hex')`;
   }
-  return `'${String(value).replace(/\\/g, '\\\\').replace(/'/g, "''")}'`;
+  return `E'${String(value).replace(/\\/g, '\\\\').replace(/'/g, "''")}'`;
 }
 
 function escapeSqlIdent(value) {
@@ -1429,10 +1429,15 @@ class PostgresStore {
     const safeLimit = Math.min(10_000, Math.max(1, Math.trunc(limit)));
     await this._runAsync(`DELETE FROM ${this._qualified('jobs')}
       WHERE id IN (
-        SELECT id FROM ${this._qualified('jobs')}
-        WHERE status IN ('completed', 'failed')
-          AND updated_at < NOW() - (${this.jobRetentionMs} * INTERVAL '1 millisecond')
-        ORDER BY updated_at
+        SELECT terminal.id FROM ${this._qualified('jobs')} terminal
+        WHERE terminal.status IN ('completed', 'failed')
+          AND terminal.updated_at < NOW() - (${this.jobRetentionMs} * INTERVAL '1 millisecond')
+          AND NOT EXISTS (
+            SELECT 1 FROM ${this._qualified('jobs')} dependent
+            WHERE dependent.status IN ('queued', 'leased')
+              AND (dependent.depends_on ? terminal.id OR dependent.depends_on ? terminal.dedupe_key)
+          )
+        ORDER BY terminal.updated_at
         LIMIT ${safeLimit}
       )`);
   }
@@ -1490,7 +1495,7 @@ class PostgresStore {
           AND EXISTS (
             SELECT 1
             FROM jsonb_array_elements_text(COALESCE(j.depends_on, '[]'::jsonb)) AS dependency(reference)
-            JOIN ${this._qualified('jobs')} AS dependency_job
+            LEFT JOIN ${this._qualified('jobs')} AS dependency_job
               ON dependency_job.id = dependency.reference OR dependency_job.dedupe_key = dependency.reference
             WHERE dependency_job.id IS NULL OR dependency_job.status = 'failed'
           )
@@ -1608,13 +1613,13 @@ class PostgresStore {
 
   getArtifact(hash) {
     const row = this._fetchJsonRows(`SELECT encode(bytes, 'base64') AS bytes FROM ${this._qualified('artifacts')} WHERE hash = ${escapeSqlLiteral(hash)}`);
-    if (!row[0]?.bytes) return null;
+    if (!row[0]) return null;
     return Buffer.from(row[0].bytes, 'base64');
   }
 
   async getArtifactAsync(hash) {
-    const rows = await this._runAsync(`SELECT encode(bytes, 'base64') AS bytes FROM ${this._qualified('artifacts')} WHERE hash = ${escapeSqlLiteral(hash)}`);
-    if (!rows[0]?.bytes) return null;
+    const rows = await this._fetchJsonRowsAsync(`SELECT encode(bytes, 'base64') AS bytes FROM ${this._qualified('artifacts')} WHERE hash = ${escapeSqlLiteral(hash)}`);
+    if (!rows[0]) return null;
     return Buffer.from(rows[0].bytes, 'base64');
   }
 
@@ -1951,7 +1956,7 @@ class PostgresStore {
     `);
 
     const evidence = this._fetchJsonRows(`
-      SELECT e.id, e.work_id, e.change_id, e.json AS evidence
+      SELECT e.id, e.work_id, e.change_id, e.e_json AS evidence
       FROM (
         SELECT e.id, e.json AS e_json, ce.change_id, c.work_id
         FROM ${this._qualified('evidence')} e
@@ -1992,9 +1997,20 @@ class PostgresStore {
       }
     }
 
+    const relationships = [];
     const copy = (relPath) => {
       const data = legacyStore.readJson(relPath);
-      if (data) {
+      if (!data) return;
+      const kind = this._classifyRelPath(relPath).kind;
+      // Insert records before their cyclic relationship projections. Restore
+      // the complete original records only after every referenced row exists.
+      if (kind === 'work') {
+        this.writeJson(relPath, { ...data, sessions: [], decisions: [] });
+        relationships.push(relPath);
+      } else if (kind === 'change') {
+        this.writeJson(relPath, { ...data, evidence: [], decisions: [] });
+        relationships.push(relPath);
+      } else {
         this.writeJson(relPath, data);
       }
     };
@@ -2002,12 +2018,18 @@ class PostgresStore {
     copy('instance.json');
     copy('meta.json');
 
-    for (const orgId of legacyStore.listJson('orgs')) {
+    for (const principalId of legacyStore.listJson('principals')) {
+      copy(`principals/${principalId}.json`);
+    }
+
+    for (const orgId of legacyStore.listJson('orgs', { includeDirs: true })) {
       copy(`orgs/${orgId}/org.json`);
+      for (const memberId of legacyStore.listJson(`orgs/${orgId}/members`)) copy(`orgs/${orgId}/members/${memberId}.json`);
       const orgProjectPath = `orgs/${orgId}/projects`;
-      for (const projectId of legacyStore.listJson(orgProjectPath)) {
+      for (const projectId of legacyStore.listJson(orgProjectPath, { includeDirs: true })) {
         copy(`orgs/${orgId}/projects/${projectId}/project.json`);
         copy(`orgs/${orgId}/projects/${projectId}/policy.json`);
+        for (const workflowId of legacyStore.listJson(`orgs/${orgId}/projects/${projectId}/workflows`)) copy(`orgs/${orgId}/projects/${projectId}/workflows/${workflowId}.json`);
 
         for (const repoId of legacyStore.listJson(`orgs/${orgId}/projects/${projectId}/repos`)) {
           copy(`orgs/${orgId}/projects/${projectId}/repos/${repoId}.json`);
@@ -2044,13 +2066,13 @@ class PostgresStore {
       }
     }
 
-    for (const principalId of legacyStore.listJson('principals')) {
-      copy(`principals/${principalId}.json`);
-    }
-
     for (const capId of legacyStore.listJson('capabilities')) {
       copy(`capabilities/${capId}.json`);
     }
+
+    for (const relPath of relationships) this.writeJson(relPath, legacyStore.readJson(relPath));
+
+    for (const sessionId of legacyStore.listJson('human-sessions')) copy(`human-sessions/${sessionId}.json`);
 
     // Preserve legacy rows as an audit trail.
     legacyStore.readAudit().forEach((entry) => this.audit(entry));
