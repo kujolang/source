@@ -1,0 +1,52 @@
+{
+  "version": 2,
+  "durationSeconds": 192.71,
+  "fps": 24,
+  "files": [
+    {
+      "name": "source-in-action-v2.mp4",
+      "bytes": 5244152,
+      "sha256": "c7cb9183f9f26e3c776ea1bb231d06033153fd47f3b65bb9119fcd086f60d5dc"
+    },
+    {
+      "name": "source-in-action-v2-mobile.mp4",
+      "bytes": 2456613,
+      "sha256": "946d467e70b98858a5f850bdc171cc495df32077eaede36e93820efbc5a08962"
+    }
+  ],
+  "voice": {
+    "provider": "ElevenLabs",
+    "model": "eleven_v4",
+    "name": "Siren",
+    "voiceId": "eXpIbVcVbLo8ZJQDlDnl"
+  },
+  "scriptSkill": "orwell-writing",
+  "content": "Recorded local UI interactions and actual stdout replay; separate takes, edited pacing.",
+  "cloudflareVerified": false,
+  "finalContestCut": false,
+  "remaining": "Live cloud footage and final 5\u201310 minute runtime.",
+  "export": "FFmpeg streaming assembly of verified HyperFrames layouts and actual browser clips; decorative progress bar static.",
+  "verification": {
+    "compositionOk": true,
+    "samples": 18,
+    "contrastChecks": 23,
+    "fullDecode": "pass",
+    "visualFramesReviewed": [
+      10,
+      42,
+      59,
+      89,
+      115,
+      123,
+      145,
+      155,
+      180
+    ],
+    "audioIntegratedLUFS": -17.26,
+    "audioTruePeakDbTP": -0.99,
+    "humanListeningReview": false
+  },
+  "implementationCommit": "dc3242b",
+  "ciRun": "https://github.com/kujolang/source/actions/runs/38397871096",
+  "captureProvenance": "Browser: 9a675f4. CLI: same base plus the trace addition later committed as dc3242b."
+}

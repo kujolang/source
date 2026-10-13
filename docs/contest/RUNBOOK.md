@@ -89,3 +89,7 @@ push recovery proof. Its JSON explicitly says `liveCloudflare: false`.
 [HYBRID.md](HYBRID.md) describes the architecture, real binding commands and
 operator recovery. Cloudflare account setup remains deferred; do not interpret
 this command as a deployed integration check.
+
+### Read the rehearsal as it runs
+
+Use `npm run demo:contest -- --trace` to print completed lifecycle steps: client proposals and approval denials, check results, stale-update rejection, conflict recovery, and canonical settings. The default command keeps its existing JSON output. Trace mode adds progress lines before that JSON.

@@ -32,8 +32,10 @@ Workers/Artifacts account setup was deferred by the owner.
 - [x] Connect accepted Source changes to the [hybrid Artifacts bridge](HYBRID.md),
   including local contract tests for concurrent updates and uncertain-push recovery.
 - [x] Prepare complete narration and architecture explanation for owner review.
-- [x] Create a captioned [5:49 review cut](video/README.md) with ElevenLabs v4
-  Siren narration, actual UI captures and explicit local-cloud limitations.
+- [x] Create a [3:13 local action cut](video/README.md) with ElevenLabs v4
+  Siren narration, recorded UI actions, actual command output, and plain narration.
+  The earlier 5:49 overview remains archived; the final contest cut still needs
+  live cloud footage and a total duration of 5–10 minutes.
 
 ## Pending account, environment and owner gates
 
