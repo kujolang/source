@@ -2,7 +2,7 @@
 
 [![Version](https://img.shields.io/badge/version-0.1.0-black)](package.json)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
-[![Kujo ecosystem](https://img.shields.io/badge/Kujo-ecosystem-white.svg)](https://github.com/kujolang)
+[![Kujo ecosystem](https://img.shields.io/badge/Kujo-ecosystem-white.svg)](https://kujolang.ai/ecosystem/source/)
 [![Runtime](https://img.shields.io/badge/Node.js-22-black)](package.json)
 
 Source connects Git changes to the work, agent sessions, checks and review decisions
@@ -11,6 +11,10 @@ authorized review decision allows Source to promote a proposal into canonical Gi
 
 Source is part of the Kujo ecosystem. Its server and CLI run on Node.js; adapters
 read evidence from Kujo Eval, Spec and ShipCheck.
+
+[Documentation](https://docs.kujolang.ai/tools/source/) ·
+[Release](https://github.com/kujolang/source/releases/tag/v0.1.0) ·
+[Public MCP catalog](https://mcp.kujolang.ai/mcp)
 
 ## What Source does
 
@@ -51,7 +55,7 @@ Use **Node.js 22**, npm and Git. The local demo needs no Cloudflare account,
 Postgres database, Kujo checkout or model-provider key.
 
 ```bash
-git clone https://github.com/kujolang/source.git
+git clone --branch v0.1.0 https://github.com/kujolang/source.git
 cd source
 npm ci
 npm run demo:contest -- --trace
