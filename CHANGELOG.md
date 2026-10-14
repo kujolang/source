@@ -104,7 +104,7 @@ Source uses Node.js and npm; it is not a Kennel-installable Kujo package.
 - Backup and backup verification now hash archives through streaming reads,
   avoiding whole-archive memory amplification.
 
-## [0.1.0]
+### Initial prototype
 
 - Initial agent-first Git, Work, Change, Evidence, Decision, capability, queue,
   workflow, and deployment vertical slice.
