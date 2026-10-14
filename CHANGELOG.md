@@ -2,7 +2,23 @@
 
 All notable changes to Source are recorded here.
 
-## [Unreleased]
+## [0.1.0] — 2026-10-14
+
+First public GitHub release under the MIT license.
+
+- Connect tasks, agent sessions, Git proposals, executable evidence and authorized review decisions.
+- Provide a browser UI, CLI, HTTP API and capability-scoped Git transport.
+- Demonstrate concurrent contributions, stale proposal rejection and conflict recovery.
+- Promote accepted changes to Cloudflare Artifacts through an authenticated Worker, with expected-tip checks and lost-acknowledgment recovery.
+- Fix authorization, session traversal, Git argument, PostgreSQL data fidelity and concurrent relationship defects; bound resource lifetimes and evidence reads.
+- Verify the deterministic suite, PostgreSQL fleet, container build and writer failover in CI.
+
+This is an experimental 0.x release. Synchronous PostgreSQL maintenance lacks
+multi-record atomic rollback; action cancellation and historical deployment data
+need the review described in [the hardening report](docs/audits/repository-hardening.md).
+Source uses Node.js and npm; it is not a Kennel-installable Kujo package.
+
+### Included development history
 
 - Added asynchronous JSON-store reads, writes, listings, artifacts, audit
   access, and counter allocation so compatibility deployments do not block the

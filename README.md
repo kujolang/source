@@ -28,8 +28,9 @@ Project → Work → Session → Change → Evidence → Decision → Canonical 
 
 ## Status
 
-Source is an experimental, self-hosted prototype. Version `0.1.0` is the package
-version, not a published release or a production-readiness claim.
+Source is an experimental, self-hosted platform. [Version 0.1.0](https://github.com/kujolang/source/releases/tag/v0.1.0)
+is the first public release. It is suitable for local evaluation; it is not a
+production-readiness certification.
 
 The three-client demo exercises real Git commits, concurrent proposals, approval
 denials, stale updates and conflict recovery. Clients and maintainer decisions are
