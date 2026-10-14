@@ -46,7 +46,7 @@ run on Cloudflare.
 CI covers the deterministic suite, PostgreSQL concurrency, container builds and
 writer failover. See the [validation record](docs/contest/VALIDATION.md),
 [live Cloudflare evidence](docs/contest/CLOUDFLARE_LIVE.md) and
-[current roadmap](docs/contest/ROADMAP.md) for the scope and remaining work.
+[versioned roadmap](ROADMAP.md) for the scope and remaining work.
 Deployment-scale capacity and independent security validation remain open.
 
 ## Quick start
