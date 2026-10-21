@@ -9,5 +9,8 @@
     "deploy": "wrangler deploy",
     "smoke": "node smoke.js"
   },
-  "devDependencies": { "wrangler": "4.149.0" }
+  "devDependencies": { "wrangler": "4.149.0" },
+  "engines": {
+    "node": ">=22.23.4 <23 || >=24.22.1 <25 || >=26.12.1"
+  }
 }
