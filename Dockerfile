@@ -1,4 +1,4 @@
-FROM node:20.19.5-bookworm@sha256:ba36e9b2705008e63e354214f0e3011c528af9df2ca13ac2bd2c0114650302e6
+FROM node:22.23.4-bookworm@sha256:2bd396628eceb5c999a6e43731fab69d5fb98b94ba9d9d90b5f64575c5178765
 
 # Upgrade the runtime independently of the immutable base image.
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl xz-utils \
