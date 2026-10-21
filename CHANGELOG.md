@@ -2,6 +2,13 @@
 
 All notable changes to Source are recorded here.
 
+## [0.1.1] — 2026-10-21
+
+- Require patched Node.js versions and update dependency requirements.
+- Improve onboarding and roadmap documentation.
+- Isolate secret-response timeout tests from connection startup timing.
+- Preserve the experimental self-hosted scope and existing production limitations.
+
 ## [0.1.0] — 2026-10-14
 
 First public GitHub release under the MIT license.

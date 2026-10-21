@@ -1,6 +1,6 @@
 {
   "name": "source",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Source \u2014 agent-first software-development and collaboration platform built around Git",
   "type": "module",
   "private": true,

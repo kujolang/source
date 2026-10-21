@@ -1,6 +1,6 @@
 # Source
 
-[![Version](https://img.shields.io/badge/version-0.1.0-black)](package.json)
+[![Version](https://img.shields.io/badge/version-0.1.1-black)](package.json)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 [![Kujo ecosystem](https://img.shields.io/badge/Kujo-ecosystem-white.svg)](https://kujolang.ai/ecosystem/source/)
 [![Runtime](https://img.shields.io/badge/Node.js-22-black)](package.json)
@@ -13,7 +13,7 @@ Source is part of the Kujo ecosystem. Its server and CLI run on Node.js; adapter
 read evidence from Kujo Eval, Spec and ShipCheck.
 
 [Documentation](https://docs.kujolang.ai/tools/source/) ·
-[Release](https://github.com/kujolang/source/releases/tag/v0.1.0) ·
+[Release](https://github.com/kujolang/source/releases/tag/v0.1.1) ·
 [Public MCP catalog](https://mcp.kujolang.ai/mcp)
 
 ## What Source does
@@ -32,7 +32,7 @@ Project → Work → Session → Change → Evidence → Decision → Canonical 
 
 ## Status
 
-Source is an experimental, self-hosted platform. [Version 0.1.0](https://github.com/kujolang/source/releases/tag/v0.1.0)
+Source is an experimental, self-hosted platform. [Version 0.1.1](https://github.com/kujolang/source/releases/tag/v0.1.1)
 is the first public release. It is suitable for local evaluation; it is not a
 production-readiness certification.
 
@@ -51,11 +51,11 @@ Deployment-scale capacity and independent security validation remain open.
 
 ## Quick start
 
-Use **Node.js 22**, npm and Git. The local demo needs no Cloudflare account,
+Use **Node.js 22.23.4+, 24.22.1+, or 26.12.1+ on the supported branches**, npm and Git. The local demo needs no Cloudflare account,
 Postgres database, Kujo checkout or model-provider key.
 
 ```bash
-git clone --branch v0.1.0 https://github.com/kujolang/source.git
+git clone --branch v0.1.1 https://github.com/kujolang/source.git
 cd source
 npm ci
 npm run demo:contest -- --trace
