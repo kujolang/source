@@ -293,8 +293,17 @@ test('secret provider timeout covers a stalled response body', { timeout: 3000 }
   const server = createServer((_req, res) => { res.writeHead(200, { 'content-type': 'application/json' }); res.write('{'); });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => { server.closeAllConnections(); server.close(); });
-  const provider = new HttpSecretProvider({ baseUrl: `http://127.0.0.1:${server.address().port}`, token: 'fixture', timeoutMs: 100, allowInsecureLocalhost: true });
+  let receivedHeaders = false;
+  const provider = new HttpSecretProvider({
+    baseUrl: `http://127.0.0.1:${server.address().port}`, token: 'fixture', timeoutMs: 1000, allowInsecureLocalhost: true,
+    async fetchImpl(...args) {
+      const response = await fetch(...args);
+      receivedHeaders = true;
+      return response;
+    },
+  });
   await assert.rejects(provider.resolve({ expiresAt: new Date(Date.now() + 10000).toISOString() }), /response is invalid/);
+  assert.equal(receivedHeaders, true, 'timeout must occur while reading the body');
 });
 
 
