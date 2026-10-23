@@ -2,6 +2,7 @@
 
 [![Version](https://img.shields.io/badge/version-0.1.1-black)](package.json)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
+[![built for Kujo](https://img.shields.io/badge/built%20for-Kujo-white.svg)](https://github.com/kujolang/kujo)
 [![Kujo ecosystem](https://img.shields.io/badge/Kujo-ecosystem-white.svg)](https://kujolang.ai/ecosystem/source/)
 [![Runtime](https://img.shields.io/badge/Node.js-22-black)](package.json)
 
