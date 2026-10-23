@@ -5,22 +5,26 @@ repository alone. It is intentionally separate from implementation TODOs.
 
 ## Status
 
-Source's local implementation gates are passing, including the 5,000-agent
-Postgres profile, Docker writer failover, full Node test suite, dependency
-audit, Kujo Eval, Concord, Fence, and ShipCheck. The items below remain open
-because they require external infrastructure, credentials, or organizational
-evidence.
+As of 2026-10-13, the Node suite, local collaboration rehearsal, dependency
+audits, and isolated-client PostgreSQL profile pass on the reviewed contest
+branch. See [dated validation](docs/contest/VALIDATION.md) for exact scope.
+Hosted CI and actual Docker build/failover now pass at `2184ece` in
+[run 38449005437](https://github.com/kujolang/source/actions/runs/38449005437).
+The local Docker daemon remains unavailable.
+Historical Kujo gate records are not a fresh certification of this branch.
 
-## Open blockers
+## Verified infrastructure gate
 
 ### 1. Hosted CI execution
 
-- **Status:** not verified from this environment.
+- **Status:** verified on the GitHub-hosted runner at `2184ece`.
 - **Required evidence:** a successful GitHub-hosted run of `.github/workflows/ci.yml`
   proving the deterministic suite, 5,000-agent Postgres gate, and two-container
   writer-failover gate on the actual runner image.
-- **Owner/action:** push or manually dispatch the workflow in GitHub and retain
-  the run URL and artifacts.
+- **Evidence:** [successful run](https://github.com/kujolang/source/actions/runs/38449005437);
+  both deterministic and release-gate jobs passed.
+
+## Open blockers
 
 ### 2. Independent security assessment
 

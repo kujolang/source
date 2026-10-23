@@ -1,7 +1,7 @@
 {
   "name": "source",
-  "version": "0.1.0",
-  "description": "Source — agent-first software-development and collaboration platform built around Git",
+  "version": "0.1.1",
+  "description": "Source \u2014 agent-first software-development and collaboration platform built around Git",
   "type": "module",
   "private": true,
   "bin": {
@@ -10,7 +10,7 @@
   "scripts": {
     "test": "node --test --test-concurrency=1",
     "test:scale": "node --test tests/concurrency.test.js",
-    "test:postgres": "node --test tests/postgres-live.test.js",
+    "test:postgres": "node --test --test-concurrency=1 tests/postgres-claims-live.test.js tests/postgres-live.test.js tests/postgres-regressions.test.js tests/store.test.js",
     "test:container": "bash scripts/container-cluster-smoke.sh",
     "test:worker": "node --test tests/worker.test.js",
     "lint": "node scripts/lint.js",
@@ -22,10 +22,15 @@
     "replicate:git": "node scripts/replicate-git.js",
     "replicate:postgres": "node scripts/replicate-postgres.js",
     "drill:failover": "node scripts/failover-drill.js",
-    "check:postgres-replication": "node scripts/check-postgres-replication.js"
+    "check:postgres-replication": "node scripts/check-postgres-replication.js",
+    "demo:contest": "node scripts/contest/demo.js",
+    "demo:serve": "node scripts/contest/serve.js",
+    "test:cloudflare": "npm --prefix cloudflare/artifacts-bootstrap test",
+    "demo:hybrid": "node scripts/contest/hybrid.js",
+    "demo:cloudflare": "node scripts/contest/demo.js --live-cloudflare --trace"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22.23.4 <23 || >=24.22.1 <25 || >=26.12.1"
   },
   "dependencies": {
     "js-yaml": "^4.3.2",

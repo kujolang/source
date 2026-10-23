@@ -98,3 +98,33 @@ test('tenant isolation: a second org cannot read the first org project', () => {
   // And org1's project is still readable under org1.
   assert.ok(src.getProject(org.id, project.id));
 });
+
+test('indexed capability lookup retains no credential cache and reflects deletion', async () => {
+  let present = true;
+  const service = new CapabilityService({
+    getCapabilityByCredential: () => present ? { id: 'K1' } : null,
+    getCapabilityByCredentialAsync: async () => present ? { id: 'K1' } : null,
+  });
+  for (let i = 0; i < 1000; i++) {
+    assert.equal(service.lookup(`sync-${i}`).id, 'K1');
+    assert.equal((await service.lookupAsync(`async-${i}`)).id, 'K1');
+  }
+  assert.equal(service._cache.size, 0);
+  present = false;
+  assert.equal(service.lookup('sync-1'), null);
+  assert.equal(await service.lookupAsync('async-1'), null);
+});
+
+test('revoking a hashed grant preserves its stored credential hash', () => {
+  let persisted;
+  const service = new CapabilityService({
+    hashCapabilities: true, nextId: () => 'K1',
+    writeJson: (_path, value) => { persisted = value; }, readJson: () => persisted,
+    getCapabilityByCredential: (credential) => credential === persisted.credential ? persisted : null,
+  });
+  const issued = service.issue({ principalId: 'U1', allowed: ['read_source'] });
+  const originalHash = persisted.credential;
+  service.revoke(issued.id);
+  assert.equal(persisted.credential, originalHash);
+  assert.equal(service.authorize(issued.credential, 'read_source').reason, 'revoked');
+});

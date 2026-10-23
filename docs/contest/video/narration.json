@@ -1,0 +1,42 @@
+[
+  {
+    "id": "chapter-1",
+    "title": "0:00\u20130:35 \u2014 Intent becomes reviewable work",
+    "text": "Git gives us a durable history of code. When several agents contribute at once, we also need to know what each one was asked to do, what it checked, and who allowed the result to become the shared version. Source connects those records. In this demonstration, we will follow work from a task to a proposed commit, inspect its evidence, and see what happens when another change lands first."
+  },
+  {
+    "id": "chapter-2",
+    "title": "0:35\u20131:15 \u2014 Bounded contributors",
+    "text": "This project has three tasks: enable a dark theme, improve the documentation, and increase the page size. Three separate clients work on them concurrently. These clients are scripted. They demonstrate the collaboration protocol; they are not a demonstration of a language model deciding what to build. \u201cEach client receives a scoped Source capability. It can obtain its context, create its proposal and supply evidence. That capability does not let it approve its own work. The session records which task the contributor claimed and the source state it started from."
+  },
+  {
+    "id": "chapter-3",
+    "title": "1:15\u20132:00 \u2014 Actual concurrent proposals",
+    "text": "Here is the repeatable rehearsal. The three clients run in separate processes, and these start and end times show that their work overlaps. Each client makes real Git commits and submits a Change linked to its Work and Session. \u201cEach also attempts an approval that its credentials do not authorize. All three requests are denied. That is an observable boundary in this fixture, not just a button hidden in the interface. These timings demonstrate overlap on this machine; they are not a production capacity benchmark."
+  },
+  {
+    "id": "chapter-4",
+    "title": "2:00\u20133:10 \u2014 Evidence and a decision",
+    "text": "Now we can inspect the first proposal. Its evidence includes checks that actually ran against the proposed source. The policy evaluation shows which requirements have been met. Evidence, policy evaluation and approval are separate records. A passing check does not give the contributor authority to accept its own Change. \u201cThe rehearsal now acts as the maintainer and records an acceptance. This approval is scripted so that another person can reproduce the flow. In normal use, the human review interface lets a maintainer examine the work and make that decision. \u201cAcceptance makes the Change eligible for canonical promotion. Source still checks the Git relationship before moving the shared branch. The proposed commit must fit the current history. The resulting canonical commit is recorded alongside the decision and evidence, so we can trace the outcome back to the original task."
+  },
+  {
+    "id": "chapter-5",
+    "title": "3:10\u20134:20 \u2014 Stale results and conflict recovery",
+    "text": "The remaining proposals were made against the earlier version. We retain them so that the original attempt stays inspectable. A stale proposal cannot simply replace the canonical tip. \u201cThe documentation change can be rebased independently. The page-size change is different: it edits the same settings line as the theme change. Git reports an actual unmerged path. The scripted client resolves that conflict, produces a new commit, runs fresh checks and submits a revised Change. \u201cThe reviewed revision now preserves both intended settings: dark theme and a page size of twenty. The documentation remains present too. We have a final code state, but we also have the path that led to it: the stale attempt, the revision, its new evidence and the later decision. Source makes that history available for review instead of treating the last passing result as the whole story."
+  },
+  {
+    "id": "chapter-6",
+    "title": "4:20\u20135:30 \u2014 Hybrid boundary: current-status rehearsal",
+    "text": "The implemented hybrid path keeps Source's application and review lifecycle in Node. A Cloudflare Worker is the operator endpoint for creating Artifacts repositories and obtaining short-lived Git credentials. The accepted-change bridge publishes to Artifacts with an expected remote tip, then confirms the commit before updating the local cache and closing the Work. \u201cThe local contract rehearsal shown here executes Source, the Worker handlers and real Git. Its Artifacts binding and remote service are emulated. It proves our local integration behavior, including recovery when a push succeeds but its acknowledgement is lost. It does not prove that Cloudflare is deployed or working for this account. That live verification remains deferred. \u201cThe operator retains the Artifacts write credentials. Contributors use Source's staging branches and scoped permissions. A direct push to the local canonical branch is rejected; accepted changes use the controlled promotion path."
+  },
+  {
+    "id": "chapter-7",
+    "title": "5:30\u20136:25 \u2014 A reviewer can reproduce the result",
+    "text": "The human interface brings these records together. Starting from a Work item, a reviewer can inspect its Changes, evidence and decisions, then open the repository state that resulted. The goal is to make a multi-contributor outcome understandable without reconstructing it from scattered terminal sessions. \u201cSource uses the MIT license, and the runbook describes the repeatable local rehearsals and their limits. Source is now public on GitHub, and pull request two has been merged. The publication checkpoint is commit nine nine six f nine e four. The runbook pins the local rehearsal commands so that another reviewer can reproduce the same behavior."
+  },
+  {
+    "id": "chapter-8",
+    "title": "6:25\u20137:00 \u2014 Honest next steps",
+    "text": "Source is an early implementation with repeatable local checks. Production use needs more evidence: the actual deployment's capacity, independent security review and operational recovery drills. Those are separate from this local demo. \u201cThe useful result today is a reviewable collaboration flow around Git: bounded contributors, explicit evidence, permitted decisions and canonical updates that respect concurrent work. The repository and runbook show how to reproduce the verified behavior and which steps still require live infrastructure."
+  }
+]

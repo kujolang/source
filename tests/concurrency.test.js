@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { createConnection } from 'node:net';
 import assert from 'node:assert/strict';
 import { KeyedSemaphore, Semaphore } from '../src/concurrency.js';
 import { RateLimiter } from '../src/ratelimit.js';
@@ -170,7 +171,7 @@ test('Postgres canonical promotion lock uses the project row', async () => {
   store._qualified = (name) => `"source"."${name}"`;
   store._runAsync = async (sql) => { calls.push(sql); return ''; };
   await store.lockProjectAsync('O1', 'P1');
-  assert.match(calls[0], /WHERE org_id = 'O1' AND id = 'P1'/);
+  assert.match(calls[0], /WHERE org_id = E'O1' AND id = E'P1'/);
   assert.match(calls[0], /FOR UPDATE/);
 });
 
@@ -180,7 +181,7 @@ test('Postgres synchronous canonical promotion exposes the same project lock pri
   store._qualified = (name) => `"source"."${name}"`;
   store._run = (sql) => { calls.push(sql); return ''; };
   store.lockProject('O1', 'P1');
-  assert.match(calls[0], /WHERE org_id = 'O1' AND id = 'P1'/);
+  assert.match(calls[0], /WHERE org_id = E'O1' AND id = E'P1'/);
   assert.match(calls[0], /FOR UPDATE/);
 });
 
@@ -243,8 +244,17 @@ test('Postgres workflow records use one bounded bulk read', async () => {
   store._fetchJsonRowsAsync = async (sql) => { query = sql; return [{ path: 'workflows/W1.json', json: { id: 'W1' } }]; };
   const rows = await store.readJsonManyAsync(['workflows/W1.json', 'workflows/W1.json']);
   assert.deepEqual(rows, [{ path: 'workflows/W1.json', json: { id: 'W1' } }]);
-  assert.match(query, /path IN \('workflows\/W1\.json'\)/);
+  assert.match(query, /path IN \(E'workflows\/W1\.json'\)/);
   await assert.rejects(() => store.readJsonManyAsync(Array.from({ length: 1_002 }, (_, index) => `W${index}`)), /0-1001/);
+});
+
+test('Postgres bulk hydration preserves cursor order independent of database collation', async () => {
+  const store = Object.create(PostgresStore.prototype);
+  store._qualified = (name) => `"source"."${name}"`;
+  // Some locales sort W10.json before W1.json, unlike the corresponding IDs.
+  store._fetchJsonRowsAsync = async () => ['W10', 'W1', 'W2'].map((id) => ({ path: `work/${id}.json`, json: { id } }));
+  const rows = await store.readJsonManyAsync(['work/W1.json', 'work/missing.json', 'work/W10.json', 'work/W2.json', 'work/W1.json']);
+  assert.deepEqual(rows.map((row) => row.json.id), ['W1', 'W10', 'W2']);
 });
 
 test('decision reads use one bounded bulk read', async () => {
@@ -267,8 +277,8 @@ test('Postgres repository resolution uses a tenant-scoped indexed query', async 
   store._fetchJsonRowsAsync = async (sql) => { query = sql; return [{ json: { id: 'R1', name: 'main' } }]; };
   assert.deepEqual(await store.findRepositoryAsync('O1', 'P1', 'main'), { id: 'R1', name: 'main' });
   assert.match(query, /kind = 'repository'/);
-  assert.match(query, /org_id = 'O1'/);
-  assert.match(query, /project_id = 'P1'/);
+  assert.match(query, /org_id = E'O1'/);
+  assert.match(query, /project_id = E'P1'/);
   assert.match(query, /json->>'name'/);
 });
 
@@ -361,20 +371,54 @@ test('smart-HTTP Git remains responsive under concurrent requests', async () => 
   }
 });
 
-test('HTTP discovery withstands a thousand concurrent agent connections', async () => {
+test('HTTP discovery serves a thousand established concurrent connections', { timeout: 30_000 }, async () => {
   const { src } = freshSource();
-  const server = await startServer(src, { port: 0, maxConnections: 2_000 });
-  const url = `http://127.0.0.1:${server.address().port}/.well-known/source`;
+  const server = await startServer(src, { host: '127.0.0.1', port: 0, maxConnections: 2_000 });
+  const sockets = [];
+  let accepted = 0;
+  let acceptanceTimer;
+  const allAccepted = new Promise((resolve, reject) => {
+    acceptanceTimer = setTimeout(() => reject(new Error('server acceptance timed out')), 15_000);
+    server.on('connection', () => {
+      if (++accepted === 1_000) { clearTimeout(acceptanceTimer); resolve(); }
+    });
+  });
+  allAccepted.catch(() => {}); // Observe failure during socket establishment too.
   let ticks = 0;
   const timer = setInterval(() => { ticks += 1; }, 1);
   try {
-    const responses = await Promise.all(Array.from({ length: 1_000 }, () => fetch(url)));
-    assert.ok(responses.every((response) => response.status === 200));
-    assert.ok(ticks > 0, 'event loop did not progress during the thousand-agent burst');
+    // Establish sockets in bounded batches to avoid measuring the host OS SYN
+    // backlog. All 1,000 sockets remain open before any request is sent.
+    for (let offset = 0; offset < 1_000; offset += 50) {
+      await Promise.all(Array.from({ length: 50 }, () => new Promise((resolve, reject) => {
+        const socket = createConnection({ host: '127.0.0.1', port: server.address().port });
+        sockets.push(socket);
+        socket.setTimeout(15_000, () => socket.destroy(new Error('discovery socket timeout')));
+        socket.once('error', reject);
+        socket.once('connect', resolve);
+      })));
+    }
+    await allAccepted;
+    assert.equal(await new Promise((resolve, reject) => server.getConnections((error, count) => error ? reject(error) : resolve(count))), 1_000);
+    const before = ticks;
+    const replies = sockets.map((socket) => new Promise((resolve, reject) => {
+      let reply = '';
+      socket.on('data', (chunk) => { reply += chunk.toString('utf8'); });
+      socket.once('error', reject);
+      socket.once('end', () => resolve(reply));
+    }));
+    for (const socket of sockets) socket.write('GET /.well-known/source HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n');
+    for (const reply of await Promise.all(replies)) {
+      assert.match(reply, /^HTTP\/1\.1 200 /);
+      assert.match(reply, /"api_version":"1"/);
+    }
+    assert.ok(ticks > before, 'event loop must progress while serving concurrent requests');
   } finally {
     clearInterval(timer);
+    clearTimeout(acceptanceTimer);
+    for (const socket of sockets) socket.destroy();
     server.closeAllConnections?.();
-    server.close();
+    await new Promise((resolve) => server.close(resolve));
   }
 });
 

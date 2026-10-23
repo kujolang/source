@@ -1,0 +1,158 @@
+{
+  "version": 3,
+  "durationSeconds": 353.9583333333333,
+  "fps": 24,
+  "frames": 8495,
+  "files": [
+    {
+      "name": "source-in-action-v3.mp4",
+      "bytes": 9637453,
+      "sha256": "a73e3b40b2571fb322e5996c1f35f4f3c25d93320a46a36c31b1ef6761dc5721",
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 1920,
+            "height": 1080,
+            "r_frame_rate": "24/1",
+            "duration": "353.958333",
+            "nb_frames": "8495"
+          },
+          {
+            "codec_name": "aac",
+            "r_frame_rate": "0/0",
+            "duration": "353.962000",
+            "nb_frames": "16591"
+          }
+        ],
+        "format": {
+          "duration": "353.962000",
+          "size": "9637453"
+        }
+      },
+      "fullDecode": "pass",
+      "fastStart": true
+    },
+    {
+      "name": "source-in-action-v3-mobile.mp4",
+      "bytes": 6199454,
+      "sha256": "7822f233e3790083620146573733384ad2e378344dd594a50757258f8d356f79",
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 1280,
+            "height": 720,
+            "r_frame_rate": "24/1",
+            "duration": "353.958333",
+            "nb_frames": "8495"
+          },
+          {
+            "codec_name": "aac",
+            "r_frame_rate": "0/0",
+            "duration": "353.962000",
+            "nb_frames": "16591"
+          }
+        ],
+        "format": {
+          "duration": "353.962000",
+          "size": "6199454"
+        }
+      },
+      "fullDecode": "pass",
+      "fastStart": true
+    },
+    {
+      "name": "source-cloudflare-segment.mp4",
+      "bytes": 4380897,
+      "sha256": "95631e04debba9d67b5d28b8254c55ff4e1290cf5339b084cf6c16726b149d7d",
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 1920,
+            "height": 1080,
+            "r_frame_rate": "24/1",
+            "duration": "163.250000",
+            "nb_frames": "3918"
+          },
+          {
+            "codec_name": "aac",
+            "r_frame_rate": "0/0",
+            "duration": "163.250000",
+            "nb_frames": "7654"
+          }
+        ],
+        "format": {
+          "duration": "163.250000",
+          "size": "4380897"
+        }
+      },
+      "fullDecode": "pass",
+      "fastStart": true
+    },
+    {
+      "name": "source-in-action-v3-editable.zip",
+      "bytes": 34552734,
+      "sha256": "22a414af707750359291a5a9c972b5b0e84242927e21b28b8fc46bfb9537f372",
+      "zipIntegrity": "pass"
+    }
+  ],
+  "voice": {
+    "provider": "ElevenLabs",
+    "model": "eleven_v4",
+    "name": "Siren",
+    "voiceId": "eXpIbVcVbLo8ZJQDlDnl"
+  },
+  "scriptSkill": "orwell-writing",
+  "cloudflareVerified": true,
+  "ownerReviewPending": true,
+  "submitted": false,
+  "cloudChapterStartSeconds": 158.70833333333334,
+  "cloudSegmentDurationSeconds": 163.25,
+  "sourceCaptureCommit": "10482dd7029406681a72dab067efd6f86c72e230",
+  "reviewedImplementationCommit": "2184ece2b3b72a7eec0f352d4be84b1f73717b42",
+  "ciRun": "https://github.com/kujolang/source/actions/runs/38449005437",
+  "liveRepository": "source-hybrid-run-mbos1u-17e96e99",
+  "liveGitCommit": "01ebfe8c6c5d550faa87fe67410c63974e42eade",
+  "content": "Actual local browser actions and captured stdout with edited pacing; cloud review UI and cloud trace use the same clean live run. Clients and approvals are scripted. Source/JSON store local; Worker/canonical Git live.",
+  "export": "Streaming FFmpeg assembly of verified HyperFrames layouts, recorded browser clips and mastered narration. Decorative progress bar static. Native full render canceled for throughput; no native render success claimed.",
+  "verification": {
+    "compositionOk": true,
+    "samples": 10,
+    "contrastChecks": 27,
+    "compositionReport": "1f1b83bc-dfea-4731-b526-514d2807aa71",
+    "layoutSnapshotsInspected": 28,
+    "visualFramesReviewed": [
+      10,
+      170,
+      220,
+      241,
+      245,
+      250,
+      255,
+      260,
+      268,
+      310,
+      338
+    ],
+    "cloudClipEvidenceDecisionFramesReviewed": [
+      3.5,
+      8,
+      11,
+      14
+    ],
+    "exactFrameCount": 8495,
+    "fullDecode": "all three MP4 files pass",
+    "fastStart": "all three MP4 files pass",
+    "audioIntegratedLUFS": -17.31,
+    "audioTruePeakDbTP": -0.99,
+    "humanListeningReview": false
+  }
+}

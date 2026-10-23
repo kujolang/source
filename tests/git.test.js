@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -56,4 +56,15 @@ test('git push works (contribution transport)', () => {
   const git = src.gitRepo(org.id, project.id, repo.id);
   const tip = git.revParse('main');
   assert.ok(tip.length === 40);
+});
+
+test('revision inputs cannot inject Git options or create output files', async () => {
+  const { src, dir, org, project } = freshSource();
+  const { repo, base, head } = seedRepo(src, org.id, project.id);
+  const git = src.gitRepo(org.id, project.id, repo.id);
+  const target = path.join(dir, 'unexpected-output');
+  await assert.rejects(() => git.diffAsync(`${base}..${head}`, `--output=${target}`), /invalid Git revision/);
+  assert.throws(() => git.diff(`${base}..${head}`, `--output=${target}`), /invalid Git revision/);
+  assert.equal(existsSync(target), false);
+  assert.ok((await git.diffAsync(base, head)).includes('change'));
 });

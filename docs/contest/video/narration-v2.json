@@ -1,0 +1,38 @@
+[
+  {
+    "id": "v2-1",
+    "title": "Create and start work",
+    "visual": "create-work",
+    "text": "This is Source running locally. Let\u2019s create a task. I enter the goal, add a requirement, and say how we\u2019ll check the result. Source saves it as a Work item. Now I claim it and start a session. Watch the status change from open, to claimed, to in progress. The session gives the work a record of who started it and where it began. This task is a separate UI example; next we\u2019ll run the three-client rehearsal."
+  },
+  {
+    "id": "v2-2",
+    "title": "Run three clients",
+    "visual": "cli-start",
+    "text": "Here is the rehearsal running against real Git repositories and Source\u2019s API. The terminal shows output captured from that run, with pauses added so we can read it. Three scripted clients start from the same commit. One changes the theme. One updates the documentation. One changes the page size. They claim separate tasks, start sessions, and submit proposals. Their execution intervals overlap. Each client also tries to approve its own change. Source returns HTTP 403 for all three. These credentials can contribute code, but they cannot approve it."
+  },
+  {
+    "id": "v2-3",
+    "title": "Inspect the evidence",
+    "visual": "review",
+    "text": "Back in the browser, I open a change from the rehearsal. The page shows the request and the two commits being compared. Below that are the checks attached to this proposal. The rehearsal ran the settings test and a Git diff check. I evaluate the policy again, then scroll to the evidence. Both records are valid. The decision has its own record and names the approver. In this demo, a script plays the maintainer. The checks really ran; the human review is simulated."
+  },
+  {
+    "id": "v2-4",
+    "title": "Recover from a conflict",
+    "visual": "cli-end",
+    "text": "Once the theme change lands, the other proposals have an old base. Source blocks the stale update without moving the shared branch. The documentation client rebases and submits a new proposal. The page-size client hits a real conflict: both clients edited the same line in settings dot JSON. The recovery step keeps the dark theme and sets the page size to twenty. It then reruns the checks and submits the revised change. Only after the scripted maintainer accepts that revision does Source advance the shared branch."
+  },
+  {
+    "id": "v2-5",
+    "title": "Check the result",
+    "visual": "repository",
+    "text": "Now let\u2019s inspect what landed. I open the repository, switch to History, and select the page-size commit. The diff shows the change from ten to twenty while keeping the dark theme. Back in Contents, I open the actual settings file. Both changes are there. The earlier proposals, their evidence, and their decisions remain in Source. This is the useful part: we can inspect the final code and follow the work that produced it."
+  },
+  {
+    "id": "v2-6",
+    "title": "What is ready",
+    "visual": "ending",
+    "text": "Source is public and MIT licensed. You can clone it and run both local rehearsals. Its CI passes, including the PostgreSQL concurrency checks and the two-container failover test. The Cloudflare path is still a local rehearsal with emulated Artifacts. We have not verified a deployed Worker or a live Artifacts repository. That is the next submission gate. For now, this video shows the working local flow: create work, submit changes, check evidence, recover from a conflict, and inspect the result."
+  }
+]

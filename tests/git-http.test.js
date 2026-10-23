@@ -229,3 +229,23 @@ test('path traversal in the Git service suffix is rejected', async () => {
     assert.ok([400, 404].includes(res.status), `unexpected status: ${res.status}`);
   });
 });
+
+test('Git pipe errors and stderr overflow reject without retaining abort listeners', async () => {
+  const { EventEmitter, getEventListeners } = await import('node:events');
+  const { PassThrough } = await import('node:stream');
+  for (const mode of ['pipe', 'stderr']) {
+    const child = new EventEmitter();
+    child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
+    let killed = false;
+    child.kill = () => { killed = true; };
+    const controller = new AbortController();
+    const result = gitHttpBackend({ projectRoot: '/fixture', pathInfo: '/repo.git/git-upload-pack', spawnProcess: () => child, abortSignal: controller.signal, maxStderrBytes: 8 });
+    const rejected = assert.rejects(result, mode === 'pipe' ? /broken pipe/ : /stderr exceeded/);
+    if (mode === 'pipe') child.stdin.emit('error', Object.assign(new Error('broken pipe'), { code: 'EPIPE' }));
+    else child.stderr.write(Buffer.alloc(9));
+    await rejected;
+    assert.equal(killed, true);
+    assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
+    child.stdout.destroy(); child.stderr.destroy(); child.stdin.destroy();
+  }
+});

@@ -164,6 +164,11 @@ export async function run(argv) {
       case 'repo': {
         const orgId = flag('--org') || 'O1';
         const projectId = flag('--project') || 'P1';
+        if (sub === 'bind-artifacts') {
+          print(await src.bindArtifactsRepositoryAsync({ orgId, projectId, repoId: flag('--repo'), name: flag('--artifacts-name'), createRemote: hasFlag('--create-remote') }));
+          return;
+        }
+
         if (sub === 'create') {
           const r = src.createRepository({ orgId, projectId, name: flag('--name') || 'main' });
           print(r);
@@ -283,6 +288,15 @@ export async function run(argv) {
           const decision = sub === 'accept' ? 'accepted' : sub === 'reject' ? 'rejected' : 'revision_requested';
           const d = src.makeDecision({ orgId, projectId, changeId: flag('--change'), decision, decider: flag('--decider') || 'U1', reasoning: flag('--reasoning') || '' });
           print(d);
+          return;
+        }
+        break;
+      }
+      case 'canonical': {
+        if (sub === 'update') {
+          const result = await src.updateCanonicalStateAsync({ orgId: flag('--org') || 'O1', projectId: flag('--project') || 'P1', changeId: flag('--change') });
+          print(result);
+          if (!result.ok) process.exitCode = 1;
           return;
         }
         break;
@@ -507,7 +521,9 @@ export async function run(argv) {
           '  org create|list|show [--name <n> --slug <s>]',
           '  org member add --org <o> --principal <id> [--role member|maintainer|admin]',
           '  project create|list|show --org <o> [--name --slug]',
+          '  canonical update --org <o> --project <p> --change <c>',
           '  repo create --org <o> --project <p> --name <n>',
+          '  repo bind-artifacts --org <o> --project <p> --repo <r> --artifacts-name <source-hybrid-name> [--create-remote]',
           '  principal create --type human|agent|service --name <n>',
           '  cap issue --principal <id> [--org <o>] [--project <p>] [--work <w>] [--allowed a,b] [--denied d,e] [--ttl <ms>]',
           '  cap revoke <id>',

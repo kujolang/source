@@ -69,6 +69,25 @@ backup is outside MVP but the requirement is documented here. (With the SQLite
 backend, the domain records/artifacts/audit live in `source.sqlite`; the bare
 repos remain on the filesystem.)
 
+## PostgreSQL operation
+
+The asynchronous PostgreSQL API uses a pooled connection for each transaction.
+Project mutations acquire a project-row lock before reading and updating shared
+relationships. This preserves concurrent evidence, session and decision links
+across serving instances. Local JSON mutations serialize within one Source
+instance; JSON remains unsuitable for multiple writers.
+
+The synchronous PostgreSQL compatibility API launches a separate `psql` process
+per call. Its `transaction(fn)` does **not** make several writes atomic. Use the
+asynchronous API for serving. Run synchronous migration and maintenance offline,
+with a verified backup; a failed migration can leave partial records. Correcting
+that synchronous contract requires a separate compatibility design.
+
+For PostgreSQL, domain records, audit entries and artifact bytes reside in the
+database; bare Git repositories remain on disk. Back up both. The JSON layout and
+`audit.jsonl` instructions above apply only to the JSON backend. See
+[deployment and restore drills](23-tls-deployment.md) for operational commands.
+
 ## Cross-references
 
 - `03-system-architecture.md` — storage boundary.

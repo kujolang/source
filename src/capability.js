@@ -43,7 +43,7 @@ export class CapabilityService {
     const expiresAt = new Date(Date.now() + ttlMs).toISOString();
     const cap = createCapability({ id, principalId, scope, allowed, denied, expiresAt, credential });
     this.store.writeJson(this._rel(id), this._persisted(cap));
-    this._cache.set(credential, cap);
+    if (typeof this.store.getCapabilityByCredential !== 'function' && typeof this.store.getCapabilityByCredentialAsync !== 'function') this._cache.set(credential, cap);
     return cap;
   }
 
@@ -54,20 +54,15 @@ export class CapabilityService {
     const cap = createCapability({ id, principalId, scope, allowed, denied, expiresAt, credential });
     if (typeof this.store.writeJsonAsync === 'function') await this.store.writeJsonAsync(this._rel(id), this._persisted(cap));
     else this.store.writeJson(this._rel(id), this._persisted(cap));
-    this._cache.set(credential, cap);
+    if (typeof this.store.getCapabilityByCredential !== 'function' && typeof this.store.getCapabilityByCredentialAsync !== 'function') this._cache.set(credential, cap);
     return cap;
   }
 
   // Look up a grant by credential. Returns null if unknown.
   lookup(credential) {
     if (!credential) return null;
-    const storeLookup = typeof this.store.getCapabilityByCredential === 'function'
-      ? this.store.getCapabilityByCredential(this._storageCredential(credential))
-      : null;
-    if (storeLookup) {
-      const hydrated = this._hydrate(storeLookup, credential);
-      this._cache.set(credential, hydrated);
-      return hydrated;
+    if (typeof this.store.getCapabilityByCredential === 'function') {
+      return this._hydrate(this.store.getCapabilityByCredential(this._storageCredential(credential)), credential);
     }
 
     this._refreshCache();
@@ -81,9 +76,7 @@ export class CapabilityService {
     if (typeof this.store.getCapabilityByCredentialAsync === 'function') {
       const storeLookup = await this.store.getCapabilityByCredentialAsync(this._storageCredential(credential));
       if (storeLookup) {
-        const hydrated = this._hydrate(storeLookup, credential);
-        this._cache.set(credential, hydrated);
-        return hydrated;
+        return this._hydrate(storeLookup, credential);
       }
       return null;
     }
@@ -139,7 +132,7 @@ export class CapabilityService {
     const cap = this.store.readJson(this._rel(id));
     if (!cap) return false;
     cap.revoked = true;
-    this.store.writeJson(this._rel(id), this._persisted(cap));
+    this.store.writeJson(this._rel(id), cap);
     this._cache.delete(cap.credential);
     this._cacheAt = 0;
     return true;
