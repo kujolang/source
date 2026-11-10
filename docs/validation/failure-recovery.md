@@ -291,3 +291,34 @@ The bridge retains Workcell run evidence and unconfirmed-cleanup source/control
 material for Workcell-owned recovery. It does not implement a Source reaper,
 certify worker-death resource cleanup, deliver remote provider credentials or
 prove endpoint/browser staging. Those remain explicit mission requirements.
+
+## Full-lifecycle benchmark validation — 2026-11-10
+
+The reproducible benchmark now drives real HTTP Git clones/pushes and submit
+records from independent client processes, then uses two separate PostgreSQL
+workers for exact-candidate verification and normal broker acceptance/promotion.
+Ten agents passed on one repository and on five repositories. Candidate ancestry,
+content, evidence gating, coalescing/reuse, repeated promotion and equality with
+conventional cumulative-merge final trees are asserted, not inferred from timing.
+See `concurrency-results.md` and its raw reports for measurements and limitations.
+
+A permanent checker regression rejects missing contributors, corrupted bytes
+(including added whitespace) and unexpected files. A live two-agent/two-repository
+regression validates the whole harness and report invariants. Benchmark, submit
+and sync suites passed ten tests, zero failures/skips, in 28.73 seconds
+(`/tmp/source-benchmark-tests.log`). Both recorded measurements' SHA-256 harness
+identities match the checked-in script. The run databases and owned temporary
+fixtures were removed after all child processes exited.
+
+Three development smoke attempts exposed a harness-only connection setup issue:
+workers inherited a deliberately minimal environment, and a socket DSN without
+an explicit user lost PostgreSQL's ambient username default. The harness now
+passes the actual connected database user as the worker's explicit PGUSER.
+The subsequent two-agent smoke completed successfully. These failed development
+attempts are not successful capacity measurements. No application authentication,
+verification policy, rate limit or admission bound was weakened for the benchmark.
+
+This increment adds harness/tests/results rather than changing the application.
+The previous full 327-test regression predates the Workcell and benchmark additions;
+no new full-regression result is claimed here. Runtime isolation, recovery under
+load, larger stages and the real-project lifecycle remain open.

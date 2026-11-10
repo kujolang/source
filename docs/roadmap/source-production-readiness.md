@@ -48,8 +48,9 @@ remains active. This ledger does not narrow the definition of done.
 
 ## Adversarial test ledger
 
-1. Ten compatible agents: actual concurrent Git clients pass; normal full Source
-   lifecycle workload still required.
+1. Ten compatible agents: actual concurrent Git clients and full HTTP submission → PostgreSQL
+   verification → acceptance/promotion pass in the fixed-checker benchmark; live
+   isolated application verification remains required.
 2. Ten same-file agents: compatible fixture passes; conflicting pair passes;
    ten-way incompatible workload remains.
 3. Different files/shared dependency: risk report passes; executed semantic checks remain.
@@ -80,7 +81,8 @@ remains active. This ledger does not narrow the definition of done.
 ## Deliverables and gates
 
 Baseline report and partial integration architecture exist. Still required:
-`docs/validation/concurrency-results.md`;
+`docs/validation/concurrency-results.md` now records 10-agent hot/distributed
+measurements and a fixed-checker conventional baseline;
 `docs/architecture/hosting-readiness.md` now records the capability inventory and
 secondary-remote, migration and rollback gates;
 verification-planner, evidence-bound-promotion and failure-recovery now document
@@ -192,3 +194,19 @@ This is a working orchestration bridge, not live isolated staging certification.
 Single-environment endpoint/browser fixtures, provider credential delivery,
 orphan recovery drills, external-service inputs, real-project lifecycle and all
 staged benchmarks remain open mission requirements. The full goal stays active.
+
+## Lifecycle benchmark increment — 2026-11-10
+
+Ten independent HTTP/Git submit clients complete the actual Work/Session/Change/
+Evidence lifecycle, candidate assembly, separate-process PostgreSQL verification,
+exact-receipt reuse, human-identity acceptance, promotion and fetch. One hot repo
+and five-repo layouts pass all assertions, including full ancestry, rejection of
+unverified acceptance, idempotent promotion and identical final trees versus the
+conventional sequential-merge baseline. Raw reports and reproducible harness are
+linked from `../validation/concurrency-results.md`.
+
+This closes the missing compatible ten-agent full control-plane lifecycle proof.
+It does not certify isolation, application CI speedup, sustained traffic, crash
+recovery under load, larger stages or one real project's normal lifecycle. The
+benchmark checker only inspects test-owned Git data, never repository code. The
+full mission stays active.
