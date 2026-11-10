@@ -3,9 +3,9 @@
 // A thin client over the application service. The CLI uses the same domain
 // services as the API; no business logic lives only in the CLI.
 //
-// `source submit` is the exception: it is a *client* command that runs inside a
-// contributor's working clone and talks to a remote Source instance over HTTP
-// (see `submit.js`). All other commands operate on the local data root.
+// `source submit` and `source sync` are client commands that run inside a
+// contributor's working clone and talk to a remote Source instance over HTTP
+// (see `submit.js` and `sync.js`). All other commands operate on the local data root.
 
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -47,6 +47,38 @@ export async function run(argv) {
     return i >= 0 ? all[i + 1] : undefined;
   };
   const hasFlag = (name) => all.includes(name);
+
+  // Client commands must not initialize server state in a contributor's clone
+  // or connect to the operator's database just to push/fetch Git objects.
+  if (cmd === 'sync' || cmd === 'submit') {
+    switch (cmd) {
+      case 'sync': {
+        const { syncFromWorkingDir } = await import('./sync.js');
+        print(await syncFromWorkingDir({
+          cwd: flag('--cwd') || process.cwd(),
+          remote: flag('--remote') || null,
+          url: flag('--url') || null,
+          credential: flag('--credential') || null,
+          dryRun: hasFlag('--dry-run'),
+        }));
+        return;
+      }
+      case 'submit': {
+        // Client command: run inside a working clone, talk to the remote Source
+        // instance over HTTP. See src/submit.js.
+        const { submitFromWorkingDir } = await import('./submit.js');
+        const result = await submitFromWorkingDir({
+          cwd: flag('--cwd') || process.cwd(),
+          intent: flag('--intent') || '',
+          remote: flag('--remote') || null,
+          baseUrl: flag('--url') || null,
+          credential: flag('--credential') || null,
+        });
+        print(result);
+        return;
+      }
+    }
+  }
 
   // Select the store backend: --store json|sqlite|postgres, or SOURCE_STORE.
   // SQLite requires Node >= 22.5 (node:sqlite); PostgreSQL requires a DSN.
@@ -487,19 +519,6 @@ export async function run(argv) {
         }
         return;
       }
-      case 'submit': {
-        // Client command: run inside a working clone, talk to the remote Source
-        // instance over HTTP. See src/submit.js.
-        const { submitFromWorkingDir } = await import('./submit.js');
-        const result = await submitFromWorkingDir({
-          cwd: flag('--cwd') || process.cwd(),
-          intent: flag('--intent') || '',
-          baseUrl: flag('--url') || null,
-          credential: flag('--credential') || null,
-        });
-        print(result);
-        return;
-      }
       case 'principal': {
         if (sub === 'create') {
           print(src.createPrincipal({ type: flag('--type') || 'human', name: flag('--name') || 'human', password: flag('--password') }));
@@ -537,7 +556,8 @@ export async function run(argv) {
           '  audit',
           '  serve --port <n> [--host <addr>] [--store postgres] [--writer-lease --writer-lease-name <name> --writer-owner <id> --writer-lease-ms <n>] [--replication-role primary|standby --require-replication --min-replicas <n> --max-replication-lag-bytes <n>] [--trust-proxy] [--git-concurrency <n>] [--git-queue <n>] [--git-tenant-concurrency <n>] [--git-tenant-queue <n>] [--git-timeout-ms <n>] [--request-concurrency <n>] [--request-queue <n>] [--max-connections <n>] [--max-git-response <bytes>] [--max-workflow-jobs <n>] [--artifact-concurrency <n>] [--artifact-queue <n>]',
           '  worker --store postgres --handler-module <path> [--worker-id <id> --worker-concurrency <n> --worker-poll-ms <n> --worker-max-poll-ms <n> --worker-project-burst <n> --worker-jitter-ratio <0..1> --worker-handler-timeout-ms <n> --worker-shutdown-timeout-ms <n> --action-manifest <path> --action-keyring <path> --secret-provider-module <path> --secret-lease-ms <n>]',
-          '  submit [--intent <s>] [--url <base>] [--credential <c>] [--cwd <dir>]',
+          '  sync [--remote <name>] [--url <Source Git URL>] [--cwd <dir>] [--dry-run] [--credential <c>]',
+          '  submit [--remote <name>] [--intent <s>] [--url <base>] [--credential <c>] [--cwd <dir>]',
           '',
           'Env: SOURCE_DATA (default .source), SOURCE_STORE (json|sqlite|postgres)',
           'Flags: --store json|sqlite|postgres (select the storage backend)',

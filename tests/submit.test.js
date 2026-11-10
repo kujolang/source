@@ -159,3 +159,39 @@ test('source submit: empty change is rejected', async () => {
     );
   });
 });
+
+test('secondary remote submit uses fresh Source history even when GitHub origin already has HEAD', async () => {
+  const { src, org, project, repo, seedHead, cap } = publicSetup();
+  await withServer(src, async (base) => {
+    const cwd = await cloneAndModify(base, org.id, project.id, repo.name);
+    await run(['remote', 'rename', 'origin', 'source'], cwd);
+    await run(['remote', 'add', 'origin', 'git@github.com:example/repo.git'], cwd);
+    await run(['update-ref', 'refs/remotes/origin/main', 'HEAD'], cwd);
+    // Even stale Source tracking refs must not influence the proposal base.
+    await run(['update-ref', 'refs/remotes/source/main', 'HEAD'], cwd);
+    const result = await submitFromWorkingDir({ cwd, credential: cap.credential });
+    assert.equal(result.change.baseCommit, seedHead);
+    assert.equal(await run(['remote', 'get-url', 'origin'], cwd), 'git@github.com:example/repo.git');
+    assert.equal(src.gitRepo(org.id, project.id, repo.id).revParse('main'), seedHead);
+  });
+});
+
+test('explicit and configured remote selection supports a nonstandard default branch', async () => {
+  const { src, org, project, repo, seedHead, cap } = publicSetup();
+  await run(['branch', 'release', seedHead], repo.barePath);
+  await run(['symbolic-ref', 'HEAD', 'refs/heads/release'], repo.barePath);
+  await withServer(src, async (base) => {
+    const cwd = await cloneAndModify(base, org.id, project.id, repo.name);
+    await run(['remote', 'rename', 'origin', 'backup'], cwd);
+    await run(['remote', 'add', 'origin', 'git@github.com:example/repo.git'], cwd);
+    // Explicit selection wins over an invalid configured choice.
+    await run(['config', 'source.remote', 'missing'], cwd);
+    const result = await submitFromWorkingDir({ cwd, remote: 'backup', credential: cap.credential });
+    assert.equal(result.change.baseCommit, seedHead);
+    await run(['config', 'source.remote', 'backup'], cwd);
+    await assert.rejects(() => submitFromWorkingDir({ cwd, remote: 'origin' }), /expected a Source/);
+    // Reach the selected remote via config, then reject an empty proposal.
+    await run(['reset', '--hard', seedHead], cwd);
+    await assert.rejects(() => submitFromWorkingDir({ cwd, credential: cap.credential }), /no changes to submit/);
+  });
+});
