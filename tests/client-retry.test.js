@@ -84,8 +84,8 @@ test('Git failure diagnostics retain safe process facts without stderr, argv or 
   const secret = 'secret-fixture-token';
   for (const input of [
     { code: 'EAGAIN', failureKind: 'resource_exhausted', signal: null, httpStatus: null },
-    { code: 128, failureKind: 'transport', signal: 'SIGTERM', killed: true, httpStatus: 503 },
-    { code: secret, failureKind: secret, signal: secret, httpStatus: secret },
+    { code: 128, failureKind: 'transport', signal: 'SIGTERM', killed: true, httpStatus: 503, curlCode: 18 },
+    { code: secret, failureKind: secret, signal: secret, httpStatus: secret, curlCode: secret },
   ]) {
     const run = authenticatedGit(secret, 'https://source.invalid/git/O/P/R.git', '.', { runGit: async () => { throw Object.assign(new Error(secret), input, { stderr: secret, cmd: secret }); } });
     await assert.rejects(() => run(['fetch']), (error) => {
@@ -94,7 +94,31 @@ test('Git failure diagnostics retain safe process facts without stderr, argv or 
       assert.equal(error.diagnostic.code, input.code === 'EAGAIN' ? 'EAGAIN' : null);
       assert.equal(error.diagnostic.exitCode, input.code === 128 ? 128 : null);
       assert.equal(error.diagnostic.httpStatus, input.httpStatus === 503 ? 503 : null);
+      assert.equal(error.diagnostic.curlCode, input.curlCode === 18 ? 18 : null);
       return true;
     });
   }
+});
+
+test('real truncated HTTP response retains only numeric curl diagnosis', async (t) => {
+  const packet = (value) => (Buffer.byteLength(value) + 4).toString(16).padStart(4, '0') + value;
+  const server = createServer((req, res) => {
+    if (req.method === 'GET') {
+      res.writeHead(200, { 'content-type': 'application/x-git-upload-pack-advertisement' });
+      res.end(packet('# service=git-upload-pack\n') + '0000' + packet('version 2\n') + packet('ls-refs=unborn\n') + '0000');
+      return;
+    }
+    res.writeHead(200, { 'content-type': 'application/x-git-upload-pack-result', 'content-length': '1000', connection: 'close' });
+    res.end('0010');
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const url = `http://127.0.0.1:${server.address().port}/repo.git`;
+  await assert.rejects(() => authenticatedGit(null, url, '.4-missing-directory')(['ls-remote', url]), (error) => error.diagnostic.code === 'ENOENT');
+  await assert.rejects(() => authenticatedGit(null, url, '.')(['ls-remote', url]), (error) => {
+    assert.equal(error.diagnostic.curlCode, 18);
+    assert.equal(error.diagnostic.exitCode, 128);
+    assert.ok(!Object.hasOwn(error, 'stderr'));
+    return true;
+  });
 });

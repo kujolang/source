@@ -262,6 +262,7 @@ async function main() {
     if (server) { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
     if (store) { await store.pool.query(`DROP SCHEMA "${schema}" CASCADE`); await store.closeAsync(); }
     await rm(root, { recursive: true, force: true });
+    report.gitBackendOutcomes = Object.fromEntries(server?.metrics.gitBackendOutcomes || []);
     report.elapsedMs = Date.now() - began; report.parentCpuMicros = process.cpuUsage(cpuBefore); report.parentPeakRssBytes = process.resourceUsage().maxRSS * 1024;
     await writeFile(output, JSON.stringify(report, null, 2) + '\n', { flag: 'wx' });
     console.log(JSON.stringify({ status: report.status, output, elapsedMs: report.elapsedMs, error: report.error }));

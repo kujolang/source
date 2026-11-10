@@ -59,6 +59,8 @@ function metrics(res, state, src, gitSlots, gitTenantSlots, artifactSlots, reque
     '# TYPE source_aborted_requests_total counter',
     `source_aborted_requests_total ${state.abortedRequests}`,
   ];
+  lines.push('# HELP source_git_backend_outcomes_total Git backend completions by bounded outcome.', '# TYPE source_git_backend_outcomes_total counter');
+  for (const [outcome, count] of state.gitBackendOutcomes || []) lines.push(`source_git_backend_outcomes_total{outcome="${outcome}"} ${count}`);
   const pool = typeof src?.store?.poolStats === 'function' ? src.store.poolStats() : null;
   if (pool) {
     lines.push(
@@ -1090,7 +1092,13 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
               if (streamed && !res.writableEnded) res.end();
             },
           },
+          }).catch((error) => {
+            const outcome = /timed out/.test(error.message) ? 'timeout' : /aborted/.test(error.message) ? 'aborted' : 'error';
+            server.metrics.gitBackendOutcomes.set(outcome, (server.metrics.gitBackendOutcomes.get(outcome) || 0) + 1);
+            throw error;
           });
+          const outcome = Number.isInteger(result.exitCode) && result.exitCode >= 0 && result.exitCode <= 255 ? `exit_${result.exitCode}` : 'signaled';
+          server.metrics.gitBackendOutcomes.set(outcome, (server.metrics.gitBackendOutcomes.get(outcome) || 0) + 1);
 
           if (streamed) return;
 
@@ -1610,6 +1618,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
     responsesTotal: 0,
     activeRequests: 0,
     abortedRequests: 0,
+    gitBackendOutcomes: new Map(),
     statuses: new Map(),
   };
   server.discoveryInstancePromise = null;

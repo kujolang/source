@@ -7,6 +7,7 @@ export function git(args, cwd, { timeoutMs = 120000 } = {}) {
     execFile('git', args, { cwd, encoding: 'utf8', timeout: timeoutMs, env: { ...process.env, LC_ALL: 'C' } }, (err, stdout, stderr) => {
       if (err) {
         err.httpStatus = Number(stderr.match(/The requested URL returned error: (\d{3})/i)?.[1]) || null;
+        err.curlCode = Number(stderr.match(/\bcurl ([0-9]{1,3})\b/i)?.[1]) || null;
         // Classify known local/transport failures without retaining remote text.
         err.failureKind = /cannot fork|unable to fork|resource temporarily unavailable|cannot create thread/i.test(stderr) ? 'resource_exhausted'
           : /timed out|timeout/i.test(stderr) ? 'timeout'
@@ -65,6 +66,7 @@ export function authenticatedGit(credential, url, cwd, { retry = new ClientRetry
           operation: ['clone', 'ls-remote', 'fetch', 'push'].includes(args[0]) ? args[0] : 'git',
           kind: ['resource_exhausted', 'timeout', 'transport', 'git_exit'].includes(error.failureKind) ? error.failureKind : 'process',
           exitCode: Number.isInteger(error.code) ? error.code : null,
+          curlCode: Number.isInteger(error.curlCode) && error.curlCode > 0 && error.curlCode < 100 ? error.curlCode : null,
           code: ['EAGAIN', 'ENOENT', 'ENOMEM', 'ENOBUFS', 'ETIMEDOUT', 'ECONNRESET', 'EPIPE'].includes(error.code) ? error.code : null,
           signal: ['SIGTERM', 'SIGKILL', 'SIGABRT', 'SIGSEGV'].includes(error.signal) ? error.signal : null,
           killed: error.killed === true,

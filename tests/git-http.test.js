@@ -362,4 +362,7 @@ test('disconnected Git requests waiting for admission do not start a backend aft
   const live = await fetch(`${base}/git/${org.id}/${project.id}/${repo.id}.git/info/refs?service=git-upload-pack`, { headers: { Authorization: basicAuthHeader(cap.credential) } });
   assert.equal(live.status, 200); await live.arrayBuffer();
   assert.equal(backendStarts, 1, 'only the live request may start a Git backend');
+  assert.equal(server.metrics.gitBackendOutcomes.get('exit_0'), 1);
+  const metrics = await (await fetch(`${base}/metrics`)).text();
+  assert.match(metrics, /source_git_backend_outcomes_total\{outcome="exit_0"\} 1/);
 });
