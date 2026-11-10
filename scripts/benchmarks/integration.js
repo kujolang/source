@@ -153,7 +153,7 @@ async function main() {
     await Promise.all(clients.map((entry) => entry.wait('ready')));
     report.phase = 'submission';
     const submittedAt = performance.now(); clients.forEach((entry) => entry.child.send({ type: 'go' }));
-    const proposals = (await Promise.all(clients.map((entry) => entry.wait('result')))).map((message) => message.result);
+    const proposals = (await Promise.all(clients.map((entry) => entry.wait('result', 660000)))).map((message) => message.result);
     const submissionWallMs = performance.now() - submittedAt;
     await Promise.all(clients.map((entry) => entry.closed));
     assert.equal(new Set(proposals.map((item) => item.changeId)).size, agents);

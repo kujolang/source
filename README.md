@@ -134,7 +134,9 @@ forcing updates or deleting destination refs. It preserves `origin`, upstream
 tracking, and your working files. GitHub-only branches, uncommitted files, Git LFS
 objects, submodule repositories, issues and pull requests are not copied. Create
 and sync each submodule separately if needed. An incompatible branch or tag
-rejects the entire push. Sync is explicit; no background job is installed.
+rejects the entire push. Sync is explicit; no background job is installed. Throttled Source Git requests
+use bounded backoff; `submit` also retries explicit pre-admission API throttling.
+The default budget is eight retries within ten minutes, with progress on stderr.
 
 Both commands select `--remote NAME`, then `git config source.remote NAME`, then
 `source` if present, otherwise `origin` for existing Source clones. The selected

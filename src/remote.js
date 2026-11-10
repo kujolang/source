@@ -1,10 +1,14 @@
 // Shared client-side remote selection. GitHub can remain origin.
 import { execFile } from 'node:child_process';
+import { ClientRetry } from './client-retry.js';
 
-export function git(args, cwd) {
+export function git(args, cwd, { timeoutMs = 120000 } = {}) {
   return new Promise((resolve, reject) => {
-    execFile('git', args, { cwd, encoding: 'utf8' }, (err, stdout) => {
-      if (err) reject(err);
+    execFile('git', args, { cwd, encoding: 'utf8', timeout: timeoutMs, env: { ...process.env, LC_ALL: 'C' } }, (err, stdout, stderr) => {
+      if (err) {
+        err.httpStatus = Number(stderr.match(/The requested URL returned error: (\d{3})/i)?.[1]) || null;
+        reject(err);
+      }
       else resolve(stdout.trim());
     });
   });
@@ -39,12 +43,21 @@ export async function resolveRemote(cwd, remote, url = null) {
   return { name, url: remoteUrl, ...parsed };
 }
 
-export function authenticatedGit(credential, url, cwd) {
+export function authenticatedGit(credential, url, cwd, { retry = new ClientRetry(), runGit = git } = {}) {
   const cred = credential || process.env.SOURCE_CREDENTIAL;
   const flags = ['-c', 'http.followRedirects=false'];
   if (cred) flags.push('-c', `http.${url}.extraHeader=Authorization: Basic ${Buffer.from(`source:${cred}`).toString('base64')}`);
   return async (args) => {
-    try { return await git([...flags, ...args], cwd); }
-    catch { throw new Error(`Source Git ${args[0]} failed; check credentials, connectivity, and fast-forward history (no force or deletion is performed)`); }
+    while (true) {
+      try { return await runGit([...flags, ...args], cwd, { timeoutMs: retry.timeoutMs() }); }
+      catch (error) {
+        if (error.httpStatus === 429 && ['ls-remote', 'fetch', 'push'].includes(args[0])) {
+          await retry.wait(`Git ${args[0]}`);
+          continue;
+        }
+        // Do not leak command argv, credentials, or remote-controlled stderr.
+        throw new Error(`Source Git ${args[0]} failed; check credentials, connectivity, and fast-forward history (no force or deletion is performed)`);
+      }
+    }
   };
 }

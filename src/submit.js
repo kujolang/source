@@ -21,6 +21,7 @@
 // process as a Source server during tests without blocking the event loop.
 
 import { git, resolveRemote, authenticatedGit } from './remote.js';
+import { ClientRetry, submitRequest } from './client-retry.js';
 
 // Fetch the selected Source default branch, rather than relying on potentially
 // stale tracking refs or the unrelated GitHub origin tip.
@@ -36,7 +37,7 @@ async function mergeBase(cwd, remote, run) {
 // Submit a contribution from a working clone. Returns the Source lifecycle
 // objects created server-side: { work, session, change, evidence, evaluation,
 // interpretation }.
-export async function submitFromWorkingDir({ cwd = process.cwd(), intent = '', baseUrl = null, credential = null, remote = null } = {}) {
+export async function submitFromWorkingDir({ cwd = process.cwd(), intent = '', baseUrl = null, credential = null, remote = null, retry = new ClientRetry() } = {}) {
   const target = await resolveRemote(cwd, remote);
   const parsed = target;
   const apiBase = baseUrl || target.baseUrl;
@@ -45,7 +46,7 @@ export async function submitFromWorkingDir({ cwd = process.cwd(), intent = '', b
   if (submitCredential && new URL(apiBase).origin !== new URL(target.baseUrl).origin) {
     throw new Error('authenticated submit requires the API and Git remote to have the same origin');
   }
-  const run = authenticatedGit(submitCredential, target.url, cwd);
+  const run = authenticatedGit(submitCredential, target.url, cwd, { retry });
   const head = await git(['rev-parse', 'HEAD'], cwd);
   const base = await mergeBase(cwd, target, run);
   if (base === head) throw new Error('no changes to submit (base == head)');
@@ -68,7 +69,7 @@ export async function submitFromWorkingDir({ cwd = process.cwd(), intent = '', b
   }
 
   // 6. Submit to the Source API (org-scoped).
-  const res = await fetch(`${apiBase}/api/v1/orgs/${parsed.orgId}/projects/${parsed.projectId}/submit`, {
+  return submitRequest(`${apiBase}/api/v1/orgs/${parsed.orgId}/projects/${parsed.projectId}/submit`, {
     method: 'POST', redirect: 'error',
     headers: { 'content-type': 'application/json', ...(submitCredential ? { authorization: `Bearer ${submitCredential}` } : {}) },
     body: JSON.stringify({
@@ -78,10 +79,5 @@ export async function submitFromWorkingDir({ cwd = process.cwd(), intent = '', b
       intent: resolvedIntent,
       contributorName,
     }),
-  });
-  const body = await res.json();
-  if (!res.ok) {
-    throw new Error(body.error || `submit failed (${res.status})`);
-  }
-  return body;
+  }, { retry });
 }

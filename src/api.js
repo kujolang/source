@@ -1356,7 +1356,8 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
         if (rest === '/submit' && req.method === 'POST') {
           const ip = clientAddress(req, trustProxy);
           if (!(await limiter.allowAsync(`submit:${ip}`, limits.submit))) {
-            return json(res, 429, { error: 'rate limit exceeded' });
+            res.setHeader('retry-after', String(Math.max(1, Math.ceil(limits.submit.windowMs / 1000))));
+            return json(res, 429, { error: 'rate limit exceeded', retryable: true });
           }
           const body = await readBody(req, maxJsonBodyBytes);
           const project = typeof src.getProjectAsync === 'function'

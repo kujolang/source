@@ -347,3 +347,20 @@ diff checks pass. No new full-suite claim is made.
 The 25-agent pilot still fails at default shared-IP Git-read admission with
 observed HTTP 429 responses; this authentication fix does not claim to resolve
 that independent scaling limit. See concurrency-results for the failed records.
+
+## Bounded client admission backoff — 2026-11-10
+
+Source clients now retain server admission limits and wait on explicit throttling.
+Git recognizes HTTP 429 without exposing remote stderr or credential-bearing argv;
+submit shares a bounded retry count/deadline across Git and API calls. The API
+marks only pre-lifecycle 429 responses retryable and supplies a conservative
+Retry-After. Unknown mutation outcomes, authentication failures and 5xx errors
+are not replayed. No capability or server-rate-limit change is included.
+
+Five retry tests cover seconds/date/malformed Retry-After, shared limits/deadline,
+Git HTTP classification, credential-safe errors, rejection of uncertain POST
+replay, and a real server's mutation count before/after throttling. Together with
+submit/sync/API/Git transport suites: 42 tests pass, zero failures/skips, 24.40
+seconds (`/tmp/source-client-backoff-tests.log`). Lint checks 106 JS files; diff
+checks pass. The benchmark client timeout now permits the documented ten-minute
+retry budget rather than aborting a still-bounded client at three minutes.

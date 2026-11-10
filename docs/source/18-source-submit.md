@@ -139,3 +139,26 @@ remote. This is checked before fetching or pushing. API redirects are rejected.
 Tests exercise explicit and environment credentials against private projects,
 retain the authenticated principal, preserve GitHub origin, reject transport-only
 capabilities, and reject an unrelated API override before any push.
+
+## Throttled clients
+
+`submit` shares a retry budget across its Git requests and API submission: at
+most eight retries within ten minutes, with each network command/request bounded
+to two minutes or the remaining budget. `sync` uses the same Git backoff. Server
+rate/admission limits and authentication are unchanged.
+
+Git retries only an explicit HTTP 429 reported by the Git client. With no safely
+available Retry-After header from Git, it waits 60 seconds initially, doubles the
+fallback up to 120 seconds for repeated throttling of the same operation, and
+adds up to 15 seconds of jitter. Existing explicit non-force refspecs are reused.
+Authentication failures, non-fast-forward errors, connection errors and 5xx
+responses are not automatically retried.
+
+The submit API advertises `retryable: true` and a conservative full-window
+`Retry-After` only when rejecting the request before lifecycle creation. The
+client honors seconds or HTTP-date values plus jitter and replays that same POST
+only for this marked 429. It does not replay an uncertain mutation response:
+a lost connection, timeout, malformed response or 5xx may follow a committed
+change. Those remain errors requiring inspection rather than duplicate creation.
+Oversized Retry-After values fail against the deadline instead of retrying early.
+Retry notices go to stderr; successful JSON output stays on stdout.
