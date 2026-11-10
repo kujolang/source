@@ -16,9 +16,10 @@ to the bearer capability rather than accepting a body producer ID. Output is
 preserved in Source's content-addressed artifact store. Promotion checks artifact
 bytes, receipt identity, expiry, outcome and current source proposal eligibility.
 An artifact hash proves integrity, not actual execution or isolation. This
-increment trusts the authorized verifier service's attestation; it does not yet
-provision a worker or execute the command. Tests using fixture receipts are not
-claims that a real project's suite executed in isolation.
+contract trusts the authorized verifier service's attestation. The optional
+PostgreSQL dispatcher and worker handler now connect execution receipts to live
+job leases and dispatch generations. Tests using fixture receipts are not claims
+that a real project's suite executed in isolation.
 
 Acceptance requires an organization maintainer/admin human plus `accept_change`
 at the API boundary. Promotion additionally requires `promote_integration`.
@@ -102,3 +103,12 @@ acceptance, protected HTTP and legacy bypass denial, two independent CLI promote
 and injected post-Git outcome failure. Actual process death, PostgreSQL failover,
 tag protection, isolated execution, operator UI and end-to-end real-project
 migration are still required by the active mission.
+## Terminal retirement
+
+Candidate retirement adds `cancelled` and `superseded` terminal states. The broker
+refuses new evidence, acceptance and promotion for retired candidates while
+preserving their history. Explicit replacement cancels the old candidate's jobs
+and dispatches the new candidate in one PostgreSQL project transaction. Evidence
+and human approval never transfer. Retirement checks the landed Git receipt,
+including after a lost database acknowledgment; it cannot undo completed Git
+promotion. See the workflow operator guide for capability and rollback details.

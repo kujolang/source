@@ -330,6 +330,10 @@ export async function run(argv) {
           print(await src.verification.dispatch({ ...scope, candidateId: flag('--candidate'), principalId: flag('--principal') || 'U1' }));
           return;
         }
+        if (sub === 'retire') {
+          print(await src.verification.retire({ ...scope, candidateId: flag('--candidate'), replacementId: flag('--replacement') || null, reason: flag('--reason') || 'cancelled by operator', principalId: flag('--principal') || 'U1' }));
+          return;
+        }
         if (sub === 'configure') {
           print(await src.integration.configure({ ...scope, principalId: flag('--principal') || 'U1', policy: JSON.parse(readFileSync(flag('--policy'), 'utf8')) }));
           return;
@@ -566,6 +570,7 @@ export async function run(argv) {
           '  project create|list|show --org <o> [--name --slug]',
           '  integration configure --repo <r> --policy <file> --principal <maintainer> (offline operator setup)',
           '  integration status|evaluate|accept|promote|split|dispatch --repo <r> --candidate <id> --principal <maintainer>',
+          '  integration retire --repo <r> --candidate <id> [--replacement <id>] [--reason <text>]',
           '  integration plan --org <o> --project <p> --repo <r> --changes C1,C2',
           '  integration show --org <o> --project <p> --repo <r> --candidate <id>',
           '  canonical update --org <o> --project <p> --change <c>',

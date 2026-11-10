@@ -7,62 +7,102 @@ export class VerificationDispatcher {
   constructor(source) { this.source = source; }
 
   async dispatch(input) {
+    return this.source._projectMutationAsync(input.orgId, input.projectId, () => this._dispatchLocked(input));
+  }
+
+  // Only call while holding the project mutation transaction. Replacement uses
+  // the same transaction for old-job cancellation and new-job admission.
+  async _dispatchLocked(input) {
     const source = this.source;
     if (!source.store.getJobAsync || !source.store.lockJobLeaseAsync) throw new Error('verification dispatch requires PostgreSQL');
     const { orgId, projectId, repoId, candidateId } = input;
-    return source._projectMutationAsync(orgId, projectId, async () => {
-      const { root, report, repo, planner } = await source.integration.load(input);
-      if (await planner.git(['rev-parse', `refs/heads/${report.branch}`]) !== report.candidate.baseCommit) throw new Error('target changed; replan before dispatch');
-      const evaluation = await source.integration.evaluate(input, { forReuse: true });
-      const rel = `${root}/${candidateId}/dispatch.json`;
-      const prior = await source.integration.read(rel);
-      const definitions = repo.integrationPolicy.checks;
-      const selected = new Set(evaluation.checks.map((check) => check.checkId));
-      const ordered = []; const visited = new Set();
-      const visit = (id) => {
-        if (visited.has(id)) return;
-        visited.add(id);
-        const check = definitions.find((entry) => entry.id === id);
-        for (const dependency of check.dependsOn || []) visit(dependency);
-        ordered.push(check);
-      };
-      for (const id of selected) visit(id);
-      const checks = [];
-      for (const check of ordered) {
-        const validity = evaluation.checks.find((entry) => entry.checkId === check.id);
-        const identity = verificationIdentity(report.candidate, repo.integrationPolicy, check.id);
-        const previous = prior?.checks.find((entry) => entry.checkId === check.id);
-        const job = previous?.jobId ? await source.store.getJobAsync({ orgId, projectId, id: previous.jobId }) : null;
-        const dependencies = (check.dependsOn || []).map((id) => checks.find((entry) => entry.checkId === id));
-        const pending = dependencies.filter((entry) => entry.action !== 'reused').map((entry) => entry.jobId);
-        const active = job && ['queued', 'leased'].includes(job.status);
-        const same = previous?.identity === identity;
-        // A receipt may already exist while its worker is still completing the
-        // job. Keep that job alive: downstream jobs depend on its completion.
-        if (active && same && pending.every((id) => job.dependsOn.includes(id))) {
-          checks.push({ checkId: check.id, identity, epoch: previous.epoch, jobId: job.id, action: 'coalesced', reason: 'equivalent verification is already queued or leased' });
-          continue;
-        }
-        if (validity?.satisfied && !pending.length) {
-          // Existing work may race a newly available external receipt. Cancel it
-          // under the same project lock used by queued broker writes.
-          if (active) await source.jobs.cancel({ orgId, projectId, id: job.id, reason: 'exact deterministic evidence already available' });
-          checks.push({ checkId: check.id, identity, epoch: previous?.epoch || 0, action: 'reused', receiptId: validity.receiptId, reason: validity.reason });
-          continue;
-        }
-        if (active) await source.jobs.cancel({ orgId, projectId, id: job.id, reason: 'verification prerequisites superseded' });
-        const epoch = (previous?.epoch || 0) + 1;
-        if (!Number.isSafeInteger(epoch)) throw new Error('verification dispatch epoch exhausted');
-        const payload = { repoId, candidateId, checkId: check.id, identity, epoch };
-        const queued = await source.jobs.enqueue({ orgId, projectId, kind: 'integration.verify', payload,
-          dedupeKey: `verification:${digest({ orgId, projectId, ...payload })}`,
-          dependsOn: pending, priority: check.priority ?? (check.tier === 3 ? 50 : 0), maxAttempts: check.maxAttempts ?? 3, maxQueueDepth: 10000 });
-        checks.push({ checkId: check.id, identity, epoch, jobId: queued.id, action: 'scheduled', reason: pending.length ? 'prerequisite verification is being rerun' : validity?.reason || 'required prerequisite needs verification' });
+    const { root, report, repo, planner } = await source.integration.load(input);
+    if (await planner.git(['rev-parse', `refs/heads/${report.branch}`]) !== report.candidate.baseCommit) throw new Error('target changed; replan before dispatch');
+    const evaluation = await source.integration.evaluate(input, { forReuse: true });
+    const rel = `${root}/${candidateId}/dispatch.json`;
+    const prior = await source.integration.read(rel);
+    const definitions = repo.integrationPolicy.checks;
+    const selected = new Set(evaluation.checks.map((check) => check.checkId));
+    const ordered = []; const visited = new Set();
+    const visit = (id) => {
+      if (visited.has(id)) return;
+      visited.add(id);
+      const check = definitions.find((entry) => entry.id === id);
+      for (const dependency of check.dependsOn || []) visit(dependency);
+      ordered.push(check);
+    };
+    for (const id of selected) visit(id);
+    const checks = [];
+    for (const check of ordered) {
+      const validity = evaluation.checks.find((entry) => entry.checkId === check.id);
+      const identity = verificationIdentity(report.candidate, repo.integrationPolicy, check.id);
+      const previous = prior?.checks.find((entry) => entry.checkId === check.id);
+      const job = previous?.jobId ? await source.store.getJobAsync({ orgId, projectId, id: previous.jobId }) : null;
+      const dependencies = (check.dependsOn || []).map((id) => checks.find((entry) => entry.checkId === id));
+      const pending = dependencies.filter((entry) => entry.action !== 'reused').map((entry) => entry.jobId);
+      const active = job && ['queued', 'leased'].includes(job.status);
+      const same = previous?.identity === identity;
+      // A receipt may already exist while its worker is still completing the
+      // job. Keep that job alive: downstream jobs depend on its completion.
+      if (active && same && pending.every((id) => job.dependsOn.includes(id))) {
+        checks.push({ checkId: check.id, identity, epoch: previous.epoch, jobId: job.id, action: 'coalesced', reason: 'equivalent verification is already queued or leased' });
+        continue;
       }
-      const result = { version: 1, candidateId, checks, plan: evaluation.plan, dispatchedAt: Date.now() };
+      if (validity?.satisfied && !pending.length) {
+        // Existing work may race a newly available external receipt. Cancel it
+        // under the same project lock used by queued broker writes.
+        if (active) await source.jobs.cancel({ orgId, projectId, id: job.id, reason: 'exact deterministic evidence already available' });
+        checks.push({ checkId: check.id, identity, epoch: previous?.epoch || 0, action: 'reused', receiptId: validity.receiptId, reason: validity.reason });
+        continue;
+      }
+      if (active) await source.jobs.cancel({ orgId, projectId, id: job.id, reason: 'verification prerequisites superseded' });
+      const epoch = (previous?.epoch || 0) + 1;
+      if (!Number.isSafeInteger(epoch)) throw new Error('verification dispatch epoch exhausted');
+      const payload = { repoId, candidateId, checkId: check.id, identity, epoch };
+      const queued = await source.jobs.enqueue({ orgId, projectId, kind: 'integration.verify', payload,
+        dedupeKey: `verification:${digest({ orgId, projectId, ...payload })}`,
+        dependsOn: pending, priority: check.priority ?? (check.tier === 3 ? 50 : 0), maxAttempts: check.maxAttempts ?? 3, maxQueueDepth: 10000 });
+      checks.push({ checkId: check.id, identity, epoch, jobId: queued.id, action: 'scheduled', reason: pending.length ? 'prerequisite verification is being rerun' : validity?.reason || 'required prerequisite needs verification' });
+    }
+    const result = { version: 1, candidateId, checks, plan: evaluation.plan, dispatchedAt: Date.now() };
+    await source._asyncWrite(rel, result);
+    await source._asyncAudit({ event: 'integration.dispatch', orgId, projectId, repoId, candidateId, principalId: input.principalId,
+      checks: checks.map(({ checkId, action, jobId, receiptId, reason }) => ({ checkId, action, jobId, receiptId, reason })) });
+    return result;
+  }
+
+  async retire(input) {
+    const source = this.source;
+    if (!source.store.getJobAsync || !source.store.lockJobLeaseAsync) throw new Error('candidate cancellation requires PostgreSQL');
+    const { orgId, projectId, repoId, candidateId, replacementId = null, reason = 'cancelled by operator' } = input;
+    if (typeof reason !== 'string' || !reason || reason.length > 1000) throw new Error('invalid candidate cancellation reason');
+    if (replacementId != null && (!/^[a-f0-9]{64}$/.test(replacementId) || replacementId === candidateId)) throw new Error('replacement must be a different candidate ID');
+    return source._projectMutationAsync(orgId, projectId, async () => {
+      const { root, planner } = await source.integration.load(input, { currentPolicy: false });
+      const rel = `${root}/${candidateId}/retirement.json`;
+      const existing = await source.integration.read(rel);
+      if (existing) {
+        if (existing.replacementId !== replacementId) throw new Error('candidate already retired with a different disposition');
+        return existing;
+      }
+      let landed = false;
+      try { await planner.git(['show-ref', '--verify', '--quiet', `refs/source/landed/${candidateId}`]); landed = true; }
+      catch (error) { if (error.code !== 1) throw error; }
+      if (landed) throw new Error('landed candidate cannot be cancelled or superseded');
+      const prior = await source.integration.read(`${root}/${candidateId}/dispatch.json`);
+      const cancelledJobs = [];
+      for (const check of prior?.checks || []) {
+        if (!check.jobId) continue;
+        const cancelled = await source.jobs.cancel({ orgId, projectId, id: check.jobId, reason });
+        if (cancelled) cancelledJobs.push(check.jobId);
+      }
+      // Validation/admission failure rolls back all old-job cancellations.
+      const replacement = replacementId ? await this._dispatchLocked({ orgId, projectId, repoId, candidateId: replacementId, principalId: input.principalId }) : null;
+      const result = { version: 1, candidateId, state: replacementId ? 'superseded' : 'cancelled', replacementId, reason,
+        principalId: input.principalId, retiredAt: Date.now(), cancelledJobs, replacement };
       await source._asyncWrite(rel, result);
-      await source._asyncAudit({ event: 'integration.dispatch', orgId, projectId, repoId, candidateId, principalId: input.principalId,
-        checks: checks.map(({ checkId, action, jobId, receiptId, reason }) => ({ checkId, action, jobId, receiptId, reason })) });
+      await source._asyncAudit({ event: 'integration.retire', orgId, projectId, repoId, candidateId, principalId: input.principalId,
+        state: result.state, replacementId, cancelledJobs, reason });
       return result;
     });
   }

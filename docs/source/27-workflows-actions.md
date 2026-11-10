@@ -194,3 +194,44 @@ deleting them discards rerun-generation enforcement. Do not operate older broker
 code against candidates with active dispatch generations; older code does not
 enforce the generation constraint. Restore a consistent pre-dispatch backup if a
 full rollback is needed, following the existing Git/database recovery procedure.
+
+## Retire or replace an integration candidate
+
+```bash
+# Terminally withdraw this candidate and cancel its pending/leased jobs.
+node bin/source.js --store postgres integration retire \
+  --org O1 --project P1 --repo R1 --candidate <old-id> --reason 'withdrawn'
+
+# Atomically withdraw old work and schedule an already-planned replacement.
+node bin/source.js --store postgres integration retire \
+  --org O1 --project P1 --repo R1 --candidate <old-id> \
+  --replacement <new-id> --reason 'updated proposal'
+```
+
+The HTTP endpoint is `POST
+/api/v1/orgs/{org}/projects/{project}/repositories/{repo}/integration/{candidate}/retire`
+with optional `reason` (1–1000 characters) and `replacementId`. It requires
+`retire_integration`; specifying a replacement also requires
+`dispatch_verification`. Neither `cancel_job` nor dispatch permission alone may
+retire a candidate. The audit principal comes from the authenticated capability.
+
+Retirement is terminal for that immutable candidate ID: status becomes
+`cancelled` or `superseded`, and new dispatch, evidence, acceptance and promotion
+are refused. It is not a pause/resume operation. Create a distinct candidate from
+updated proposals or policy to continue. Historical receipts and approvals remain
+inspectable but do not transfer to the replacement. Ordinary single-job
+cancellation remains available when you only want to stop/retry one check.
+
+The replacement must be a valid current candidate in the same repository and
+project. Old-job cancellation, replacement admission and the retirement audit
+commit together; validation or queue-admission failure rolls back all changes.
+Repeated requests with the same replacement return the original result without
+launching another generation. A different replacement for an already retired
+candidate is refused. Landed Git receipts prevent retirement even if the database
+promotion acknowledgment was lost. Promotion and retirement share the project
+transaction lock, so retirement cannot undo a completed canonical Git update.
+
+Runtime cancellation still depends on worker heartbeat/abort handling; late
+evidence is rejected at the broker even if physical teardown is delayed. Never
+delete retirement records during rollback or run an older broker that ignores
+them against affected candidates. This change adds no database schema migration.

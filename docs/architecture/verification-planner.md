@@ -126,9 +126,10 @@ implement `execute({ candidate, check, repository, identity, job, signal })`, re
 `{ execution, output }` conforming to `createVerificationReceipt`, and honor
 cancellation. The live dispatcher tests use a controlled Git-reading fixture,
 not untrusted workload execution. Workcell/container lifecycle integration and
-production execution provenance remain separate required work. Supersession is
-currently within a candidate's check dependency graph; automatic cancellation of
-all work for replaced candidates remains open.
+production execution provenance remain separate required work. Explicit candidate
+replacement now atomically retires the old candidate, cancels its jobs and
+dispatches the replacement. It does not infer replacement intent from ordinary
+planning or automatically retire unrelated candidates.
 
 An optional `CandidateContainerExecutor` now supplies a digest-pinned OCI runner
 with bounded raw-Git export and attempt cleanup. See

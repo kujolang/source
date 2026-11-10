@@ -1123,10 +1123,10 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           return json(res, 200, selectFields(p, fields));
         }
 
-        const brokerRoute = rest.match(/^\/repositories\/([A-Za-z0-9_-]+)\/integration\/([a-f0-9]{64})\/(verification|evaluate|accept|promote|status|split|dispatch)$/);
+        const brokerRoute = rest.match(/^\/repositories\/([A-Za-z0-9_-]+)\/integration\/([a-f0-9]{64})\/(verification|evaluate|accept|promote|status|split|dispatch|retire)$/);
         if (brokerRoute && req.method === 'POST') {
           const operation = brokerRoute[3];
-          const action = { dispatch: ACTIONS.dispatch_verification, verification: ACTIONS.record_verification, split: ACTIONS.plan_integration, status: ACTIONS.read_context, evaluate: ACTIONS.read_context, accept: ACTIONS.accept_change, promote: ACTIONS.promote_integration }[operation];
+          const action = { retire: ACTIONS.retire_integration, dispatch: ACTIONS.dispatch_verification, verification: ACTIONS.record_verification, split: ACTIONS.plan_integration, status: ACTIONS.read_context, evaluate: ACTIONS.read_context, accept: ACTIONS.accept_change, promote: ACTIONS.promote_integration }[operation];
           const authorization = await authorizeRequestAsync(src.capabilities, req, action, { org: orgId, project: projectId });
           if (!authorization.ok) return json(res, authorization.status, { error: authorization.error });
           const scope = { orgId, projectId, repoId: brokerRoute[1], candidateId: brokerRoute[2], principalId: authorization.cap.principalId };
@@ -1134,6 +1134,14 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           if (!release) return json(res, 503, { error: 'Git service busy; retry later' });
           try {
             if (operation === 'dispatch') return json(res, 200, await src.verification.dispatch(scope));
+            if (operation === 'retire') {
+              const body = await readBody(req, maxJsonBodyBytes);
+              if (body.replacementId != null) {
+                const dispatchAuth = await authorizeRequestAsync(src.capabilities, req, ACTIONS.dispatch_verification, { org: orgId, project: projectId });
+                if (!dispatchAuth.ok) return json(res, dispatchAuth.status, { error: dispatchAuth.error });
+              }
+              return json(res, 200, await src.verification.retire({ ...scope, replacementId: body.replacementId, reason: body.reason }));
+            }
             if (operation === 'verification') {
               const body = await readBody(req, maxJsonBodyBytes);
               return json(res, 201, await src.integration.record({ ...scope, checkId: body.checkId, execution: body.execution, output: body.output }));

@@ -170,3 +170,27 @@ is provided but was not run against a container. No claim of live isolation,
 rootless UID mapping compatibility, confirmed runtime teardown or staging
 readiness follows from this increment. The previous full 311-test regression
 predates these additive modules; it was not repeated for this focused addition.
+
+## Candidate retirement and replacement — 2026-11-10
+
+The focused broker, dispatcher, queue, CLI and authorization regression passed
+40 tests, zero failures/skips, in 50.02 seconds with disposable live PostgreSQL
+(`/tmp/source-retirement-tests.log`). After extending the replacement test to
+inject a lost promotion acknowledgment, the final six live dispatcher tests all
+passed in 51.90 seconds (`/tmp/source-retirement-final.log`). Syntax lint checked
+99 JavaScript files; diff checks passed. No full-suite result is claimed for this
+increment.
+
+Coverage proves rollback of old-job cancellation when a replacement is invalid,
+atomic replacement dispatch, idempotent retirement, terminal candidate gating,
+late evidence rejection after in-flight execution, distinct retirement and
+dispatch capabilities, audit principal integrity, and a promotion-versus-retire
+race across two Source instances sharing PostgreSQL. The lost-acknowledgment
+case commits Git, rolls back the database outcome, refuses retirement using the
+landed Git ref, then reconciles promotion successfully. Prior receipts/approval
+remain inspectable and never transfer to a replacement.
+
+Retirement is explicit rather than inferred from unrelated proposals. Runtime
+abort/teardown remains a worker responsibility; database fencing is not evidence
+that an unreachable container was removed. These tests do not close the pending
+isolated staging, multi-process failover, hosting or scale gates.

@@ -151,3 +151,16 @@ UID mapping and teardown are unverified. Networked/provider-neutral staging,
 Workcell lifecycle execution, crash orphan reconciliation and all later mission
 gates remain required. Symlinks, submodules and external inputs currently fail
 closed rather than being silently omitted from the tested candidate.
+
+## Candidate retirement increment — 2026-11-10
+
+Explicit cancellation/replacement now retires a candidate terminally, cancels its
+queued/leased jobs, and optionally dispatches a same-repository replacement in
+one project transaction. Failed replacement admission rolls back cancellation.
+Late evidence and promotion of retired candidates are rejected; a landed Git
+receipt, including a lost-acknowledgment receipt, prevents retirement. API
+authorization, audit, CLI and status expose the distinction. This completes the
+explicit replaced-candidate cancellation portion of the earlier work list;
+automatic replacement inference is not enabled. Live PostgreSQL contract/race
+results are recorded in failure-recovery. Runtime teardown, staging and the
+remaining full-mission gates are still open.

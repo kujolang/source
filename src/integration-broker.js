@@ -50,6 +50,10 @@ export class IntegrationBroker {
     if (!report?.candidate || !repo?.integrationPolicy || repo.artifacts) throw new Error('configured integration candidate not found');
     const { id, ...body } = report.candidate;
     if (id !== input.candidateId || digest(body) !== id) throw new Error('candidate snapshot integrity mismatch');
+    if (currentPolicy) {
+      const retirement = await this.read(`${root}/${id}/retirement.json`);
+      if (retirement) throw new Error(`candidate ${retirement.state}; verification and promotion are disabled`);
+    }
     const policy = await this.source.getPolicyAsync(input.orgId, input.projectId);
     if (currentPolicy && report.policyHash !== digest({ project: policy, integration: repo.integrationPolicy })) throw new Error('candidate policy changed; replan and reverify');
     if (currentPolicy) {
@@ -139,11 +143,12 @@ export class IntegrationBroker {
     const acceptance = await this.read(`${root}/${input.candidateId}/acceptance.json`);
     const intent = await this.read(`${root}/${input.candidateId}/intent.json`);
     const outcome = await this.read(`${root}/${input.candidateId}/outcome.json`);
+    const retirement = await this.read(`${root}/${input.candidateId}/retirement.json`);
     let evaluation;
     try { evaluation = await this.evaluate(input); }
     catch (error) { evaluation = { ok: false, reason: error.message }; }
     const accepted = acceptance && evaluation.ok && digest(acceptance.receipts) === digest(evaluation.checks.map((check) => check.receiptId));
-    return { candidate: report.candidate, state: outcome?.state === 'landed' ? 'landed' : accepted ? 'accepted' : evaluation.ok ? 'verified' : 'proposed', evaluation, acceptance, intent, outcome, reconciliationRequired: Boolean(intent && !outcome) };
+    return { candidate: report.candidate, state: outcome?.state === 'landed' ? 'landed' : retirement?.state || (accepted ? 'accepted' : evaluation.ok ? 'verified' : 'proposed'), evaluation, acceptance, intent, outcome, retirement, reconciliationRequired: Boolean(intent && !outcome && !retirement) };
   }
 
   async split(input) {

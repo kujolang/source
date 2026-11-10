@@ -33,6 +33,7 @@ export const ACTIONS = {
   git_push: 'git_push',
   plan_integration: 'plan_integration',
   dispatch_verification: 'dispatch_verification',
+  retire_integration: 'retire_integration',
   record_verification: 'record_verification',
   promote_integration: 'promote_integration',
 };
