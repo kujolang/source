@@ -68,3 +68,16 @@ test('revision inputs cannot inject Git options or create output files', async (
   assert.equal(existsSync(target), false);
   assert.ok((await git.diffAsync(base, head)).includes('change'));
 });
+
+
+test('repository file reads preserve exact UTF-8 whitespace', async () => {
+  const { src, org, project } = freshSource();
+  const { repo, work } = seedRepo(src, org.id, project.id);
+  const content = '\n  indented\n\ttrailing whitespace  \n\n';
+  writeFileSync(path.join(work, 'spaces.txt'), content);
+  run(['add', 'spaces.txt'], work);
+  run(['commit', '-m', 'whitespace fixture'], work);
+  run(['push', 'origin', 'main'], work);
+  const git = src.gitRepo(org.id, project.id, repo.id);
+  assert.equal(await git.showFileAsync('main', 'spaces.txt'), content);
+});

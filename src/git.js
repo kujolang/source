@@ -28,12 +28,13 @@ function run(args, opts = {}) {
 const execFileAsync = promisify(execFile);
 
 async function runAsync(args, opts = {}) {
+  const { trim = true, ...execOptions } = opts;
   const { stdout } = await execFileAsync('git', args, {
     encoding: 'utf8',
     maxBuffer: 32 * 1024 * 1024,
-    ...opts,
+    ...execOptions,
   });
-  return String(stdout || '').trim();
+  return trim ? String(stdout || '').trim() : String(stdout || '');
 }
 
 export class GitRepo {
@@ -200,7 +201,7 @@ export class GitRepo {
     validateRevision(ref);
     if (typeof ref !== 'string' || !/^[A-Za-z0-9._/@-]{1,200}$/.test(ref)) throw new Error('invalid Git ref');
     if (typeof filePath !== 'string' || filePath.includes('..') || filePath.startsWith('/') || filePath.includes(':')) throw new Error('invalid repository file path');
-    return runAsync(['show', `${ref}:${filePath}`], { cwd: this.barePath });
+    return runAsync(['show', `${ref}:${filePath}`], { cwd: this.barePath, trim: false });
   }
 
   async listCommitsAsync(ref = 'HEAD', limit = 50) {
