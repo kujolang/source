@@ -494,3 +494,25 @@ The run imposed a 240-second per-file timeout; none was reached.
 This is the main application suite, not a new run of separate Cloudflare package
 checks, successful Workcell/AppArmor execution, deployed failover/restore,
 100/250/1000 integration workloads, or a production-readiness certification.
+
+## Ancestry-discovery optimization — 2026-11-10
+
+The measured100-agent hot batch spent324.555s assembling, with up to9,900
+pairwise Git ancestry subprocesses in addition to history validation. Git's
+independent-head discovery now excludes impossible ancestor edges before that
+loop. Every remaining edge, explicit dependency, history validity check and actual
+merge retains its existing behavior.
+
+A red regression (`/tmp/source-ancestry-before.log`) showed100 ancestry calls for
+ten independent proposals. After the change it observes10 base/history calls plus
+one independent-head discovery, while the complete report equals the original
+all-pairs reference. Differential fixtures also cover chains, shared-base inferred
+dependencies, duplicate heads, missing heads, explicit missing dependencies and
+cycles. Planner/broker/verification regression:24/24 pass, no skips,44.85s
+(`/tmp/source-ancestry-tests.log`). This is an operation-count proof, not a measured
+wall-time improvement; repeated100-agent benchmark reports establish timing.
+
+Live PostgreSQL benchmark default/private fixtures and both isolated semantic
+failure/split cases also pass:5/5, no skips (`/tmp/source-ancestry-live.log`).
+Syntax lint108 and diff checks pass. The earlier348-test main regression remains
+historical; this increment does not claim a repeated full suite.

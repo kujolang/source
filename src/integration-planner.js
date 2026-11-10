@@ -44,6 +44,23 @@ export class IntegrationPlanner {
     catch (error) { if (error.code === 1) return false; throw error; }
   }
 
+  async independentHeads(proposals) {
+    const heads = new Set(proposals.map((proposal) => proposal.headCommit));
+    if (heads.size < 2) return heads;
+    try {
+      // Git returns the supplied heads not reachable from any other supplied
+      // head. Such heads cannot be inferred ancestors of a distinct proposal.
+      const result = (await this.git(['merge-base', '--independent', ...heads])).split('\n').filter(Boolean);
+      if (!result.length || result.some((head) => !heads.has(head))) return new Set();
+      return new Set(result);
+    } catch (error) {
+      if (error.killed || error.code === 'ENOBUFS') throw error;
+      // Missing/corrupt objects retain the existing per-proposal diagnostics.
+      // Failure to establish independence never permits skipping ancestry checks.
+      return new Set();
+    }
+  }
+
   async changes(base, head) {
     // -z handles spaces, tabs and newlines without confusing conflict grouping.
     const raw = await this.git(['diff', '--name-status', '-z', '--find-renames', base, head]);
@@ -105,6 +122,7 @@ export class IntegrationPlanner {
       if (proposal.dependsOn && (!Array.isArray(proposal.dependsOn) || !proposal.dependsOn.every((id) => idPattern.test(id)))) throw new Error('invalid proposal dependencies');
       byId.set(proposal.id, { ...proposal, dependsOn: [...new Set(proposal.dependsOn || [])].sort() });
     }
+    const independent = await this.independentHeads([...byId.values()]);
     const rejected = [];
     const eligible = new Map();
     for (const proposal of [...byId.values()].sort((a, b) => a.id.localeCompare(b.id, 'en'))) {
@@ -120,7 +138,7 @@ export class IntegrationPlanner {
         }
         // An included proposal's head in this history is an inferred dependency.
         for (const other of byId.values()) {
-          if (other.id !== proposal.id && other.headCommit !== proposal.headCommit && await this.ancestor(other.headCommit, proposal.headCommit)) {
+          if (other.id !== proposal.id && other.headCommit !== proposal.headCommit && !independent.has(other.headCommit) && await this.ancestor(other.headCommit, proposal.headCommit)) {
             if (!proposal.dependsOn.includes(other.id)) proposal.dependsOn.push(other.id);
           }
         }

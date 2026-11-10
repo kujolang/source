@@ -125,3 +125,19 @@ fault isolation, not a claim to identify every semantic interaction automaticall
 
 Isolated execution and durable dispatch still remain. Planner and broker tests cover dependency closure, child identity,
 repeatability, failed-check admission and absence of inherited evidence.
+
+## Ancestry discovery optimization
+
+Before inferring dependencies, the planner asks Git `merge-base --independent`
+for supplied heads that cannot be reached from another supplied head. Such a head
+cannot be an ancestor dependency of a distinct proposal, so those impossible
+pairwise queries are omitted. Other heads still use the original ancestry checks;
+explicit dependencies and base/history validation are unchanged. Git defines this
+reachability operation in its [merge-base documentation](https://git-scm.com/docs/git-merge-base).
+
+Missing objects or failed discovery fall back to the original checks and their
+per-proposal diagnostics. Timeout/output-bound failures still terminate planning.
+The optimization does not assume disjoint files are independent, skip real merges,
+change proposal order, or transfer evidence between candidate identities. In a
+fully dependent chain, pairwise inference can still be quadratic. Tests compare
+complete reports, including candidate identity, against the original all-pairs path.

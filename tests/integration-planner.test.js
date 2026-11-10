@@ -176,3 +176,39 @@ test('ten concurrent incompatible edits retain one proposal and report every exc
   assert.equal(await git(bare, 'show', `${report.candidate.headCommit}:shared.txt`), await git(bare, 'show', `${winner.headCommit}:shared.txt`));
   assert.equal(await git(bare, 'rev-parse', 'main'), base);
 });
+
+test('independent-head discovery preserves exact reports while avoiding pairwise ancestry processes', async (t) => {
+  const f = await fixture(t);
+  const proposals = await Promise.all(Array.from({ length: 10 }, (_, i) => f.proposal(`independent-${i}`, (cwd) => writeFile(path.join(cwd, `independent-${i}`), `${i}`))));
+  const reference = new IntegrationPlanner(f.bare);
+  reference.independentHeads = async () => new Set(); // Retain the original all-pairs inference path.
+  let actualCalls = 0; let referenceCalls = 0;
+  const actualAncestor = f.planner.ancestor.bind(f.planner), referenceAncestor = reference.ancestor.bind(reference);
+  f.planner.ancestor = (...args) => { actualCalls++; return actualAncestor(...args); };
+  reference.ancestor = (...args) => { referenceCalls++; return referenceAncestor(...args); };
+  const input = { baseCommit: f.base, proposals };
+  assert.deepEqual(await f.planner.assemble(input), await reference.assemble(input));
+  assert.equal(referenceCalls, 100);
+  assert.equal(actualCalls, 10, 'only each proposal base/history check remains');
+});
+
+test('maximal-head pruning preserves dependent histories, duplicates and explicit dependency failures', async (t) => {
+  const f = await fixture(t);
+  const parent = await f.proposal('parent', cwd => writeFile(path.join(cwd, 'parent'), 'parent'));
+  const child = await f.proposal('child', cwd => writeFile(path.join(cwd, 'child'), 'child'), parent.headCommit);
+  const sibling = await f.proposal('sibling', cwd => writeFile(path.join(cwd, 'sibling'), 'sibling'));
+  const reference = new IntegrationPlanner(f.bare); reference.independentHeads = async () => new Set();
+  for (const proposals of [
+    [parent, child, sibling],
+    [parent, { ...child, baseCommit: f.base }, sibling],
+    [parent, { ...parent, id: 'duplicate-head' }, child],
+    [{ ...parent, dependsOn: ['missing'] }, child, sibling],
+    [{ ...parent, dependsOn: ['sibling'] }, { ...sibling, dependsOn: ['parent'] }],
+    [parent, { ...sibling, headCommit: 'f'.repeat(40) }],
+  ]) {
+    const input = { baseCommit: f.base, proposals };
+    assert.deepEqual(await f.planner.assemble(input), await reference.assemble(input));
+  }
+  const report = await f.planner.assemble({ baseCommit: f.base, proposals: [parent, { ...child, baseCommit: f.base }, sibling] });
+  assert.deepEqual(report.candidate.proposals.find(p => p.id === 'child').dependsOn, ['parent']);
+});
