@@ -52,3 +52,21 @@ being edited had mixed-version child-process failures and are not the acceptance
 run. The unchanged clean rerun above supersedes them; no source edits occurred
 during that rerun. This is correctness regression evidence, not an agent capacity
 or CI-efficiency benchmark.
+
+## Impact and failed-batch increment — 2026-11-10
+
+Focused split planner/broker validation passed 14 tests. Current impact, adapter
+and identity tests passed 11 tests; current broker tests passed nine tests. Syntax
+lint checked 93 JavaScript files. Full regression attempted 293 tests across 43
+files: 267 passed, 19 failed, seven PostgreSQL skips. Host ENOSPC affected six
+suites; this is not a passing regression.
+
+An empty-Git-template retry with per-file temporary cleanup ran 33 tests:
+17 passed, 16 failed (40.18 seconds). Multi-repository and scan suites passed;
+planner, store, submit and sync still failed disk/Git writes, including inability
+to set HEAD and SQLite disk I/O errors. Ten concurrent Git clients and the split
+fixture passed. Logs: `/tmp/source-impact-regression.log` and
+`/tmp/source-impact-retry.log`. Free disk capacity and rerun those four suites
+before claiming complete regression verification. The implementation commit is
+`ecc5aa0`; neither this increment nor its focused tests establish production or
+performance readiness.
