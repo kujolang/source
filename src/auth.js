@@ -30,6 +30,7 @@ export const ACTIONS = {
   read_workflows: 'read_workflows',
   dispatch_workflow: 'dispatch_workflow',
   git_push: 'git_push',
+  plan_integration: 'plan_integration',
 };
 
 // Extract a bearer credential from an Authorization header.

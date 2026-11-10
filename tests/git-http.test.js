@@ -249,3 +249,15 @@ test('Git pipe errors and stderr overflow reject without retaining abort listene
     child.stdout.destroy(); child.stderr.destroy(); child.stdin.destroy();
   }
 });
+
+test('internal candidate refs cannot be modified by a Git push capability', async () => {
+  const { src, org, project, human } = freshSource();
+  const { repo, head } = seedRepo(src, org.id, project.id);
+  const cap = gitCap(src, org.id, project.id, human.id);
+  await withServer(src, async (base) => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'source-internal-ref-'));
+    await run(['clone', authedUrl(base, `/git/${org.id}/${project.id}/${repo.id}.git`, cap.credential), cwd]);
+    await assert.rejects(() => run(['push', 'origin', `${head}:refs/source/candidates/forged`], cwd), /hidden ref/);
+    assert.equal(src.gitRepo(org.id, project.id, repo.id).revParse('refs/source/candidates/forged'), '');
+  });
+});

@@ -26,19 +26,83 @@ coupling. Every candidate requires preflight and combined integration verificati
 these flags are requirements, not passing evidence. File overlap alone never
 establishes compatibility or safety.
 
+## Scoped service access
+
+`POST /api/v1/orgs/{org}/projects/{project}/repositories/{repo}/integration`
+accepts `{ "changeIds": ["C1", "C2"] }` with a project-scoped
+`plan_integration` capability. Work-only credentials cannot assemble unrelated
+work. The service loads proposal heads from persisted Changes, reads the current
+repository branch and operator policy, and persists an inspectable report with
+scope and policy hash. It rejects multi-repository changes and Artifacts binding
+until those coordination contracts are implemented. Project mutation uses the
+existing async Postgres advisory-lock/transaction seam, with existing in-process
+admission for local stores; Git command admission is shared with the HTTP server.
+
+`GET` on the same path followed by `/{candidateId}` requires `read_context`.
+Repeated planning yields the same candidate; audit records retain planning
+outcomes including conflicts. Git smart HTTP rejects pushes to `refs/source/`
+through Git's receive.hideRefs, preserving existing operator hooks. Candidate refs
+are not a promotion API and must never be passed to the legacy canonical update
+as a shortcut around verification.
+
+Local operators can use the existing server data root with:
+
+```sh
+node bin/source.js integration plan --org O1 --project P1 --repo R1 --changes C1,C2
+node bin/source.js integration show --org O1 --project P1 --repo R1 --candidate <id>
+```
+
+These commands manage the local server store like the existing administration
+commands. Remote clients use the scoped HTTP interface. There is deliberately no
+integration promotion command until the exact-candidate broker is implemented.
+
 ## Scope still required
 
-This primitive is not yet an exposed/authorized integration service or a merge
-broker. Source Change eligibility wiring, verification-failure splitting, durable
-promotion receipts, protected refs, policy-bound evidence and workflow execution
-remain subsequent increments. Transport must protect internal refs before this
-primitive can be exposed to untrusted contributors. Existing legacy promotion is
-not made safe by merely constructing a candidate.
+Verification-failure splitting, protected local canonical refs, durable promotion
+receipts, policy-bound evidence and workflow execution remain subsequent
+increments. The optional integrationPolicy transport guard is plumbing for that
+next broker; this increment does not provision or enable it. Existing legacy
+promotion is not made safe by merely constructing a candidate. Reports are
+proposed state only, and the complete mission is not yet satisfied.
 
 ## Reproduce
 
 `node --test tests/integration-planner.test.js` uses real Git subprocesses and
-ten concurrent clones/commits/pushes. Four tests pass: deterministic ten-agent
+ten concurrent clones/commits/pushes. Planner tests cover: deterministic ten-agent
 assembly with attribution, same-file compatibility/conflicts and binaries,
 stacked dependencies/stale bases/cycles, and rename/delete plus shared dependency
 risk. These are correctness fixtures, not production-capacity measurements.
+
+`node --test tests/integration-api.test.js tests/git-http.test.js tests/artifacts.test.js`
+checks project authorization, persisted proposal identity, repeat planning/readback,
+canonical preservation and reserved-ref rejection alongside existing Artifacts
+transport recovery. The tests do not yet demonstrate a broker or a production gate.
+
+## Increment validation — 2026-11-10
+
+Planner (five tests), scoped API and CLI readback (one test), Git transport and
+Artifacts regressions pass. Syntax lint checks 85 JavaScript files. The first
+complete regression attempt hit host ENOSPC and is recorded as a failed run.
+A subsequent isolated-per-file run of all 38 root test files passed 259 tests
+with seven PostgreSQL-only skips; all six Worker tests also passed. Combined:
+272 tests, 265 pass, seven skips, zero failures. The final CLI change was then
+checked again through the API/CLI integration fixture (one pass).
+
+To bound accumulated temporary fixture usage on a constrained host, run each
+file with its own temporary directory and remove that directory after it exits:
+
+```sh
+for test_file in tests/*.test.js cloudflare/artifacts-bootstrap/worker.test.js; do
+  source_test_tmp=$(mktemp -d) || exit 1
+  TMPDIR="$source_test_tmp" node --test "$test_file"
+  source_test_status=$?
+  rm -rf "$source_test_tmp"
+  [ "$source_test_status" -eq 0 ] || exit "$source_test_status"
+done
+```
+
+The actual regression used the equivalent Python subprocess loop, collecting
+all failures rather than stopping at the first. Test logs are local transient
+files `/tmp/source-agent-native-isolated-regression.log` and
+`/tmp/source-agent-native-worker.log`. No live Postgres, container, staging or
+production claim follows from these results.

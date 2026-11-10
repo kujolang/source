@@ -30,6 +30,7 @@ import { defaultPolicy, evaluateEvidence, interpret, canApprove } from './policy
 import { nextId, nextIdAsync, randomHex } from './ids.js';
 import { normalizeEvalSummary, normalizeEvalManifest, normalizeEvalRun, readEvalArtifacts } from './integrations/kujo.js';
 import { scanSecrets } from './scan.js';
+import { IntegrationPlanner, digest } from './integration-planner.js';
 import { JobQueue } from './job-queue.js';
 import { translateGitHubActions } from './integrations/github-actions.js';
 import { KeyedSemaphore, Semaphore } from './concurrency.js';
@@ -934,6 +935,42 @@ export class Source {
 
   _saveChange(orgId, projectId, change) {
     this.store.writeJson(`${this._projectRel(orgId, projectId)}/changes/${change.id}.json`, change);
+  }
+
+  // Integration snapshots use source-owned Change records, never caller-supplied
+  // Git heads. The async project lock also coordinates with Postgres peers.
+  async planIntegrationAsync({ orgId, projectId, repoId, changeIds }) {
+    if (![orgId, projectId, repoId].every((id) => /^[A-Za-z0-9_-]+$/.test(id))) throw new Error('invalid integration scope');
+    if (!Array.isArray(changeIds) || !changeIds.length || changeIds.length > 100 || new Set(changeIds).size !== changeIds.length || !changeIds.every((id) => /^[A-Za-z0-9_-]+$/.test(id))) throw new Error('expected 1-100 distinct change IDs');
+    return this._projectMutationAsync(orgId, projectId, async () => {
+      const repo = await this.getRepositoryAsync(orgId, projectId, repoId);
+      if (!repo) throw new Error('integration repository not found');
+      if (repo.artifacts) throw new Error('Artifacts candidate assembly requires remote reconciliation; not enabled');
+      const policy = await this.getPolicyAsync(orgId, projectId);
+      const proposals = [];
+      for (const id of changeIds) {
+        const change = await this.getChangeAsync(orgId, projectId, id);
+        if (!change) throw new Error(`change not found: ${id}`);
+        if (change.repositoryChanges.length !== 1 || change.repositoryChanges[0].repoId !== repoId) throw new Error('integration currently requires single-repository changes in the selected repository');
+        proposals.push({ id, ...change.repositoryChanges[0], decisionState: change.decisionState });
+      }
+      const planner = new IntegrationPlanner(repo.barePath);
+      const baseCommit = await planner.git(['rev-parse', `refs/heads/${repo.defaultBranch}`]);
+      const report = await planner.assemble({ baseCommit, proposals, ...{
+        exclusivePaths: policy.integration?.exclusivePaths ?? ['migrations/', 'generated/'],
+        dependencyGroups: policy.integration?.dependencyGroups ?? [],
+      } });
+      const snapshot = { ...report, orgId, projectId, repoId, branch: repo.defaultBranch, policyHash: digest(policy) };
+      if (report.candidate) await this._asyncWrite(`${this._projectRel(orgId, projectId)}/integration/${repoId}/${report.candidate.id}.json`, snapshot);
+      await this._asyncAudit({ event: 'integration.plan', orgId, projectId, repoId, candidateId: report.candidate?.id || null, accepted: report.candidate?.proposals.map((p) => p.id) || [], rejected: report.rejected, conflicts: report.conflicts });
+      return snapshot;
+    });
+  }
+
+  async getIntegrationAsync({ orgId, projectId, repoId, candidateId }) {
+    if (![orgId, projectId, repoId].every((id) => /^[A-Za-z0-9_-]+$/.test(id)) || !/^[a-f0-9]{64}$/.test(candidateId)) throw new Error('invalid integration identity');
+    const rel = `${this._projectRel(orgId, projectId)}/integration/${repoId}/${candidateId}.json`;
+    return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.store.readJson(rel);
   }
 
   // --- evidence ---------------------------------------------------------

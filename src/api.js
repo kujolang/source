@@ -1033,6 +1033,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           const result = await gitHttpBackend({
           projectRoot: src.reposRoot(orgId, projectId),
           hooksPath: artifacts ? path.resolve(repo.barePath, 'hooks') : null,
+          protectedRef: repo.integrationPolicy ? `refs/heads/${repo.defaultBranch}` : '',
           pathInfo: `/${repo.id}.git${decodedRest}`,
           queryString: url.search ? url.search.slice(1) : '',
           method: req.method,
@@ -1120,6 +1121,24 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           const p = await src.getProjectAsync(orgId, projectId);
           if (!p) return json(res, 404, { error: 'not found' });
           return json(res, 200, selectFields(p, fields));
+        }
+
+        const integrationRoute = rest.match(/^\/repositories\/([A-Za-z0-9_-]+)\/integration(?:\/([a-f0-9]{64}))?$/);
+        if (integrationRoute && (req.method === 'GET' || req.method === 'POST')) {
+          const g = await guard(src, req, req.method === 'POST' ? ACTIONS.plan_integration : ACTIONS.read_context, { org: orgId, project: projectId });
+          if (g) return json(res, g.status, g.body);
+          const repoId = integrationRoute[1];
+          if (req.method === 'GET' && integrationRoute[2]) {
+            const report = await src.getIntegrationAsync({ orgId, projectId, repoId, candidateId: integrationRoute[2] });
+            return json(res, report ? 200 : 404, report || { error: 'not found' });
+          }
+          if (req.method === 'POST' && !integrationRoute[2]) {
+            const body = await readBody(req, maxJsonBodyBytes);
+            const release = await gitSlots.acquire();
+            if (!release) return json(res, 503, { error: 'Git service busy; retry later' });
+            try { return json(res, 201, await src.planIntegrationAsync({ orgId, projectId, repoId, changeIds: body.changeIds })); }
+            finally { release(); }
+          }
         }
 
         if (rest === '/policy' && req.method === 'GET') {

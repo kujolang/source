@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
@@ -96,4 +96,20 @@ test('rename/delete conflicts use Git semantics; shared dependency domains requi
   assert.match(exclusive.message, /exclusive paths/);
   const generated = await planner.assemble({ baseCommit: base, proposals: [a, b], exclusivePaths: ['api', 'consumer'] });
   assert.equal(generated.candidate.proposals.length, 2);
+});
+
+
+test('different migration files remain exclusive and failed dependencies cannot enter the candidate', async (t) => {
+  const { base, planner, proposal } = await fixture(t);
+  const proposals = await Promise.all(['a', 'b'].map((id) => proposal(id, async (cwd) => {
+    await mkdir(path.join(cwd, 'migrations'));
+    await writeFile(path.join(cwd, 'migrations', `${id}.sql`), `-- ${id}`);
+  })));
+  const result = await planner.assemble({ baseCommit: base, proposals });
+  assert.equal(result.candidate.proposals.length, 1);
+  assert.equal(result.conflicts[0].kind, 'exclusive-artifact-domain');
+  const dependent = await proposal('child', (cwd) => writeFile(path.join(cwd, 'child'), 'child'));
+  const blocked = await planner.assemble({ baseCommit: base, proposals: [...proposals, { ...dependent, dependsOn: ['b'] }] });
+  assert.equal(blocked.candidate.proposals.length, 1);
+  assert.equal(blocked.rejected[0].id, 'child');
 });

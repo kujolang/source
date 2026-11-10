@@ -324,6 +324,18 @@ export async function run(argv) {
         }
         break;
       }
+      case 'integration': {
+        const scope = { orgId: flag('--org') || 'O1', projectId: flag('--project') || 'P1', repoId: flag('--repo') };
+        if (sub === 'plan') {
+          print(await src.planIntegrationAsync({ ...scope, changeIds: (flag('--changes') || '').split(',').filter(Boolean) }));
+          return;
+        }
+        if (sub === 'show') {
+          print(await src.getIntegrationAsync({ ...scope, candidateId: flag('--candidate') }));
+          return;
+        }
+        break;
+      }
       case 'canonical': {
         if (sub === 'update') {
           const result = await src.updateCanonicalStateAsync({ orgId: flag('--org') || 'O1', projectId: flag('--project') || 'P1', changeId: flag('--change') });
@@ -540,6 +552,8 @@ export async function run(argv) {
           '  org create|list|show [--name <n> --slug <s>]',
           '  org member add --org <o> --principal <id> [--role member|maintainer|admin]',
           '  project create|list|show --org <o> [--name --slug]',
+          '  integration plan --org <o> --project <p> --repo <r> --changes C1,C2',
+          '  integration show --org <o> --project <p> --repo <r> --candidate <id>',
           '  canonical update --org <o> --project <p> --change <c>',
           '  repo create --org <o> --project <p> --name <n>',
           '  repo bind-artifacts --org <o> --project <p> --repo <r> --artifacts-name <source-hybrid-name> [--create-remote]',
