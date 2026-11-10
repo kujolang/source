@@ -45,3 +45,21 @@ test('integration API scopes planning, uses persisted proposal heads, retains in
   assert.equal(src.gitRepo(org.id, project.id, repo.id).revParse('main'), baseCommit);
   assert.ok(src.readAudit().some((event) => event.event === 'integration.plan'));
 });
+
+test('operator batch bound rejects excess before reading changes and cannot be overridden by requests', async (t) => {
+  const { Source } = await import('../src/source.js');
+  const { src: original, dir, org, project, agent } = freshSource();
+  const { repo } = seedRepo(original, org.id, project.id);
+  const src = new Source(dir, { maxIntegrationProposals: 2 });
+  const server = await startServer(src, { port: 0 });
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  const credential = src.capabilities.issue({ principalId: agent.id, scope: { org: org.id, project: project.id }, allowed: ['plan_integration'] }).credential;
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/orgs/${org.id}/projects/${project.id}/repositories/${repo.id}/integration`, {
+    method: 'POST', headers: { Authorization: `Bearer ${credential}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ changeIds: ['C1', 'C2', 'C3'], maxIntegrationProposals: 1000 }),
+  });
+  assert.equal(response.status, 400);
+  assert.match(await response.text(), /expected 1-2 distinct change IDs/);
+  for (const value of [0, -1, 1001, 1.5, NaN, Infinity, '250']) assert.throws(() => new Source(dir, { maxIntegrationProposals: value }), /integer from 1 to 1000/);
+  assert.equal(new Source(dir, { maxIntegrationProposals: 1000 }).maxIntegrationProposals, 1000);
+});

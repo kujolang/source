@@ -34,7 +34,7 @@ export class IntegrationBroker {
     return this.source._projectMutationAsync(orgId, projectId, async () => {
       const repo = await this.source.getRepositoryAsync(orgId, projectId, repoId);
       if (!repo || repo.artifacts) throw new Error('integration broker requires a local repository');
-      const planner = new IntegrationPlanner(repo.barePath);
+      const planner = new IntegrationPlanner(repo.barePath, { maxProposals: this.source.maxIntegrationProposals });
       await planner.git(['rev-parse', '--verify', `refs/heads/${repo.defaultBranch}`]);
       repo.integrationPolicy = structuredClone(policy);
       await this.source._asyncWrite(`orgs/${orgId}/projects/${projectId}/repos/${repoId}.json`, repo);
@@ -64,7 +64,7 @@ export class IntegrationBroker {
       }
     }
     if (report.branch !== repo.defaultBranch) throw new Error('candidate target changed');
-    const planner = new IntegrationPlanner(repo.barePath);
+    const planner = new IntegrationPlanner(repo.barePath, { maxProposals: this.source.maxIntegrationProposals });
     if (await planner.git(['rev-parse', `refs/source/candidates/${id}`]) !== report.candidate.headCommit || await planner.git(['rev-parse', `${report.candidate.headCommit}^{tree}`]) !== report.candidate.tree) throw new Error('candidate Git identity mismatch');
     return { root, report, repo, planner };
   }

@@ -212,3 +212,31 @@ test('maximal-head pruning preserves dependent histories, duplicates and explici
   const report = await f.planner.assemble({ baseCommit: f.base, proposals: [parent, { ...child, baseCommit: f.base }, sibling] });
   assert.deepEqual(report.candidate.proposals.find(p => p.id === 'child').dependsOn, ['parent']);
 });
+
+test('explicit larger batch assembles 101 independent real Git proposals without changing the default bound', { timeout: 120000 }, async (t) => {
+  const { base, bare, seed, planner } = await fixture(t);
+  const proposals = [];
+  // Build independent commit objects directly, avoiding 101 working clones.
+  const baseTree = await git(seed, 'ls-tree', base);
+  for (let i = 0; i < 101; i++) {
+    const blobProcess = exec('git', ['hash-object', '-w', '--stdin'], { cwd: seed });
+    blobProcess.child.stdin.end(`${i}\n`);
+    const blob = (await blobProcess).stdout.trim();
+    const treeProcess = exec('git', ['mktree'], { cwd: seed });
+    treeProcess.child.stdin.end(`${baseTree}\n100644 blob ${blob}\tfeature-${i}\n`);
+    const tree = (await treeProcess).stdout.trim();
+    const head = await git(seed, 'commit-tree', tree, '-p', base, '-m', `feature ${i}`);
+    await git(seed, 'update-ref', `refs/heads/feature-${i}`, head);
+    proposals.push({ id: `C${i}`, baseCommit: base, headCommit: head });
+  }
+  await git(bare, 'fetch', seed, '+refs/heads/*:refs/heads/*');
+  await assert.rejects(() => planner.assemble({ baseCommit: base, proposals }), /invalid proposal batch size/);
+  const large = new IntegrationPlanner(bare, { maxProposals: 101 });
+  const report = await large.assemble({ baseCommit: base, proposals });
+  assert.equal(report.candidate.proposals.length, 101);
+  assert.deepEqual(report.rejected, []); assert.deepEqual(report.conflicts, []);
+  for (const proposal of proposals) assert.ok(await large.ancestor(proposal.headCommit, report.candidate.headCommit));
+  for (let i = 0; i < 101; i++) assert.equal(await git(bare, 'show', `${report.candidate.headCommit}:feature-${i}`), String(i));
+  assert.equal(await git(bare, 'rev-parse', 'main'), base);
+  for (const maxProposals of [0, 1001, NaN, Infinity, 1.5]) assert.throws(() => new IntegrationPlanner(bare, { maxProposals }), /integer from 1 to 1000/);
+});

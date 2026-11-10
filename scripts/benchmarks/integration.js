@@ -58,7 +58,7 @@ async function worker(config) {
   const { SourceWorker } = await import('../../src/worker.js');
   const { createVerificationHandler } = await import('../../src/verification-dispatcher.js');
   const store = new PostgresStore({ dsn: config.dsn, schema: config.schema, connectionOptions: { maxConnections: 4, user: config.databaseUser } });
-  const source = new Source(config.root, { store });
+  const source = new Source(config.root, { store, maxIntegrationProposals: config.maxIntegrationProposals });
   const handler = createVerificationHandler({ source, principalId: config.serviceId, executor: { execute: async ({ candidate, check, identity, repository, job, signal }) => {
     const startedAt = Date.now();
     const meta = await store.getJobAsync({ id: job.id, orgId: job.orgId, projectId: job.projectId });
@@ -84,7 +84,8 @@ async function main() {
   const args = process.argv.slice(2); const flag = (name, fallback) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
   if (args.includes('--help')) { console.log('SOURCE_TEST_DATABASE_URL=<disposable database> node scripts/benchmarks/integration.js --agents 10 --repos 1 --profile default|private-load --output /absolute/report.json'); return; }
   const agents = Number(flag('--agents', 10)), repos = Number(flag('--repos', 1));
-  if (![agents, repos].every(Number.isSafeInteger) || agents < 1 || agents > 100 || repos < 1 || repos > agents || Math.ceil(agents / repos) > 100) throw new Error('current harness supports 1-100 agents and 1..agents repositories; larger candidate orchestration remains unimplemented');
+  if (![agents, repos].every(Number.isSafeInteger) || agents < 1 || agents > 1000 || repos < 1 || repos > agents) throw new Error('harness supports 1-1000 agents and 1..agents repositories');
+  const maxIntegrationProposals = Math.max(100, Math.ceil(agents / repos));
   const profile = flag('--profile', 'default');
   if (!['default', 'private-load'].includes(profile)) throw new Error('unknown benchmark profile');
   const privateProfile = profile === 'private-load';
@@ -99,7 +100,7 @@ async function main() {
   const schema = `source_bench_${process.pid}_${Date.now()}`;
   let store, server; const children = [], sockets = []; const executions = [], workerErrors = [];
   const cpuBefore = process.cpuUsage(); const began = Date.now();
-  const report = { version: 1, status: 'running', phase: 'setup', httpStatuses: {}, date: new Date().toISOString(), agents, repositories: repos, concurrency: { agentProcesses: agents, workerProcesses: 2, workerConcurrency: 2 }, host: { platform: process.platform, arch: process.arch, node: process.version, cpuCount: cpus().length, memoryBytes: totalmem() }, fixture: 'compatible independent files; fixed host Git-content checker; no repository code execution', profile, rateLimits: privateProfile ? 'explicit private-load operator profile; not default capacity' : 'unchanged server defaults', admissionConfiguration: rateLimit, stages: {}, raw: {}, limitations: ['loopback single host; no deployed TLS latency', 'fixed Git-content verification, not application CI or isolated staging', 'no induced worker crash in this measurement', 'maximum 100 agents per harness run', privateProfile ? 'private repositories; explicit 1000/min push and submit limits per shared address; server queue/concurrency defaults unchanged' : 'default same-address submit/read/push rate limits apply'] };
+  const report = { version: 1, status: 'running', phase: 'setup', httpStatuses: {}, date: new Date().toISOString(), agents, repositories: repos, concurrency: { agentProcesses: agents, workerProcesses: 2, workerConcurrency: 2 }, host: { platform: process.platform, arch: process.arch, node: process.version, cpuCount: cpus().length, memoryBytes: totalmem() }, fixture: 'compatible independent files; fixed host Git-content checker; no repository code execution', profile, rateLimits: privateProfile ? 'explicit private-load operator profile; not default capacity' : 'unchanged server defaults', admissionConfiguration: rateLimit, maxIntegrationProposals, stages: {}, raw: {}, limitations: ['loopback single host; no deployed TLS latency', 'fixed Git-content verification, not application CI or isolated staging', 'no induced worker crash in this measurement', 'maximum 1000 agents per harness run; operator batch bound recorded explicitly', privateProfile ? 'private repositories; explicit 1000/min push and submit limits per shared address; server queue/concurrency defaults unchanged' : 'default same-address submit/read/push rate limits apply'] };
   const spawnRole = (role, config) => {
     const child = fork(script, [`--${role}`], { stdio: ['ignore', 'pipe', 'pipe', 'ipc'], env: { ...env(), ...(role === 'worker' ? { PGUSER: config.databaseUser } : {}) } });
     let stderr = ''; child.stderr.on('data', (chunk) => { if (stderr.length < 16384) stderr += chunk; }); child.stdout.resume();
@@ -121,7 +122,7 @@ async function main() {
     return entry;
   };
   try {
-    store = new PostgresStore({ dsn, schema }); const source = new Source(root, { store });
+    store = new PostgresStore({ dsn, schema }); const source = new Source(root, { store, maxIntegrationProposals });
     const databaseUser = (await store.pool.query('SELECT current_user AS name')).rows[0].name;
     report.sourceRevision = await git(path.resolve(path.dirname(script), '../..'), 'rev-parse', 'HEAD');
     report.harnessSha256 = createHash('sha256').update(await readFile(script)).digest('hex');
@@ -148,7 +149,7 @@ async function main() {
     server.on('connection', (socket) => sockets.push(socket));
     server.prependListener('request', (_req, res) => res.once('finish', () => { report.httpStatuses[res.statusCode] = (report.httpStatuses[res.statusCode] || 0) + 1; }));
     const baseUrl = `http://127.0.0.1:${server.address().port}`;
-    const workers = Array.from({ length: 2 }, (_, i) => spawnRole('worker', { dsn, databaseUser, schema, root, serviceId: service.id, workerId: `benchmark-${i}` }));
+    const workers = Array.from({ length: 2 }, (_, i) => spawnRole('worker', { dsn, databaseUser, schema, root, maxIntegrationProposals, serviceId: service.id, workerId: `benchmark-${i}` }));
     await Promise.all(workers.map((entry) => entry.wait('ready')));
     const clients = []; const clientConfigs = [];
     if (privateProfile) {
@@ -270,7 +271,7 @@ async function main() {
 if (process.argv[2] === '--verify') {
   let input = ''; for await (const chunk of process.stdin) { input += chunk; if (input.length > 16384) throw new Error('checker input too large'); }
   const { repository, commit, expected } = JSON.parse(input);
-  if (!Number.isSafeInteger(expected) || expected < 1 || expected > 100) throw new Error('invalid expected contributor count');
+  if (!Number.isSafeInteger(expected) || expected < 1 || expected > 1000) throw new Error('invalid expected contributor count');
   await verify(repository, commit, expected);
 } else if (process.argv[2] === '--agent' || process.argv[2] === '--worker') {
   process.once('message', async ({ config }) => {

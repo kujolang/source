@@ -141,3 +141,29 @@ The optimization does not assume disjoint files are independent, skip real merge
 change proposal order, or transfer evidence between candidate identities. In a
 fully dependent chain, pairwise inference can still be quadratic. Tests compare
 complete reports, including candidate identity, against the original all-pairs path.
+
+
+### Operator batch admission bound
+
+Source defaults to at most 100 changes per candidate. An operator may set
+`SOURCE_MAX_INTEGRATION_PROPOSALS` to an integer from 1 through 1000 before
+starting the API, CLI or workers. Embedded callers can pass the numeric
+`maxIntegrationProposals` Source constructor option. Invalid configuration fails
+at construction rather than silently disabling the bound. Keep all instances on
+the same setting; a request body cannot override it. Planner construction, initial
+assembly and broker split operations use the same bound. Authentication, exact
+verification identities, mandatory checks, immutable proposal lookup, protected
+promotion and stale-base rejection are unchanged.
+
+This is an admission ceiling, not a demonstrated capacity guarantee. Raising it
+increases per-candidate Git work, retained evidence and time holding the project
+mutation lock; dependent proposals can still incur quadratic ancestry checks.
+Keep the default until an isolated workload with the intended policy demonstrates
+acceptable queue and assembly latency. Lowering it rejects new oversized plans;
+existing candidate evidence remains inspectable and existing promotion gates
+remain active. Splits must fit the operator's current ceiling.
+
+The benchmark accepts up to 1000 real agent processes and records its explicit
+`maxIntegrationProposals` setting (at least 100, otherwise the largest per-repo
+proposal count). It does not claim simulated requests are concurrent agents.
+Large stages remain unverified until a raw report records their outcome.

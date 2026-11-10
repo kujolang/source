@@ -48,7 +48,9 @@ const scryptAsync = promisify(scrypt);
 export class Source {
   // `store` is optional; defaults to the JSON-file store. Pass a SqliteStore
   // (see sqlite-store.js) for ACID transactions across records.
-  constructor(dataRoot, { store, artifacts = artifactsFromEnv(), gitRoot = process.env.SOURCE_GIT_ROOT || dataRoot, maxArtifactBytes = 64 * 1024 * 1024, canonicalRepoConcurrency = 8, canonicalConcurrency = 8, canonicalQueue = 256 } = {}) {
+  constructor(dataRoot, { store, artifacts = artifactsFromEnv(), gitRoot = process.env.SOURCE_GIT_ROOT || dataRoot, maxArtifactBytes = 64 * 1024 * 1024, canonicalRepoConcurrency = 8, canonicalConcurrency = 8, canonicalQueue = 256, maxIntegrationProposals = Number(process.env.SOURCE_MAX_INTEGRATION_PROPOSALS ?? 100) } = {}) {
+    if (!Number.isSafeInteger(maxIntegrationProposals) || maxIntegrationProposals < 1 || maxIntegrationProposals > 1000) throw new Error('maxIntegrationProposals must be an integer from 1 to 1000');
+    this.maxIntegrationProposals = maxIntegrationProposals;
     this.dataRoot = dataRoot;
     this.artifacts = artifacts;
     this.gitRoot = gitRoot;
@@ -946,7 +948,7 @@ export class Source {
   // Git heads. The async project lock also coordinates with Postgres peers.
   async planIntegrationAsync({ orgId, projectId, repoId, changeIds }) {
     if (![orgId, projectId, repoId].every((id) => /^[A-Za-z0-9_-]+$/.test(id))) throw new Error('invalid integration scope');
-    if (!Array.isArray(changeIds) || !changeIds.length || changeIds.length > 100 || new Set(changeIds).size !== changeIds.length || !changeIds.every((id) => /^[A-Za-z0-9_-]+$/.test(id))) throw new Error('expected 1-100 distinct change IDs');
+    if (!Array.isArray(changeIds) || !changeIds.length || changeIds.length > this.maxIntegrationProposals || new Set(changeIds).size !== changeIds.length || !changeIds.every((id) => /^[A-Za-z0-9_-]+$/.test(id))) throw new Error(`expected 1-${this.maxIntegrationProposals} distinct change IDs`);
     return this._projectMutationAsync(orgId, projectId, async () => {
       const repo = await this.getRepositoryAsync(orgId, projectId, repoId);
       if (!repo) throw new Error('integration repository not found');
@@ -959,7 +961,7 @@ export class Source {
         if (change.repositoryChanges.length !== 1 || change.repositoryChanges[0].repoId !== repoId) throw new Error('integration currently requires single-repository changes in the selected repository');
         proposals.push({ id, ...change.repositoryChanges[0], decisionState: change.decisionState });
       }
-      const planner = new IntegrationPlanner(repo.barePath);
+      const planner = new IntegrationPlanner(repo.barePath, { maxProposals: this.maxIntegrationProposals });
       const baseCommit = await planner.git(['rev-parse', `refs/heads/${repo.defaultBranch}`]);
       const report = await planner.assemble({ baseCommit, proposals, context: { orgId, projectId, repoId, branch: repo.defaultBranch, policyHash: digest({ project: policy, integration: repo.integrationPolicy || null }) }, ...{
         exclusivePaths: policy.integration?.exclusivePaths ?? ['migrations/', 'generated/'],

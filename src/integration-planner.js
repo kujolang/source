@@ -22,7 +22,8 @@ export function digest(value) {
 export class IntegrationPlanner {
   constructor(barePath, { maxProposals = 100, timeoutMs = 30_000 } = {}) {
     this.barePath = barePath;
-    this.maxProposals = Math.min(1000, Math.max(1, maxProposals));
+    if (!Number.isSafeInteger(maxProposals) || maxProposals < 1 || maxProposals > 1000) throw new Error('maxProposals must be an integer from 1 to 1000');
+    this.maxProposals = maxProposals;
     this.timeoutMs = timeoutMs;
   }
 
