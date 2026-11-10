@@ -210,3 +210,15 @@ It does not certify isolation, application CI speedup, sustained traffic, crash
 recovery under load, larger stages or one real project's normal lifecycle. The
 benchmark checker only inspects test-owned Git data, never repository code. The
 full mission stays active.
+
+
+## Live OCI validation increment — 2026-11-10
+
+Docker Desktop now runs locally. The exact-candidate OCI executor passes a live
+loopback service check plus non-root/no-ambient-env/no-host-file probes, runtime
+resource-profile inspection and cleanup after success, command failure,
+cancellation, timeout and output overflow. Evidence: validation/container/
+candidate-smoke.json and scripts/candidate-container-smoke.js. This supersedes
+the unavailable-Docker limitation for this local executor, not other deployment
+profiles. Worker-death orphan recovery, browser/multi-service staging, Workcell
+live validation, real-project lifecycle and larger load stages remain open.

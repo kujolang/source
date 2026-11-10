@@ -391,3 +391,28 @@ final HTTP fetch and exact baseline-tree comparison. See
 [raw report](benchmarks/agents-25-repos-1-gzip.json) and concurrency-results for
 measurements and scope. This resolves the observed fetch failure; it does not
 certify production capacity.
+
+
+## Live OCI endpoint and bounded termination — 2026-11-10
+
+Starting the installed Docker Desktop enabled real container validation. The public
+Node image was pulled without using private registry credentials, then pinned by
+its returned digest. An initial mismatched tool-version assertion
+failed; the actual image reports v26.13.0. The correct-version smoke passes.
+
+The expanded reproducible smoke runs five cases: exact-candidate loopback endpoint
+and isolation probes; command exit7 recorded as failed evidence; cancellation
+after workload readiness; five-second timeout after readiness; and output overflow.
+After each, successful runtime inventory proves the exact owned container names
+are absent and the workspace/runner slots are released. A live inspect confirms
+network none, read-only root, 1GiB memory, 2CPUs, 256PIDs, host numeric non-root
+UID/GID and a sole workspace bind. Host working edits/untracked files/canary
+environment are excluded; effective capabilities are zero and no-new-privileges
+is set. Raw evidence: [five-case report](container/candidate-smoke.json).
+
+This proves normal bounded termination on this running Docker Desktop, not worker
+SIGKILL reconciliation, runtime-unreachable cleanup, browser checks or a security
+escape assessment. Those remain separate gates.
+
+Focused candidate-export and action-runner regression: 27/27 pass, zero skips,
+1.57 s (`/tmp/source-container-focused.log`). Lint106 and diff checks pass.

@@ -94,9 +94,20 @@ node scripts/candidate-container-smoke.js
 
 Use the actual image's exact Node version. This command fails if configuration or
 the runtime is unavailable; it never substitutes host execution. It validates
-candidate contents, absence of Git metadata, workspace writes, process version,
-and workspace cleanup. Network/resource escape tests and complete staging
-lifecycle validation are additional gates, not claims made by this smoke test.
+candidate contents and a loopback HTTP endpoint, absence of untracked host files,
+Git metadata and an ambient canary variable, non-root execution, dropped effective
+capabilities, no-new-privileges, read-only root and loopback-only interfaces. A live
+runtime inspection checks the configured memory/CPU/PID limits and sole workspace
+bind mount. Failed commands, cancellation after startup, timeout and output overflow
+must leave no named containers or workspaces. Runtime inventory failure fails the
+check; absence is never inferred from a failed inspection. This is not a container
+escape audit, browser test or worker-SIGKILL orphan recovery proof.
+
+The Docker Desktop run on 2026-11-10 passed all five cases. Raw profile/results and
+limitations: [candidate smoke](../validation/container/candidate-smoke.json).
+Docker server 29.6.2, image Node v26.13.0, digest recorded in that report. This
+supersedes the previous unavailable-daemon status for the local OCI executor;
+other runtime/UID mappings and production isolation remain unverified.
 
 Rollback consists of stopping verification workers and removing this executor
 from the operator handler module. Retain existing candidate/receipt/dispatch

@@ -1,0 +1,208 @@
+{
+  "version": 2,
+  "runtime": "docker",
+  "image": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216",
+  "nodeVersion": "v26.13.0",
+  "cases": [
+    {
+      "name": "endpoint-and-isolation",
+      "durationMs": 837,
+      "profile": {
+        "version": 1,
+        "runtime": "docker",
+        "image": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216",
+        "toolVersions": {
+          "node": "v26.13.0"
+        },
+        "timeoutMs": 30000,
+        "maxOutputBytes": 65536,
+        "memory": "1g",
+        "cpus": 2,
+        "pidsLimit": 256,
+        "user": "501:20",
+        "network": "none",
+        "export": "git-blobs-regular-files-v1"
+      },
+      "result": {
+        "output": "candidate endpoint and isolation passed\n",
+        "execution": {
+          "identity": "f2ef2c6553373db97e21d316e03f655a079f6bc5fc91328abe9960d01f96845d",
+          "commit": "00c19bb9bfb7a8ea42dc0efd28fbed28a548867f",
+          "tree": "bd7242f0a237b081cb80f48263155be1fa9d0078",
+          "command": [
+            "node",
+            "-e",
+            "\n    const fs=require('node:fs'),assert=require('node:assert/strict'),os=require('node:os');\n    (async()=>{\n      assert.equal(process.version,\"v26.13.0\");\n      assert.notEqual(process.getuid(),0);\n      assert.equal(fs.readFileSync('expected','utf8'),'exact-candidate');\n      assert.equal(fs.existsSync('.git'),false);\n      assert.equal(fs.existsSync('host-only'),false);\n      assert.equal(process.env.SOURCE_SMOKE_HOST_ONLY,undefined);\n      assert.equal(fs.existsSync('/var/run/docker.sock'),false);\n      assert.throws(()=>fs.writeFileSync('/source-escape','bad'));\n      assert.ok(Object.values(os.networkInterfaces()).flat().every(x=>x.internal));\n      const status=fs.readFileSync('/proc/self/status','utf8');\n      assert.match(status,/CapEff:\\s+0+\\n/); assert.match(status,/NoNewPrivs:\\s+1\\n/);\n      const server=require('./app.cjs');\n      await new Promise(r=>server.listen(0,'127.0.0.1',r));\n      try { const response=await fetch('http://127.0.0.1:'+server.address().port); assert.equal(response.status,200); assert.deepEqual(await response.json(),{value:'exact-candidate'}); }\n      finally { await new Promise(r=>server.close(r)); }\n      fs.writeFileSync('temporary-result','ok'); console.log('candidate endpoint and isolation passed');\n    })().catch(e=>{console.error(e);process.exitCode=1});\n  "
+          ],
+          "environment": "source-oci-v1:60eb18271714dc99c6eee997395cddd5b8318cb9f5963a500515319688283540",
+          "inputs": {},
+          "externalState": {},
+          "toolVersions": {
+            "node": "v26.13.0"
+          },
+          "status": "pass",
+          "startedAt": 1794346007657,
+          "finishedAt": 1794346008419,
+          "durationMs": 762,
+          "stderr": "",
+          "exitCode": 0,
+          "runtimeSignal": null,
+          "export": {
+            "files": 2,
+            "bytes": 234,
+            "commit": "00c19bb9bfb7a8ea42dc0efd28fbed28a548867f",
+            "tree": "bd7242f0a237b081cb80f48263155be1fa9d0078"
+          },
+          "workspaceRemoved": true
+        }
+      },
+      "cleanupVerified": true
+    },
+    {
+      "name": "failed-check",
+      "durationMs": 606,
+      "profile": {
+        "version": 1,
+        "runtime": "docker",
+        "image": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216",
+        "toolVersions": {
+          "node": "v26.13.0"
+        },
+        "timeoutMs": 30000,
+        "maxOutputBytes": 65536,
+        "memory": "1g",
+        "cpus": 2,
+        "pidsLimit": 256,
+        "user": "501:20",
+        "network": "none",
+        "export": "git-blobs-regular-files-v1"
+      },
+      "result": {
+        "output": "controlled integration failure\n",
+        "execution": {
+          "identity": "c52777d445d1d42279357c9f8811a0cafd01cc90bf1385230cb89479c4664a71",
+          "commit": "00c19bb9bfb7a8ea42dc0efd28fbed28a548867f",
+          "tree": "bd7242f0a237b081cb80f48263155be1fa9d0078",
+          "command": [
+            "node",
+            "-e",
+            "console.error('controlled integration failure'); process.exitCode=7"
+          ],
+          "environment": "source-oci-v1:60eb18271714dc99c6eee997395cddd5b8318cb9f5963a500515319688283540",
+          "inputs": {},
+          "externalState": {},
+          "toolVersions": {
+            "node": "v26.13.0"
+          },
+          "status": "fail",
+          "startedAt": 1794346008494,
+          "finishedAt": 1794346009038,
+          "durationMs": 544,
+          "stderr": "controlled integration failure\n",
+          "exitCode": 7,
+          "runtimeSignal": null,
+          "export": {
+            "files": 2,
+            "bytes": 234,
+            "commit": "00c19bb9bfb7a8ea42dc0efd28fbed28a548867f",
+            "tree": "bd7242f0a237b081cb80f48263155be1fa9d0078"
+          },
+          "workspaceRemoved": true
+        }
+      },
+      "cleanupVerified": true
+    },
+    {
+      "name": "cancel",
+      "durationMs": 709,
+      "profile": {
+        "version": 1,
+        "runtime": "docker",
+        "image": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216",
+        "toolVersions": {
+          "node": "v26.13.0"
+        },
+        "timeoutMs": 30000,
+        "maxOutputBytes": 65536,
+        "memory": "1g",
+        "cpus": 2,
+        "pidsLimit": 256,
+        "user": "501:20",
+        "network": "none",
+        "export": "git-blobs-regular-files-v1"
+      },
+      "result": {
+        "error": "isolated workflow cancelled"
+      },
+      "runtimeInspection": {
+        "network": "none",
+        "readOnlyRoot": true,
+        "memoryBytes": 1073741824,
+        "nanoCpus": 2000000000,
+        "pids": 256,
+        "user": "501:20"
+      },
+      "cleanupVerified": true
+    },
+    {
+      "name": "timeout",
+      "durationMs": 5303,
+      "profile": {
+        "version": 1,
+        "runtime": "docker",
+        "image": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216",
+        "toolVersions": {
+          "node": "v26.13.0"
+        },
+        "timeoutMs": 5000,
+        "maxOutputBytes": 65536,
+        "memory": "1g",
+        "cpus": 2,
+        "pidsLimit": 256,
+        "user": "501:20",
+        "network": "none",
+        "export": "git-blobs-regular-files-v1"
+      },
+      "result": {
+        "error": "isolated workflow timed out"
+      },
+      "cleanupVerified": true
+    },
+    {
+      "name": "output-limit",
+      "durationMs": 623,
+      "profile": {
+        "version": 1,
+        "runtime": "docker",
+        "image": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216",
+        "toolVersions": {
+          "node": "v26.13.0"
+        },
+        "timeoutMs": 30000,
+        "maxOutputBytes": 1024,
+        "memory": "1g",
+        "cpus": 2,
+        "pidsLimit": 256,
+        "user": "501:20",
+        "network": "none",
+        "export": "git-blobs-regular-files-v1"
+      },
+      "result": {
+        "error": "isolated workflow output exceeded configured limit"
+      },
+      "cleanupVerified": true
+    }
+  ],
+  "ok": true,
+  "sourceRevision": "e471a2fb0f2dd77c4fd4e7f40bfca60a6df3fc7d",
+  "harnessSha256": "1271f0e225ed816bd73d4b976b78bf936a28ed329f62106cdd7eafa9c9e94d88",
+  "recordedAt": "2026-11-10T21:27:57.160354+00:00",
+  "runtimeServerVersion": "29.6.2",
+  "host": "macOS x64; Docker Desktop Linux VM; host Node v26.12.1",
+  "limitations": [
+    "single local runtime",
+    "no worker SIGKILL/orphan recovery proof",
+    "no browser or multi-service staging",
+    "no container escape security audit"
+  ]
+}
