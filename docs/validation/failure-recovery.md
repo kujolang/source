@@ -151,3 +151,22 @@ real Git; it does not prove workload isolation or deployment. Worker loss here i
 simulated through lease expiry, not a killed verification worker process. Real
 isolated execution, staging teardown, multi-process dispatcher crash/failover,
 replacement-candidate cancellation and scale benchmarks remain required.
+
+## Exact-candidate executor contract — 2026-11-10
+
+The optional pinned-image container executor and raw Git exporter passed 40
+focused tests with the existing runner/worker suites, zero failures/skips, in
+1.60 seconds (`/tmp/source-candidate-executor-tests.log`). Syntax lint checked 99
+JavaScript files and diff checks passed. Tests cover raw binary bytes, executable
+mode, exclusion of uncommitted/untracked files, export-attribute independence,
+tree mismatch, size limits, symlinks, filesystem aliases, corrupt blob hashes,
+argument quoting, environment mismatch, cancellation before allocation and
+cleanup after export/runtime errors.
+
+The container process in these tests is controlled, not a real Docker/Podman
+workload. `docker info` was rechecked and failed because
+`/Users/robertdevore/.docker/run/docker.sock` does not exist. The live smoke script
+is provided but was not run against a container. No claim of live isolation,
+rootless UID mapping compatibility, confirmed runtime teardown or staging
+readiness follows from this increment. The previous full 311-test regression
+predates these additive modules; it was not repeated for this focused addition.

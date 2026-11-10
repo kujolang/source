@@ -138,3 +138,16 @@ must supply a provider-neutral isolated executor/staging lifecycle, cancellation
 of replaced candidates, broader worker-process crash/failover validation, and the
 remaining hosting, real-project lifecycle and benchmark gates. Historical test
 records remain in failure-recovery; no production-readiness claim is made.
+
+## Exact-candidate executor increment — 2026-11-10
+
+An optional OCI executor now exports bounded regular-file Git trees without
+checkout filters or Git metadata, verifies blob bytes, requires a digest-pinned
+image/environment/tool manifest, and runs through the existing bounded isolated
+runner. Worker configuration and an explicit live smoke command are documented
+in `docs/architecture/candidate-execution.md`. Controlled tests verify the export
+and cleanup contract. Docker's daemon is still absent, so runtime isolation,
+UID mapping and teardown are unverified. Networked/provider-neutral staging,
+Workcell lifecycle execution, crash orphan reconciliation and all later mission
+gates remain required. Symlinks, submodules and external inputs currently fail
+closed rather than being silently omitted from the tested candidate.

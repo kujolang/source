@@ -129,3 +129,10 @@ not untrusted workload execution. Workcell/container lifecycle integration and
 production execution provenance remain separate required work. Supersession is
 currently within a candidate's check dependency graph; automatic cancellation of
 all work for replaced candidates remains open.
+
+An optional `CandidateContainerExecutor` now supplies a digest-pinned OCI runner
+with bounded raw-Git export and attempt cleanup. See
+[candidate execution](candidate-execution.md) for setup, profile identity,
+supported repository/input limits and the explicit live smoke command. Its Git
+and lifecycle contract tests pass; live runtime isolation and staging remain
+unverified because the local Docker daemon is unavailable.
