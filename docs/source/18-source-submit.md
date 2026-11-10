@@ -9,7 +9,7 @@ A normal developer must be able to contribute without learning Source concepts
 up front:
 
 ```text
-git clone https://source.example.com/git/{project}/{repo}.git
+git clone https://source.example.com/git/{org}/{project}/{repo}.git
 # make changes
 source submit
 ```
@@ -31,7 +31,7 @@ commands which operate on the local data root.
 4. determine head = HEAD
 5. reject empty changes (base == head)
 6. push head to the selected Source URL on a contribution ref (so it is present in the bare repo)
-7. POST /api/v1/projects/{project}/submit
+7. POST /api/v1/orgs/{org}/projects/{project}/submit
 ```
 
 The server then creates the lifecycle:
@@ -75,8 +75,9 @@ see a Change id and a clear statement of what is still required.
   No LLM, no test suite assumption. It is real evidence but does not satisfy the
   project's full required evidence (tests/eval); the maintainer's verification
   service fills those. Missing evidence is visible, not hidden.
-- **Contributor identity is a `human` principal** created server-side from the
-  Git `user.name`. No auth in the MVP; capability-gated auth is the next phase.
+- **Public contribution identity** is a `human` principal created server-side
+  from Git `user.name`. Private contributions require `submit_change` and use the
+  authenticated principal, rather than trusting a caller-supplied identity.
 - **The CLI is a thin client** — `src/submit.js` uses the same HTTP API as any
   other client; no business logic lives only in the CLI.
 
@@ -84,7 +85,7 @@ see a Change id and a clear statement of what is still required.
 
 - `src/submit.js` — client-side contribution logic (async git + fetch).
 - `src/source.js` — `submitContribution` server method (the lifecycle).
-- `src/api.js` — `POST /api/v1/projects/{project}/submit`.
+- `src/api.js` — `POST /api/v1/orgs/{org}/projects/{project}/submit`.
 - `src/cli.js` — `source submit` command.
 - `tests/submit.test.js` — end-to-end contribution tests.
 
@@ -122,3 +123,19 @@ It requires an existing Source repository, preserves origin/upstream settings,
 and does not create lifecycle evidence. It does not copy GitHub-only branches or
 Git LFS data. Use `--cwd` for each local repository and `--dry-run` with an already
 configured remote to preview. See the README for the complete setup flow.
+
+## Private project credentials
+
+The client forwards its explicit credential or `SOURCE_CREDENTIAL` as a bearer
+capability to the submit API, as well as using it for Git authentication. Issue a
+project-scoped capability with `read_source,git_push,submit_change` using `source
+cap issue --org O1 --project P1 --principal U1 --allowed
+read_source,git_push,submit_change`. A plain `git-cap` remains transport-only and
+cannot authorize private submission. A Git credential helper by itself supplies
+no API credential.
+
+Authenticated `--url` overrides must have the same origin as the chosen Git
+remote. This is checked before fetching or pushing. API redirects are rejected.
+Tests exercise explicit and environment credentials against private projects,
+retain the authenticated principal, preserve GitHub origin, reject transport-only
+capabilities, and reject an unrelated API override before any push.

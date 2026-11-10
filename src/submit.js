@@ -40,7 +40,12 @@ export async function submitFromWorkingDir({ cwd = process.cwd(), intent = '', b
   const target = await resolveRemote(cwd, remote);
   const parsed = target;
   const apiBase = baseUrl || target.baseUrl;
-  const run = authenticatedGit(credential, target.url, cwd);
+  const submitCredential = credential || process.env.SOURCE_CREDENTIAL;
+  // A Git credential must never be forwarded to an unrelated API override.
+  if (submitCredential && new URL(apiBase).origin !== new URL(target.baseUrl).origin) {
+    throw new Error('authenticated submit requires the API and Git remote to have the same origin');
+  }
+  const run = authenticatedGit(submitCredential, target.url, cwd);
   const head = await git(['rev-parse', 'HEAD'], cwd);
   const base = await mergeBase(cwd, target, run);
   if (base === head) throw new Error('no changes to submit (base == head)');
@@ -64,8 +69,8 @@ export async function submitFromWorkingDir({ cwd = process.cwd(), intent = '', b
 
   // 6. Submit to the Source API (org-scoped).
   const res = await fetch(`${apiBase}/api/v1/orgs/${parsed.orgId}/projects/${parsed.projectId}/submit`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    method: 'POST', redirect: 'error',
+    headers: { 'content-type': 'application/json', ...(submitCredential ? { authorization: `Bearer ${submitCredential}` } : {}) },
     body: JSON.stringify({
       repoRef: parsed.repoRef,
       baseCommit: base,

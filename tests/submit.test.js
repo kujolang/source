@@ -195,3 +195,37 @@ test('explicit and configured remote selection supports a nonstandard default br
     await assert.rejects(() => submitFromWorkingDir({ cwd, credential: cap.credential }), /no changes to submit/);
   });
 });
+
+for (const credentialSource of ['argument', 'environment']) test(`private secondary-remote submit authenticates API using ${credentialSource} credential`, async () => {
+  const { src, org, project, human } = freshSource();
+  const { repo, work: cwd } = seedRepo(src, org.id, project.id);
+  const scope = { org: org.id, project: project.id };
+  const cap = src.capabilities.issue({ principalId: human.id, scope, allowed: ['read_source', 'git_push', 'submit_change'] });
+  await withServer(src, async (base) => {
+    await run(['remote', 'set-url', 'origin', 'git@github.com:example/private.git'], cwd);
+    await run(['remote', 'add', 'source', `${base}/git/${org.id}/${project.id}/${repo.id}.git`], cwd);
+    writeFileSync(path.join(cwd, 'private-feature'), 'private feature\n');
+    await run(['add', '.'], cwd); await run(['commit', '-m', 'private feature'], cwd);
+    const previous = process.env.SOURCE_CREDENTIAL;
+    try {
+      if (credentialSource === 'environment') process.env.SOURCE_CREDENTIAL = cap.credential;
+      const result = await submitFromWorkingDir({ cwd, ...(credentialSource === 'argument' ? { credential: cap.credential } : {}) });
+      assert.equal(result.session.principal, human.id);
+      assert.equal(result.change.repositories[0], repo.id);
+      assert.equal(await run(['remote', 'get-url', 'origin'], cwd), 'git@github.com:example/private.git');
+    } finally {
+      if (previous == null) delete process.env.SOURCE_CREDENTIAL; else process.env.SOURCE_CREDENTIAL = previous;
+    }
+    const gitOnly = src.issueGitCapability({ orgId: org.id, projectId: project.id, principalId: human.id });
+    await assert.rejects(() => submitFromWorkingDir({ cwd, credential: gitOnly.credential }), /not allowed|denied|capability|unauthorized/i);
+  });
+});
+
+test('authenticated submit refuses a different API origin before pushing', async () => {
+  const { src, org, project, human } = freshSource();
+  const { repo, work: cwd } = seedRepo(src, org.id, project.id);
+  await run(['remote', 'add', 'source', `https://source.example/git/${org.id}/${project.id}/${repo.id}.git`], cwd);
+  const cap = src.issueGitCapability({ orgId: org.id, projectId: project.id, principalId: human.id });
+  await assert.rejects(() => submitFromWorkingDir({ cwd, credential: cap.credential, baseUrl: 'https://different.example' }), /same origin/);
+  assert.equal(await run(['for-each-ref', '--format=%(refname)', 'refs/heads/source-submit-'], repo.barePath), '');
+});

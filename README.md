@@ -102,6 +102,18 @@ branch as your existing repository. Issue a project-scoped Git capability with
 checkout (using the server's `SOURCE_DATA`). Use the returned credential through
 `SOURCE_CREDENTIAL`, or your Git credential helper; do not put it in remote URLs.
 
+For a **private** Source project, issue a capability that also permits submission:
+
+```bash
+node bin/source.js cap issue --org O1 --project P1 --principal U1 --allowed read_source,git_push,submit_change
+```
+
+Set its returned credential in `SOURCE_CREDENTIAL` (or pass `--credential`).
+Private submission uses it for both Git and the API; a Git credential helper
+alone cannot authenticate the API request. `git-cap` intentionally grants no
+`submit_change` permission. An authenticated API URL override must have the same
+origin as the selected Source Git remote; submission does not follow redirects.
+
 From your existing working repository, invoke the Source CLI by its absolute path:
 
 ```bash

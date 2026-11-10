@@ -322,3 +322,28 @@ This increment adds harness/tests/results rather than changing the application.
 The previous full 327-test regression predates the Workcell and benchmark additions;
 no new full-regression result is claimed here. Runtime isolation, recovery under
 load, larger stages and the real-project lifecycle remain open.
+
+## Private secondary-remote submission — 2026-11-10
+
+The private submission regression reproduced `missing credential` for both an
+explicit credential and `SOURCE_CREDENTIAL`: Git authenticated correctly, but the
+client omitted the bearer capability on the API POST. The client now uses the
+same supplied credential for both transports, rejects a different API origin
+before any fetch/push, and refuses API redirects. Server permissions are unchanged;
+private submission still requires `submit_change` in addition to Git permissions.
+The transport-only `git-cap` helper has not gained additional authority.
+
+Final submit suite: eight tests pass, no skips/failures, 9.42 seconds
+(`/tmp/source-private-submit-final.log`). Tests verify private authenticated
+principal attribution, environment/argument credential paths, unchanged GitHub
+origin, denial of transport-only capabilities and pre-push rejection of an
+unrelated API override. The four related sync/API/Git/auth suites passed 46 tests
+(`/tmp/source-private-submit-tests.log`); its initial submit assertions used the
+wrong session field, corrected to the actual `session.principal` contract before
+the final passing run. A final live benchmark regression passes both tests in
+10.09 seconds (`/tmp/source-benchmark-final-tests.log`). Lint checks 104 JS files;
+diff checks pass. No new full-suite claim is made.
+
+The 25-agent pilot still fails at default shared-IP Git-read admission with
+observed HTTP 429 responses; this authentication fix does not claim to resolve
+that independent scaling limit. See concurrency-results for the failed records.
