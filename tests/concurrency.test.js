@@ -661,3 +661,59 @@ test('Git CGI output is bounded when a caller configures a response cap', async 
     /output limit/,
   );
 });
+
+
+test('writer shutdown fences a renewal that finishes after stop', async () => {
+  const renewal = Promise.withResolvers();
+  const store = {
+    async acquireWriterLeaseAsync() { return { fencingToken: '7' }; },
+    renewWriterLeaseAsync() { return renewal.promise; },
+    async releaseWriterLeaseAsync() { return true; },
+    async assertWriterLeaseAsync() { return true; },
+  };
+  const controller = new WriterLeaseController(store, { owner: 'shutdown' });
+  await controller.start();
+  const pending = controller._renew();
+  await controller.stop();
+  renewal.resolve({ fencingToken: '7' });
+  await pending;
+  assert.equal(controller.metrics().active, 0);
+  await assert.rejects(() => controller.assertAsync(), { code: 'WRITER_LEASE_LOST' });
+});
+
+test('writer shutdown during acquisition does not leave a renewal timer', async () => {
+  const acquisition = Promise.withResolvers();
+  let released = 0;
+  const controller = new WriterLeaseController({
+    acquireWriterLeaseAsync() { return acquisition.promise; },
+    async releaseWriterLeaseAsync() { released += 1; },
+  }, { owner: 'starting' });
+  const pending = controller.start();
+  await controller.stop();
+  acquisition.resolve({ fencingToken: '8' });
+  await pending;
+  const timer = controller.timer;
+  await controller.stop();
+  assert.equal(timer, null);
+  assert.equal(released, 1);
+});
+
+
+test('minimum-duration writer lease renews before expiry and repeated start is idempotent', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  let acquisitions = 0;
+  let renewals = 0;
+  const controller = new WriterLeaseController({
+    async acquireWriterLeaseAsync() { acquisitions += 1; return { fencingToken: '1' }; },
+    async renewWriterLeaseAsync() { renewals += 1; return { fencingToken: '1' }; },
+    async releaseWriterLeaseAsync() {},
+  }, { owner: 'short-lease', leaseMs: 1000 });
+  try {
+    await Promise.all([controller.start(), controller.start()]);
+    await controller.start();
+    assert.equal(acquisitions, 1);
+    t.mock.timers.tick(334);
+    await Promise.resolve();
+    assert.equal(renewals, 1);
+  } finally { await controller.stop(); }
+});
