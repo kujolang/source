@@ -13,6 +13,39 @@ import { exportCandidate, CandidateContainerExecutor } from '../src/candidate-ex
 const exec = promisify(execFile);
 const image = `fixture/runner@sha256:${'a'.repeat(64)}`;
 
+test('unconfirmed container cleanup preserves the workspace and a durable recovery record', async (t) => {
+  const f = await fixture(t);
+  const controller = new AbortController();
+  let started;
+  const ready = new Promise((resolve) => { started = resolve; });
+  const executor = new CandidateContainerExecutor({ workspaceRoot: path.join(f.root, 'workspaces'), image,
+    toolVersions: { node: 'fixture' }, spawnProcess: () => {
+      const child = new EventEmitter(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
+      child.kill = () => {};
+      started(); return child;
+    } });
+  executor.runner.removeContainer = async () => false;
+  const check = { command: ['sleep', '60'], environment: executor.environment, toolVersions: executor.profile.toolVersions, inputs: {}, externalState: {} };
+  const pending = executor.execute({ candidate: await f.candidate(), check, repository: f.repository,
+    identity: 'fixture', job: { id: 'cleanup', leaseToken: 'attempt' }, signal: controller.signal });
+  await ready; controller.abort();
+  let failure;
+  await assert.rejects(pending, (error) => { failure = error; return /cancelled/.test(error.message); });
+  assert.equal(failure.cleanup?.confirmed, false);
+  assert.equal(failure.cleanup.recorded, true);
+  const record = JSON.parse(await readFile(failure.cleanup.recordPath, 'utf8'));
+  assert.equal(record.containerName, failure.cleanup.containerName);
+  assert.equal(record.runtime, 'podman');
+  assert.equal((await stat(path.join(record.workspace, 'binary'))).isFile(), true);
+  assert.equal(record.state, 'cleanup-unconfirmed');
+  assert.equal(executor.runner.slots.active, 0);
+  assert.equal(executor.workspaces.slots.active, 0);
+  assert.equal(executor.workspaces.active.size, 0);
+  await assert.rejects(() => executor.runner.run({ steps: [{ run: 'true' }] }, { workspace: record.workspace }), /cleanup recovery required/);
+  const restarted = new CandidateContainerExecutor({ workspaceRoot: executor.workspaces.root, image, toolVersions: { node: 'fixture' } });
+  await assert.rejects(() => restarted.runner.run({ steps: [{ run: 'true' }] }, { workspace: record.workspace }), /cleanup recovery required/);
+});
+
 async function fixture(t) {
   const root = await mkdtemp(path.join(tmpdir(), 'source-executor-'));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -87,10 +120,11 @@ test('container executor pins its environment, quotes argv and cleans its exact 
     return child;
   };
   const executor = new CandidateContainerExecutor({ workspaceRoot: path.join(f.root, 'workspaces'), image, toolVersions: { node: 'fixture' }, spawnProcess });
+  executor.runner.removeContainer = async () => true;
   const check = { command: ['printf', "$(touch outside); 'quoted'"], environment: executor.environment, inputs: {}, externalState: {}, toolVersions: { node: 'fixture' } };
   const input = { candidate: await f.candidate(), check, repository: f.repository, identity: 'identity', job: { id: 'J1', leaseToken: 'attempt1' } };
   const result = await executor.execute(input);
-  assert.equal(result.execution.status, 'pass'); assert.equal(result.execution.workspaceRemoved, true);
+  assert.equal(result.execution.status, 'pass'); assert.equal(result.execution.workspaceRemoved, true); assert.equal(result.execution.cleanupConfirmed, true);
   assert.equal(result.output, 'fixture output');
   assert.ok(calls[0].args.includes(image)); assert.ok(calls[0].args.includes('--network=none'));
   assert.match(calls[0].args.at(-1), /'printf' '\$\(touch outside\); '/);

@@ -135,5 +135,6 @@ An optional `CandidateContainerExecutor` now supplies a digest-pinned OCI runner
 with bounded raw-Git export and attempt cleanup. See
 [candidate execution](candidate-execution.md) for setup, profile identity,
 supported repository/input limits and the explicit live smoke command. Its Git
-and lifecycle contract tests pass; live runtime isolation and staging remain
-unverified because the local Docker daemon is unavailable.
+and lifecycle contract tests pass. Local Docker endpoint/isolation and semantic
+integration tests now pass; see the linked execution guide for raw evidence and
+the separate worker-death, multi-service and production-isolation gates.

@@ -582,3 +582,28 @@ SOURCE_TEST_DATABASE_URL=<disposable-database> node --test --test-concurrency=1 
 Log: `/tmp/source-assembly-regressions.log` (local, ephemeral). Syntax validation
 checked 112 JavaScript files and `git diff --check` passed. The disposable database
 was dropped after completion. No test or benchmark remained running at commit.
+
+### OCI cleanup confirmation and retention
+
+A regression reproduced the previous behavior: cancellation with an unavailable
+cleanup boundary removed the candidate workspace and returned no cleanup status.
+The new regression was red before the fix and passes afterward. Source now
+confirms named runtime removal (or a successful inventory showing absence),
+retains an unconfirmed workspace plus a host-only recovery record, and blocks
+new execution in the current runner and restarted runners using that root. A
+zero-exit workload cannot produce a successful result with uncertain cleanup.
+Secret revocation remains attempted while an uncertain workflow workspace is
+preserved. The candidate environment hash binds `confirmed-removal-v1`.
+
+Validation: 36 focused tests including two actual OCI semantic integration/split
+cases passed with zero skips (25.042 s). After adding the returned cleanup metadata
+field, the 34 action/candidate/GitHub tests passed again with zero skips (3.290 s).
+All six final Docker smoke cases passed against pinned Node v26.13.0; the sixth
+case verifies a real container remains running during injected cleanup failure,
+retained workspace bytes and metadata, blocked current/restarted execution, and
+confirmed recovery before deleting its workspace. See
+[raw results and implementation hashes](container/cleanup-confirmation.json).
+Syntax lint checked 112 JS files; diff checks passed. No shared daemon was stopped.
+This is not worker-SIGKILL orphan reconciliation or an actual daemon restart drill;
+those remain open. Operator recovery and storage-failure limits are documented in
+[the execution guide](../architecture/candidate-execution.md).

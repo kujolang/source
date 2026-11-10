@@ -299,3 +299,15 @@ relaxed. This supersedes the blanket status that no 250-agent run has passed;
 it does not invalidate prior intermittent failures. 250 hot, repeated/sustained
 load, 1000 agents, recovery and complete host-resource accounting remain open,
 alongside the independent real-project/isolation/production gates.
+
+## Confirmed OCI cleanup — 2026-11-10
+
+The runner now confirms exact named-container teardown before reporting success
+or deleting a managed workspace. Unconfirmed cleanup retains the workspace and
+a durable recovery record and blocks new execution, including restarted runners
+using that root. The candidate environment hash includes the new cleanup contract;
+policy update, replanning and fresh evidence are required. Local real-container
+fault injection proves retention and explicit recovery while the container is
+still running. This advances runtime-unreachable handling; it does not complete
+worker-SIGKILL orphan reconciliation, actual daemon restart, multi-service staging,
+Workcell compatibility, or the other load/real-project/production gates.

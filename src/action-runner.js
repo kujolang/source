@@ -5,9 +5,9 @@
 // default profile is network-less, read-only, capability-dropped, and bounded
 // by CPU, memory, PIDs, output, and wall-clock limits.
 
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
 import { randomBytes, verify as verifySignature } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile, readdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Semaphore } from './concurrency.js';
@@ -285,19 +285,20 @@ function killRuntimeProcess(child) {
   try { child.kill('SIGKILL'); } catch { /* process may have already exited */ }
 }
 
-function removeRuntimeContainer(runtime, name) {
+function runtimeCommand(runtime, args) {
   return new Promise((resolve) => {
-    if (!name) return resolve();
-    const stopper = spawn(runtime, ['rm', '--force', name], { stdio: 'ignore' });
-    const timer = setTimeout(() => {
-      try { stopper.kill('SIGKILL'); } catch { /* process may have already exited */ }
-      resolve();
-    }, 5_000);
-    timer.unref?.();
-    const finish = () => { clearTimeout(timer); resolve(); };
-    stopper.once('error', finish);
-    stopper.once('close', finish);
+    execFile(runtime, args, { encoding: 'utf8', timeout: 5000, killSignal: 'SIGKILL', maxBuffer: 65536,
+      env: { PATH: process.env.PATH || '/usr/bin:/bin' } }, (error, stdout) => resolve(error ? null : stdout));
   });
+}
+
+// A failed removal is not proof of absence: the daemon may be unreachable.
+// Only a successful remove or a successful inventory showing absence confirms it.
+export async function removeRuntimeContainer(runtime, name, run = runtimeCommand) {
+  if (!['docker', 'podman'].includes(runtime) || !/^source-action-[0-9]+-[0-9]+-[a-f0-9]{12}$/.test(name)) throw new Error('invalid runtime cleanup identity');
+  if (await run(runtime, ['rm', '--force', name]) !== null) return true;
+  const listed = await run(runtime, ['ps', '--all', '--filter', `name=${name}`, '--format', '{{.Names}}']);
+  return listed !== null && !listed.trim().split('\n').includes(name);
 }
 
 const IMMUTABLE_ACTION_REF = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[0-9a-fA-F]{40}$/;
@@ -438,6 +439,15 @@ export class EphemeralWorkspaceManager {
     }
   }
 
+  preserve(job) {
+    const key = this.attemptKey(job);
+    const entry = this.active.get(key);
+    if (!entry) return false;
+    this.active.delete(key);
+    entry.releaseSlot();
+    return entry.workspace;
+  }
+
   async release(job) {
     const key = this.attemptKey(job);
     const entry = this.active.get(key);
@@ -450,7 +460,7 @@ export class EphemeralWorkspaceManager {
 }
 
 export class IsolatedActionRunner {
-  constructor({ runtime = 'podman', image, workspaceRoot, timeoutMs = 15 * 60_000, maxOutputBytes = 8 * 1024 * 1024, memory = '1g', cpus = 2, pidsLimit = 256, allowNetwork = false, user = '65532:65532', maxActive = 256, queue = 512, actionResolver = null, spawnProcess = spawn } = {}) {
+  constructor({ runtime = 'podman', image, workspaceRoot, timeoutMs = 15 * 60_000, maxOutputBytes = 8 * 1024 * 1024, memory = '1g', cpus = 2, pidsLimit = 256, allowNetwork = false, user = '65532:65532', maxActive = 256, queue = 512, actionResolver = null, spawnProcess = spawn, removeContainer = removeRuntimeContainer } = {}) {
     if (runtime !== 'podman' && runtime !== 'docker') throw new Error('isolated runner runtime must be podman or docker');
     this.runtime = runtime;
     this.image = safeImage(image);
@@ -463,6 +473,8 @@ export class IsolatedActionRunner {
     this.allowNetwork = allowNetwork === true;
     this.user = safeImage(user);
     this.actionResolver = typeof actionResolver === 'function' ? actionResolver : null;
+    if (typeof removeContainer !== 'function') throw new Error('container cleanup function is required');
+    this.removeContainer = removeContainer;
     this.spawnProcess = typeof spawnProcess === 'function' ? spawnProcess : spawn;
     this.slots = new Semaphore({ capacity: boundedInteger(maxActive, 256, 1, 10_000), queue: boundedInteger(queue, 512, 0, 100_000) });
   }
@@ -508,9 +520,15 @@ export class IsolatedActionRunner {
     signal?.throwIfAborted();
     const resolvedSteps = await this.resolveSteps(steps);
     const safeEnv = safeEnvironment(env);
+    if (this.cleanupBlocked) throw new Error('isolated runner cleanup recovery required');
+    let entries;
+    try { entries = await readdir(this.workspaceRoot); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; entries = []; }
+    if (entries.some((name) => /^\.source-action-[0-9]+-[0-9]+-[a-f0-9]{12}\.cleanup\.json$/.test(name))) throw new Error('isolated runner cleanup recovery required');
     let releaseSlot = await this.slots.acquire();
     if (!releaseSlot) throw new Error('isolated runner capacity exhausted');
     if (signal?.aborted) { releaseSlot(); signal.throwIfAborted(); }
+    if (this.cleanupBlocked) { releaseSlot(); throw new Error('isolated runner cleanup recovery required'); }
     const containerName = `source-action-${process.pid}-${Date.now()}-${randomBytes(6).toString('hex')}`;
     let child;
     try {
@@ -539,14 +557,29 @@ export class IsolatedActionRunner {
           releaseSlot = null;
         }
       };
+      const finish = async (error, result) => {
+        let confirmed = false;
+        try { confirmed = await this.removeContainer(this.runtime, containerName) === true; } catch { /* retain for recovery */ }
+        const cleanup = { confirmed, runtime: this.runtime, containerName, workspace };
+        if (!confirmed) {
+          this.cleanupBlocked = true;
+          cleanup.recordPath = path.join(path.resolve(this.workspaceRoot), `.${containerName}.cleanup.json`);
+          try {
+            await writeFile(cleanup.recordPath, JSON.stringify({ version: 1, state: 'cleanup-unconfirmed',
+              runtime: this.runtime, containerName, workspace, image: this.image, recordedAt: new Date().toISOString() }) + '\n', { flag: 'wx', mode: 0o600 });
+            cleanup.recorded = true;
+          } catch { cleanup.recorded = false; }
+          error = new Error(`${error?.message || 'isolated workflow finished'}; container cleanup unconfirmed: ${containerName}; workspace retained at ${workspace}; recovery record ${cleanup.recorded ? cleanup.recordPath : 'could not be saved'}`);
+        }
+        release();
+        if (error) { error.cleanup = cleanup; reject(error); }
+        else resolve({ ...result, cleanupConfirmed: true });
+      };
       const timer = setTimeout(() => {
         if (settled) return;
         settled = true;
         killRuntimeProcess(child);
-        void removeRuntimeContainer(this.runtime, containerName).finally(() => {
-          release();
-          reject(new Error('isolated workflow timed out'));
-        });
+        void finish(new Error('isolated workflow timed out'));
       }, this.timeoutMs);
       timer.unref?.();
       const onAbort = () => {
@@ -554,10 +587,7 @@ export class IsolatedActionRunner {
         settled = true;
         clearTimeout(timer);
         killRuntimeProcess(child);
-        void removeRuntimeContainer(this.runtime, containerName).finally(() => {
-          release();
-          reject(new Error('isolated workflow cancelled'));
-        });
+        void finish(new Error('isolated workflow cancelled'));
       };
       signal?.addEventListener('abort', onAbort, { once: true });
       if (signal?.aborted) onAbort();
@@ -568,10 +598,7 @@ export class IsolatedActionRunner {
           settled = true;
           killRuntimeProcess(child);
           clearTimeout(timer);
-          void removeRuntimeContainer(this.runtime, containerName).finally(() => {
-            release();
-            reject(new Error('isolated workflow output exceeded configured limit'));
-          });
+          void finish(new Error('isolated workflow output exceeded configured limit'));
           return;
         }
         target.push(chunk);
@@ -582,15 +609,14 @@ export class IsolatedActionRunner {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        release();
-        reject(error);
+        if (!child.pid && error.code === 'ENOENT') { release(); reject(error); }
+        else void finish(error);
       });
       child.once('close', (code, signal) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        release();
-        resolve({ ok: code === 0, code, signal, stdout: Buffer.concat(stdout).toString('utf8'), stderr: Buffer.concat(stderr).toString('utf8') });
+        void finish(null, { ok: code === 0, code, signal, stdout: Buffer.concat(stdout).toString('utf8'), stderr: Buffer.concat(stderr).toString('utf8') });
       });
     });
   }
@@ -608,17 +634,24 @@ export function createGitHubActionsHandler({ runner, workspaceForJob, workspaceM
       ? await workspaceManager.acquire(job)
       : await workspaceForJob(payload, job);
     let leaseId = null;
+    let cleanupConfirmed = true;
     try {
       const leased = secretBroker?.issue ? await secretBroker.issue(payload, job) : null;
       leaseId = leased?.leaseId || null;
       const env = safeEnvironment(leased ? leased.env : await (secretBroker ? secretBroker.get(payload, job) : secretProvider(payload, job)));
       const result = await runner.run({ steps: parameters.steps }, { workspace, env, ...(signal ? { signal } : {}) });
       return redactSecretOutput(result, env);
+    } catch (error) {
+      cleanupConfirmed = error.cleanup?.confirmed !== false;
+      throw error;
     } finally {
       try {
         if (leaseId && secretBroker?.revokeLease) await secretBroker.revoke(leaseId);
       } finally {
-        if (workspaceManager) await workspaceManager.release(job);
+        if (workspaceManager) {
+          if (cleanupConfirmed) await workspaceManager.release(job);
+          else workspaceManager.preserve(job);
+        }
       }
     }
   };

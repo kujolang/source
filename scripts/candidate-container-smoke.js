@@ -1,11 +1,12 @@
 // Explicit live OCI validation; never substitutes host execution.
-import { mkdtemp, writeFile, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import assert from 'node:assert/strict';
 import { CandidateContainerExecutor } from '../src/candidate-executor.js';
+import { removeRuntimeContainer } from '../src/action-runner.js';
 import { digest } from '../src/integration-planner.js';
 const exec = promisify(execFile);
 const image = process.env.SOURCE_TEST_CONTAINER_IMAGE;
@@ -35,7 +36,7 @@ try {
     assert.equal(executor.workspaces.slots.active, 0);
     assert.equal(executor.runner.slots.active, 0);
   };
-  const runCase = async (name, script, { timeoutMs = 30000, maxOutputBytes = 65536, expectedError, expectedStatus = 'pass', cancelOnReady = false } = {}) => {
+  const runCase = async (name, script, { timeoutMs = 30000, maxOutputBytes = 65536, expectedError, expectedStatus = 'pass', cancelOnReady = false, cleanupUnavailable = false } = {}) => {
     const controller = new AbortController(); const names = []; let ready = false; let inspection; let inspected;
     const executor = new CandidateContainerExecutor({
       workspaceRoot: path.join(root, 'workspaces'), runtime, image, toolVersions: { node: nodeVersion }, timeoutMs, maxOutputBytes,
@@ -72,6 +73,7 @@ try {
         return child;
       },
     });
+    if (cleanupUnavailable) executor.runner.removeContainer = async () => false;
     const command = ['node', '-e', script];
     const check = { command, environment: executor.environment, toolVersions: executor.profile.toolVersions, inputs: {}, externalState: {} };
     const started = Date.now();
@@ -83,10 +85,26 @@ try {
     } catch (error) {
       if (!expectedError) throw error;
       assert.match(error.message, expectedError);
-      result = { error: error.message };
+      result = { error: error.message, ...(error.cleanup ? { cleanup: error.cleanup } : {}) };
     }
     if (inspection) await inspection;
     if (cancelOnReady || name === 'timeout') assert.equal(ready, true, 'workload must start before termination');
+    if (cleanupUnavailable) {
+      assert.equal(result.cleanup?.confirmed, false);
+      assert.equal(result.cleanup.recorded, true);
+      const record = JSON.parse(await readFile(result.cleanup.recordPath, 'utf8'));
+      const actual = JSON.parse((await exec(runtime, ['inspect', record.containerName], { timeout: 15000 })).stdout)[0];
+      assert.equal(actual.State.Running, true, 'failure injection must leave a real running container');
+      assert.equal(await readFile(path.join(record.workspace, 'expected'), 'utf8'), 'exact-candidate');
+      await assert.rejects(() => executor.runner.run({ steps: [{ run: 'true' }] }, { workspace: record.workspace }), /cleanup recovery required/);
+      const recovered = new CandidateContainerExecutor({ workspaceRoot: executor.workspaces.root, runtime, image, toolVersions: { node: nodeVersion } });
+      await assert.rejects(() => recovered.runner.run({ steps: [{ run: 'true' }] }, { workspace: record.workspace }), /cleanup recovery required/);
+      assert.equal(await removeRuntimeContainer(runtime, record.containerName), true);
+      await rm(record.workspace, { recursive: true });
+      await rm(result.cleanup.recordPath);
+      result.recovery = { fault: 'injected unavailable cleanup boundary; real running OCI container', containerRemovalConfirmed: true,
+        workspacePreservedUntilRemoval: true, currentAndRestartedWorkerBlocked: true };
+    }
     await clean(names, executor);
     report.cases.push({ name, durationMs: Date.now() - started, profile: executor.profile, result, ...(inspected ? { runtimeInspection: inspected } : {}), cleanupVerified: true });
   };
@@ -115,6 +133,7 @@ try {
   await runCase('cancel', `console.log('SOURCE_SMOKE_READY'); setInterval(()=>{},1000)`, { cancelOnReady: true, expectedError: /cancelled/ });
   await runCase('timeout', `console.log('SOURCE_SMOKE_READY'); setInterval(()=>{},1000)`, { timeoutMs: 5000, expectedError: /timed out/ });
   await runCase('output-limit', `console.log('x'.repeat(8192)); setInterval(()=>{},1000)`, { maxOutputBytes: 1024, expectedError: /output exceeded/ });
+  await runCase('cleanup-outage', `console.log('SOURCE_SMOKE_READY'); setInterval(()=>{},1000)`, { cancelOnReady: true, cleanupUnavailable: true, expectedError: /cleanup unconfirmed/ });
   report.ok = true;
   console.log(JSON.stringify(report, null, 2));
 } finally {

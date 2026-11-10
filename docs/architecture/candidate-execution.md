@@ -15,7 +15,7 @@ is limited to 10,000 files and 256 MiB, with bounded Git command time/output.
 
 The operator must supply an image pinned by SHA-256 digest and a tool-version
 manifest for that image. The executor's `environment` value hashes the normalized
-image, runtime, tool manifest, resource limits, user and export profile. Configure
+image, runtime, tool manifest, resource limits, user, export and cleanup profile. Configure
 the check with exactly that environment and tool manifest before planning the
 candidate. Changing the profile requires policy update, replanning and fresh
 verification. The manifest is an operator attestation about the pinned image;
@@ -64,14 +64,40 @@ that image against `/workspace`. Start the module with the existing PostgreSQL
 worker CLI and dispatch through `integration dispatch` or the scoped API.
 
 Successful or failed command results preserve stdout, stderr, exit status,
-candidate identity, export size and elapsed duration. The workspace is removed
-before a result is returned. Cancellation, export errors and runtime exceptions
-also release the attempt workspace; no passing receipt is returned for them.
-The existing runner attempts named-container removal after cancellation/timeouts,
-but that is not confirmed cleanup if the runtime is unreachable. Worker process
-death and orphan-container/workspace reconciliation still require an operational
-reaper before production use. Do not count local cleanup as proof of remote
-container teardown.
+candidate identity, export size and elapsed duration. The runner confirms named
+container removal before returning a result, including when the runtime command
+exited successfully. A failed removal is followed by a bounded successful runtime
+inventory check; an unreachable daemon is never treated as proof of absence.
+The workspace is removed only after confirmed teardown (or a pre-launch/export
+failure). Returned candidate execution metadata records `cleanupConfirmed: true`.
+The profile now includes `cleanup: confirmed-removal-v1`, changing the environment
+hash: update operator policy from the executor's new environment, then replan and
+reverify. Do not edit old receipts to match the new environment.
+
+If cleanup cannot be confirmed, no passing result is returned. The exact workspace
+is retained and a mode-0600 `.source-action-<attempt>.cleanup.json` record is written
+in the configured workspace root, outside the container's sole bind mount. It
+contains the container name, runtime, image, workspace and timestamp, never command
+output or injected secrets. The worker error also identifies the container and
+workspace, and whether writing the record succeeded. The runner stops admitting
+new workloads, including queued admissions; another runner instance using that
+root refuses work while a cleanup record exists. Already-running attempts retain
+their independent cleanup lifecycle. If storage prevents writing a record, the
+current runner still blocks, but restart protection requires operator intervention
+using the job error; do not restart around that failure.
+
+Operator recovery is explicit: stop/drain workers using the affected root, restore
+runtime access, inspect the recorded exact container and confirm its workspace
+mount, then remove that container and verify absence through a successful runtime
+inventory. Only then remove the recorded workspace and its cleanup record. Restart
+workers and retry/re-dispatch through the existing lease-fenced job path. Preserve
+records until every affected container is accounted for; never sweep containers by
+prefix or delete a workspace while its container might still run. Rollback also
+requires resolving retained cleanup records before restarting an older binary.
+
+This is confirmed cleanup with durable recovery on observed runtime failures.
+Worker SIGKILL before cleanup can still leave an unrecorded container/workspace;
+that separate crash-orphan reaper and deployment recovery proof remain required.
 
 ## Validation
 
@@ -103,7 +129,7 @@ must leave no named containers or workspaces. Runtime inventory failure fails th
 check; absence is never inferred from a failed inspection. This is not a container
 escape audit, browser test or worker-SIGKILL orphan recovery proof.
 
-The Docker Desktop run on 2026-11-10 passed all five cases. Raw profile/results and
+The original Docker Desktop run on 2026-11-10 passed all five cases. Raw profile/results and
 limitations: [candidate smoke](../validation/container/candidate-smoke.json).
 Docker server 29.6.2, image Node v26.13.0, digest recorded in that report. This
 supersedes the previous unavailable-daemon status for the local OCI executor;
@@ -119,3 +145,12 @@ The optional [Workcell bridge](workcell-execution.md) reuses Workcell portable
 lifecycle, evidence verification, cancellation and recovery contracts. It retains
 recovery material when cleanup is unconfirmed; live execution and orphan recovery
 remain validation gates. This does not change the OCI executor above.
+
+The cleanup-confirmation follow-up adds a sixth live case: after real container
+startup, a fault-injected unavailable cleanup boundary leaves the container
+running. The script verifies retained candidate bytes, durable recovery metadata,
+and blocked current/restarted runners; restores real cleanup, confirms removal,
+and only then removes the workspace and marker. See
+[cleanup confirmation results](../validation/container/cleanup-confirmation.json).
+This injects the cleanup failure without stopping the shared Docker daemon; it is
+not a daemon restart or worker-SIGKILL recovery test.

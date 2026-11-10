@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign } from 'node:crypto';
-import { canonicalActionManifestPayload, createGitHubActionsHandler, createHttpSecretBroker, EphemeralWorkspaceManager, HttpSecretProvider, IsolatedActionRunner, loadActionKeyring, loadSecretLeaseBroker, loadSignedActionRegistry, SecretLeaseBroker, StaticActionRegistry } from '../src/action-runner.js';
+import { canonicalActionManifestPayload, createGitHubActionsHandler, createHttpSecretBroker, EphemeralWorkspaceManager, removeRuntimeContainer, HttpSecretProvider, IsolatedActionRunner, loadActionKeyring, loadSecretLeaseBroker, loadSignedActionRegistry, SecretLeaseBroker, StaticActionRegistry } from '../src/action-runner.js';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -126,7 +126,7 @@ test('isolated runner releases admission after a runtime exits', async () => {
   child.stderr = new PassThrough();
   child.kill = () => { child.killed = true; };
   const runner = new IsolatedActionRunner({
-    runtime: 'docker', image: 'kujo/runner:latest', workspaceRoot: '/srv/workspaces', maxActive: 1, queue: 0,
+    runtime: 'docker', image: 'kujo/runner:latest', workspaceRoot: '/srv/workspaces', maxActive: 1, queue: 0, removeContainer: async () => true,
     spawnProcess: () => {
       setImmediate(() => child.emit('close', 0, null));
       return child;
@@ -364,4 +364,43 @@ test('old attempt cleanup cannot remove a reclaimed job workspace', async (t) =>
   assert.equal(await manager.release(current), true);
   assert.equal(manager.active.size, 0);
   assert.equal(manager.slots.active, 0);
+});
+
+
+test('runtime cleanup distinguishes confirmed absence from an unreachable daemon', async () => {
+  const name = 'source-action-123-456-abcdef012345';
+  const calls = [];
+  assert.equal(await removeRuntimeContainer('docker', name, async (_runtime, args) => { calls.push(args); return ''; }), true);
+  assert.deepEqual(calls, [['rm', '--force', name]]);
+  for (const [listed, expected] of [[null, false], [name + '\n', false], ['', true], [name + '-other\n', true]]) {
+    let count = 0;
+    assert.equal(await removeRuntimeContainer('docker', name, async () => ++count === 1 ? null : listed), expected);
+    assert.equal(count, 2);
+  }
+  await assert.rejects(() => removeRuntimeContainer('docker', 'unrelated-container'), /cleanup identity/);
+});
+
+test('a successful runtime exit cannot report success when cleanup is unconfirmed', async (t) => {
+  const root = await mkdtemp(path.join(tmpdir(), 'source-cleanup-result-'));
+  t.after(() => import('node:fs/promises').then(({ rm }) => rm(root, { recursive: true, force: true })));
+  const runner = new IsolatedActionRunner({ image: 'fixture', workspaceRoot: root, removeContainer: async () => { throw new Error('daemon unavailable'); },
+    spawnProcess: () => {
+      const child = new EventEmitter(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
+      setImmediate(() => child.emit('close', 0, null)); return child;
+    } });
+  await assert.rejects(() => runner.run({ steps: [{ run: 'true' }] }, { workspace: root }), (error) =>
+    /cleanup unconfirmed/.test(error.message) && error.cleanup.confirmed === false && error.cleanup.recorded === true);
+  assert.equal(runner.slots.active, 0);
+});
+
+test('workflow handler preserves uncertain workspaces while revoking its secret lease', async () => {
+  let preserved = false; let revoked = false;
+  const failure = Object.assign(new Error('cleanup uncertain'), { cleanup: { confirmed: false } });
+  const handler = createGitHubActionsHandler({
+    runner: { async run() { throw failure; } },
+    workspaceManager: { acquire: async () => '/owned', release: async () => assert.fail('must preserve'), preserve() { preserved = true; } },
+    secretBroker: { get() {}, issue: async () => ({ env: {}, leaseId: 'fixture' }), revokeLease() {}, revoke: async () => { revoked = true; } },
+  });
+  await assert.rejects(() => handler({ parameters: { steps: [{ run: 'true' }] } }, { id: 'fixture' }), /cleanup uncertain/);
+  assert.equal(preserved, true); assert.equal(revoked, true);
 });
