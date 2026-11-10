@@ -4,6 +4,22 @@ import { PostgresStore } from '../src/postgres-store.js';
 
 const dsn = process.env.SOURCE_TEST_DATABASE_URL;
 
+test('parallel transaction writes commit together and caught SQL failures cannot report success', { skip: !dsn }, async (t) => {
+  const schema = `source_transaction_${process.pid}_${Date.now()}`;
+  const store = new PostgresStore({ dsn, schema });
+  t.after(async () => { await store.pool.query(`DROP SCHEMA "${schema}" CASCADE`); await store.closeAsync(); });
+  await store.transactionAsync(() => Promise.all(Array.from({ length: 20 }, (_, i) =>
+    store.transactionAsync(() => store.writeJsonAsync(`checks/item-${i}.json`, { i })))));
+  assert.equal((await store.listJsonAsync('checks')).length, 20);
+  await assert.rejects(() => store.transactionAsync(async () => {
+    await store.writeJsonAsync('checks/rollback.json', { shouldNotPersist: true });
+    await store._runAsync('SELECT 1 / 0').catch(() => {});
+    return 'must not succeed';
+  }), (error) => error.code === '22012');
+  assert.equal(await store.readJsonAsync('checks/rollback.json'), null);
+  assert.equal(await store._runAsync('SELECT 1'), '1', 'pool remains usable after rollback');
+});
+
 test('Postgres artifacts preserve empty and binary bytes through sync and async reads', { skip: !dsn }, async (t) => {
   const schema = `source_artifacts_${process.pid}_${Date.now()}`;
   const store = new PostgresStore({ dsn, schema });

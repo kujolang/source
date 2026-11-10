@@ -183,7 +183,15 @@ class PostgresStore {
   async _runAsync(sql) {
     const context = this._asyncTransaction.getStore();
     if (context?.client) {
-      const result = await context.client.query(String(sql).trim());
+      if (context.state !== 'active') throw new Error('Postgres transaction is no longer active');
+      // Promise.all callers still share one physical connection. Serialize at
+      // admission rather than relying on the driver's deprecated implicit queue.
+      const pending = context.tail.then(() => {
+        if (context.error) throw context.error;
+        return context.client.query(String(sql).trim());
+      });
+      context.tail = pending.then(() => {}, (error) => { context.error ||= error; });
+      const result = await pending;
       return this._formatAsyncRows(result.rows);
     }
     const release = await this._acquireDbSlot();
@@ -1691,22 +1699,35 @@ class PostgresStore {
 
   async transactionAsync(fn) {
     const existing = this._asyncTransaction.getStore();
-    if (existing?.client) return fn();
+    if (existing?.client) {
+      if (existing.state !== 'active') throw new Error('Postgres transaction is no longer active');
+      return fn();
+    }
     const release = await this._acquireDbSlot();
     const client = await this.pool.connect().catch((error) => {
       release();
       throw error;
     });
+    const context = { client, state: 'active', tail: Promise.resolve(), error: null };
+    let discard;
     try {
       await client.query('BEGIN');
-      const result = await this._asyncTransaction.run({ client }, fn);
+      const result = await this._asyncTransaction.run(context, fn);
+      context.state = 'closing';
+      await context.tail;
+      if (context.error) throw context.error;
       await client.query('COMMIT');
       return result;
     } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
+      context.state = 'closing';
+      // A callback can reject while sibling queries are still pending. Drain
+      // those admissions before rollback or returning this client to the pool.
+      await context.tail;
+      try { await client.query('ROLLBACK'); } catch (rollbackError) { discard = rollbackError; }
       throw error;
     } finally {
-      client.release();
+      context.state = 'closed';
+      client.release(discard);
       release();
     }
   }

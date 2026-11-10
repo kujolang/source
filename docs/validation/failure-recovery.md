@@ -228,3 +228,32 @@ host/power-loss durability or database-primary failover. A PostgreSQL client
 deprecation warning about overlapping queries on one transaction client was
 observed; it did not fail these tests and is not a certification of future driver
 compatibility.
+
+## Serialized PostgreSQL transaction queries — 2026-11-10
+
+Async transaction contexts now serialize admitted queries on their single physical
+connection. Commit/rollback drains those queries before releasing the connection;
+closing/closed contexts reject escaped work. A caught SQL error still fails the
+transaction, preventing PostgreSQL's aborted transaction from appearing to commit.
+Failed rollback discards the connection while preserving the original failure.
+Nested transactions remain flattened; this does not introduce savepoints.
+
+Four new fake-client tests assert physical query concurrency of one, nested and
+parallel admission, draining on callback failure, late-context rejection, poisoned
+transactions and rollback connection disposal. A live PostgreSQL regression
+commits twenty parallel nested writes, catches a division-by-zero SQL failure,
+checks that the earlier write rolled back, and verifies pool reuse afterward.
+
+Focused transaction/regression/dispatcher/queue tests: 22 pass, zero failures or
+skips, 80.95 seconds (`/tmp/source-transaction-focused.log`). Full regression:
+327 tests across 47 test files, all pass, zero skips/failures/cancellations, 299.56
+seconds (`/tmp/source-transaction-full.log`). The full run includes the Cloudflare
+Worker suite and real PostgreSQL tests using a disposable local database. Each
+test file used an owned temporary directory removed only after its process exited;
+the disposable database was dropped after the run. No overlapping-query driver
+deprecation warning appeared. Existing PostgreSQL notices and warnings from other
+schema/transaction paths remain; their absence is not claimed.
+
+These results supersede the earlier observed overlapping-query warning. They do
+not establish live OCI isolation, database-primary failover, deployed staging,
+real-project migration or the required staged concurrency benchmarks.
