@@ -118,3 +118,23 @@ This supplies primitives for item 5; it does not yet connect candidate identitie
 reuse, coalescing, supersession or execution receipts to the queue. The full
 attached mission remains active and all later environment/hosting/scale gates
 remain required.
+
+## Candidate dispatcher increment — 2026-11-10
+
+The PostgreSQL queue is now connected to exact-candidate verification through a
+durable per-check generation ledger. Dispatch uses valid deterministic receipts,
+coalesces active equivalent jobs, schedules prerequisites, propagates required
+reruns to descendants, and preserves reasons in audit records. API dispatch has
+its own capability; the operator CLI exposes the same operation. Worker handler
+modules receive Source and can use a service-authenticated verification handler.
+Queued receipts are fenced by live lease and ledger generation. Requested reruns
+invalidate prior-generation evidence for acceptance and promotion. Lost job
+acknowledgment after receipt persistence can reuse the saved deterministic result.
+
+This supersedes the earlier statement that candidate identities, coalescing and
+receipts are not connected to the queue. It does not establish isolated execution:
+the current live lifecycle tests use a controlled Git-reading executor. Next work
+must supply a provider-neutral isolated executor/staging lifecycle, cancellation
+of replaced candidates, broader worker-process crash/failover validation, and the
+remaining hosting, real-project lifecycle and benchmark gates. Historical test
+records remain in failure-recovery; no production-readiness claim is made.

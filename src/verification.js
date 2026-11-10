@@ -15,6 +15,9 @@ export function validateVerificationPolicy(policy) {
   for (const check of policy.checks) {
     if (!text(check.id) || ids.has(check.id) || !text(check.version)) throw new Error('invalid or duplicate check identity');
     ids.add(check.id);
+    if (check.priority != null && (!Number.isInteger(check.priority) || check.priority < -100 || check.priority > 100)) throw new Error('invalid verification priority');
+    if (check.maxAttempts != null && (!Number.isInteger(check.maxAttempts) || check.maxAttempts < 1 || check.maxAttempts > 100)) throw new Error('invalid verification retry limit');
+    if (check.dependsOn != null && (!Array.isArray(check.dependsOn) || check.dependsOn.length > 100 || !check.dependsOn.every(text) || new Set(check.dependsOn).size !== check.dependsOn.length)) throw new Error('invalid verification dependencies');
     if (check.adapter != null && !gateAdapters.includes(check.adapter)) throw new Error('unsupported or context-only verification adapter');
     if (check.tier != null && ![0, 1, 2, 3].includes(check.tier)) throw new Error('invalid verification tier');
     if (check.optionalByImpact != null && typeof check.optionalByImpact !== 'boolean') throw new Error('invalid applicability flag');
@@ -24,6 +27,17 @@ export function validateVerificationPolicy(policy) {
     if (typeof check.deterministic !== 'boolean' || !Number.isSafeInteger(check.maxAgeMs) || check.maxAgeMs <= 0 || check.maxAgeMs > 7 * 24 * 60 * 60 * 1000) throw new Error('invalid verification reuse lifetime');
     if (!Array.isArray(check.producers) || !check.producers.length || !check.producers.every(text)) throw new Error('check requires trusted producer identities');
   }
+  const visited = new Set(); const visiting = new Set();
+  const visit = (id) => {
+    if (visited.has(id)) return;
+    if (visiting.has(id)) throw new Error('verification dependency cycle');
+    const check = policy.checks.find((entry) => entry.id === id);
+    if (!check) throw new Error('unknown verification dependency');
+    visiting.add(id);
+    for (const dependency of check.dependsOn || []) visit(dependency);
+    visiting.delete(id); visited.add(id);
+  };
+  for (const id of ids) visit(id);
   return policy;
 }
 
@@ -38,7 +52,7 @@ export function verificationIdentity(candidate, policy, checkId) {
   });
 }
 
-export function createVerificationReceipt({ candidate, policy, checkId, producer, execution, artifactRef, now = Date.now() }) {
+export function createVerificationReceipt({ candidate, policy, checkId, producer, execution, artifactRef, jobRef = null, now = Date.now() }) {
   const identity = verificationIdentity(candidate, policy, checkId);
   const check = policy.checks.find((item) => item.id === checkId);
   if (!producer || producer.type !== 'service' || !check.producers.includes(producer.id)) throw new Error('untrusted verification producer');
@@ -52,6 +66,7 @@ export function createVerificationReceipt({ candidate, policy, checkId, producer
     policyHash: digest(policy), checkId, producer: producer.id, execution, artifactRef,
     recordedAt: now, expiresAt: execution.startedAt + check.maxAgeMs,
     provenance: 'authorized-service-attestation',
+    ...(jobRef ? { jobRef } : {}),
   };
   const { recordedAt, ...identityFields } = receipt;
   return { ...receipt, id: digest(identityFields) };

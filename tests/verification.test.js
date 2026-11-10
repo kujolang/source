@@ -20,6 +20,17 @@ function receipt(status = 'pass', now = 10_000) {
   });
 }
 
+test('verification scheduling rejects unknown dependencies, cycles and invalid resource controls', () => {
+  for (const update of [{ dependsOn: ['absent'] }, { dependsOn: ['integration'] }, { priority: 101 }, { maxAttempts: 0 }, { dependsOn: ['a', 'a'] }]) {
+    const changed = structuredClone(policy); Object.assign(changed.checks[0], update);
+    assert.throws(() => validateVerificationPolicy(changed), /verification/);
+  }
+  const changed = structuredClone(policy);
+  changed.checks.push({ ...changed.checks[0], id: 'preflight' });
+  changed.checks[0].dependsOn = ['preflight'];
+  assert.equal(validateVerificationPolicy(changed), changed);
+});
+
 test('verification binds every policy input and exact candidate, not a similar diff', () => {
   const saved = receipt();
   assert.equal(evaluateVerification({ candidate, policy, receipts: [saved], now: 11_000 }).ok, true);

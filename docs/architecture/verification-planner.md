@@ -73,8 +73,8 @@ Successful deterministic receipts may be reused only for an identical identity
 while unexpired. Environment-dependent checks explicitly rerun when asked for
 reuse. Latest matching execution governs; later failures block older passes and
 failures win tied completion timestamps. Reasons include missing identity,
-expiry, latest failure and required rerun. This evaluator is not yet a durable
-execution cache or dispatcher.
+expiry, latest failure and required rerun. PostgreSQL dispatch now persists these
+decisions and coalesces active jobs for the exact candidate/check identity.
 
 Record/expiry times use service/operator clocks, so workers need monitored clock
 synchronization. Original output is retained content-addressed and checked on
@@ -84,5 +84,48 @@ Run `node --test tests/impact-planner.test.js tests/control-tools.test.js
 tests/verification.test.js tests/integration-broker.test.js`. Contract tests use
 minimal source-grounded reports, not execution of all ten tools. A captured Lens
 report from its hardening evaluation was also parsed successfully with disabled
-visual comparison/accessibility preserved. Real end-to-end tool execution,
-durable scheduling, supersession/cancellation and isolated staging remain open.
+visual comparison/accessibility preserved. Real end-to-end tool execution and
+isolated staging remain open.
+
+## Durable candidate dispatch
+
+`source.verification.dispatch(scope)` runs under the existing PostgreSQL project
+lock and transaction. It loads the immutable candidate and current policy,
+rejects a changed target branch, validates stored artifact bytes, and evaluates
+deterministic reuse. Each check has a durable scheduling epoch. Active equivalent
+jobs coalesce; terminal jobs without valid evidence receive a new epoch and
+deduplication key. Retaining terminal queue keys cannot prevent a required rerun.
+Audit events and the candidate's `dispatch.json` explain every decision.
+
+Checks may declare `dependsOn` check IDs, integer `priority` from -100 to 100,
+and `maxAttempts` from 1 to 100. Defaults are three attempts and priority zero
+(50 for tier 3). Unknown dependencies and cycles are rejected. Impact selection
+retains transitive prerequisites. A rerun of a prerequisite schedules descendants
+again and cancels active descendants tied to the previous prerequisite job.
+Dispatch currently caps active project jobs at 10,000; worker concurrency,
+timeouts, retry delay, project burst and polling remain existing operator knobs.
+
+Receipts from queued execution include the job ID and dispatch epoch. Once a
+rerun is requested, an older generation cannot satisfy acceptance or promotion.
+The broker checks the current ledger and live lease in the same transaction as
+receipt/artifact/audit persistence. A crash after writing a passing deterministic
+receipt but before job completion is recoverable: the reclaimed job returns that
+receipt without executing again. An in-flight job with a saved receipt is kept
+alive until completion so dependent jobs retain a satisfiable prerequisite.
+
+The separate worker uses `createVerificationHandler` with an operator-selected
+service principal and executor. It resolves commands and environment from policy,
+never from queue payloads, verifies candidate/ledger/lease before execution, and
+records through the broker before acknowledging success. Failed checks preserve
+their receipt and fail the job; queue dependencies require successful completion.
+Completed job results expose receipt ID and measured duration; a recovered cached
+result records zero additional execution time and `reused: true`.
+
+There is deliberately no default host-shell executor. An isolated executor must
+implement `execute({ candidate, check, repository, identity, job, signal })`, return
+`{ execution, output }` conforming to `createVerificationReceipt`, and honor
+cancellation. The live dispatcher tests use a controlled Git-reading fixture,
+not untrusted workload execution. Workcell/container lifecycle integration and
+production execution provenance remain separate required work. Supersession is
+currently within a candidate's check dependency graph; automatic cancellation of
+all work for replaced candidates remains open.

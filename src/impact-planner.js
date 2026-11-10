@@ -41,5 +41,18 @@ export function planVerification(candidate, policy) {
     if (reason) checks.push({ id: check.id, tier, reason });
     else omitted.push({ id: check.id, reason: 'explicit optional applicability excludes the complete affected set' });
   }
-  return { version: 1, conservative: false, reason: 'complete operator impact model', paths, affected: [...affected].sort(), checks, omitted };
+  // Optional applicability cannot remove prerequisites of a selected check.
+  const selected = new Set(checks.map((check) => check.id));
+  for (let index = 0; index < checks.length; index++) {
+    const definition = policy.checks.find((check) => check.id === checks[index].id);
+    for (const id of definition.dependsOn || []) {
+      const dependency = policy.checks.find((check) => check.id === id);
+      if (!dependency) return all('verification dependency is unknown', paths);
+      if (!selected.has(id)) {
+        selected.add(id);
+        checks.push({ id, tier: dependency.tier ?? 2, reason: 'prerequisite of selected verification' });
+      }
+    }
+  }
+  return { version: 1, conservative: false, reason: 'complete operator impact model', paths, affected: [...affected].sort(), checks, omitted: omitted.filter((check) => !selected.has(check.id)) };
 }

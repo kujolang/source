@@ -1445,6 +1445,14 @@ class PostgresStore {
     `);
   }
 
+  async getJobAsync({ id, orgId, projectId }) {
+    const rows = await this._fetchJsonRowsAsync(`SELECT id, kind, payload, status, depends_on AS "dependsOn", result,
+      attempts, priority, created_at AS "createdAt", updated_at AS "updatedAt"
+      FROM ${this._qualified('jobs')} WHERE id = ${escapeSqlLiteral(id)}
+        AND org_id = ${escapeSqlLiteral(orgId)} AND project_id = ${escapeSqlLiteral(projectId)}`);
+    return rows[0] || null;
+  }
+
   async countJobsAsync({ orgId, projectId }) {
     const out = await this._runAsync(`SELECT COUNT(*) FROM ${this._qualified('jobs')}
       WHERE org_id = ${escapeSqlLiteral(orgId)} AND project_id = ${escapeSqlLiteral(projectId)}

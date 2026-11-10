@@ -156,3 +156,41 @@ schema upgrade and racing cancellation/completion. Its HTTP test checks authoriz
 tests check cancellation propagation with controlled processes; they do not
 establish live Docker/Podman cleanup. Durable candidate-aware scheduling, safe
 reuse/coalescing, supersession and execution-cost accounting remain separate work.
+## Candidate verification jobs
+
+For a configured and planned integration candidate on PostgreSQL, dispatch with:
+
+```bash
+node bin/source.js --store postgres integration dispatch \
+  --org O1 --project P1 --repo R1 --candidate <candidate-id> --principal U1
+```
+
+The HTTP equivalent is `POST
+/api/v1/orgs/{org}/projects/{project}/repositories/{repo}/integration/{candidate}/dispatch`.
+It requires `dispatch_verification` for that project. `enqueue_job` alone does not
+authorize candidate dispatch. The body cannot set commands, producer identities,
+priority, or execution environments. Configure those through the repository's
+operator-managed verification policy.
+
+The response reports `scheduled`, `coalesced`, or `reused` for each selected check,
+with a reason and job or receipt ID. Use existing scoped job list/count and cancel
+operations for visibility and cancellation. Completion results include execution
+duration and receipt ID. Original check output remains in the evidence store.
+
+Worker modules exporting `createHandlers` now receive `{ source, actionRegistry,
+secretBroker }`. An operator module can import `createVerificationHandler` from
+`src/verification-dispatcher.js` and return an `integration.verify` handler built
+with `{ source, principalId, executor }`. The principal must be a trusted service
+listed in each check policy. The executor must provide isolated exact-candidate
+execution and cancellation; Source does not install a default host-shell runner.
+Run the module with the existing PostgreSQL `worker --handler-module` command and
+its concurrency/timeout/lease settings. See the verification planner architecture
+for the executor interface and current limitations.
+
+Rollback: stop dispatcher callers and drain/cancel `integration.verify` jobs
+before reverting these code changes. Existing job storage requires no additional
+schema migration for dispatch. Retain candidate dispatch ledgers and receipts:
+deleting them discards rerun-generation enforcement. Do not operate older broker
+code against candidates with active dispatch generations; older code does not
+enforce the generation constraint. Restore a consistent pre-dispatch backup if a
+full rollback is needed, following the existing Git/database recovery procedure.

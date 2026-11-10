@@ -126,3 +126,28 @@ Syntax lint checked 94 JavaScript files; diff whitespace validation passed.
 This is the fencing seam for the forthcoming candidate dispatcher, not a claim
 that dispatch, isolated execution, or end-to-end queued receipt production is
 implemented. A live PostgreSQL broker/dispatcher lifecycle test remains required.
+
+## Candidate dispatcher lifecycle — 2026-11-10
+
+The full regression passed 311 tests across 45 files with live PostgreSQL enabled:
+zero failures, skips or cancellations, 244.79 seconds. Each file used its own
+temporary fixture root, removed after exit; the disposable database was dropped.
+Evidence log: `/tmp/source-dispatch-full.log`. Syntax lint checked 96 JavaScript
+files and `git diff --check` passed.
+
+New live tests cover ten concurrent dispatches across two Source/store instances,
+one job per exact check, ordered prerequisites, deterministic reuse, mandatory
+environment-dependent reruns, generation invalidation of old evidence, cancelled
+lease rejection before and after execution, forged job rejection, failed-check
+receipt persistence, descendant rescheduling, and acceptance/promotion using
+queued receipts. A simulated worker loss after receipt persistence but before
+acknowledgment expires the lease, reclaims the job and reuses that exact receipt.
+The HTTP dispatch test enforces its distinct capability and ignores attempted
+client command/producer/priority substitution.
+
+This supersedes the preceding missing live broker/dispatcher lifecycle test. The
+executor is a controlled test fixture that reads the assembled candidate through
+real Git; it does not prove workload isolation or deployment. Worker loss here is
+simulated through lease expiry, not a killed verification worker process. Real
+isolated execution, staging teardown, multi-process dispatcher crash/failover,
+replacement-candidate cancellation and scale benchmarks remain required.

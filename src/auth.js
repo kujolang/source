@@ -32,6 +32,7 @@ export const ACTIONS = {
   dispatch_workflow: 'dispatch_workflow',
   git_push: 'git_push',
   plan_integration: 'plan_integration',
+  dispatch_verification: 'dispatch_verification',
   record_verification: 'record_verification',
   promote_integration: 'promote_integration',
 };

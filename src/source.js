@@ -32,6 +32,7 @@ import { normalizeEvalSummary, normalizeEvalManifest, normalizeEvalRun, readEval
 import { scanSecrets } from './scan.js';
 import { IntegrationPlanner, digest } from './integration-planner.js';
 import { IntegrationBroker } from './integration-broker.js';
+import { VerificationDispatcher } from './verification-dispatcher.js';
 import { JobQueue } from './job-queue.js';
 import { translateGitHubActions } from './integrations/github-actions.js';
 import { KeyedSemaphore, Semaphore } from './concurrency.js';
@@ -56,6 +57,7 @@ export class Source {
     this.capabilities = new CapabilityService(this.store);
     this.jobs = new JobQueue(this.store);
     this.integration = new IntegrationBroker(this);
+    this.verification = new VerificationDispatcher(this);
     this.canonicalLocks = new KeyedSemaphore({ capacity: 1, queue: 256, maxKeys: 100_000 });
     const requestedCanonicalConcurrency = Number(canonicalRepoConcurrency);
     this.canonicalRepoConcurrency = Number.isFinite(requestedCanonicalConcurrency)

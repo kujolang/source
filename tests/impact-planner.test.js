@@ -19,6 +19,16 @@ test('impact follows transitive dependencies without dropping mandatory checks',
   assert.equal(plan.conservative, false);
 });
 
+test('optional applicability retains transitive prerequisites of mandatory checks', () => {
+  const changed = structuredClone(policy);
+  changed.checks.find((check) => check.id === 'combined').dependsOn = ['unit-other'];
+  changed.checks.find((check) => check.id === 'unit-other').dependsOn = ['unit-ui'];
+  const plan = planVerification(candidate('docs/guide.md'), changed);
+  assert.ok(plan.checks.some((check) => check.id === 'unit-other'));
+  assert.ok(plan.checks.some((check) => check.id === 'unit-ui'));
+  assert.ok(!plan.omitted.some((check) => check.id === 'unit-other'));
+});
+
 test('unknown, sensitive, release, historical failure and incomplete inputs require every check', () => {
   for (const file of ['unknown.txt', 'package.json', 'src/auth/session.js', 'src/schema.sql', 'src/generated/result.js', 'src/public-api/index.js']) {
     assert.equal(planVerification(candidate(file), policy).checks.length, policy.checks.length, file);

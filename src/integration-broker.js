@@ -73,8 +73,12 @@ export class IntegrationBroker {
         if (!this.source.store.lockJobLeaseAsync) throw new Error('queued verification requires transactional lease fencing');
         const job = await this.source.store.lockJobLeaseAsync({ ...input.jobLease, orgId, projectId });
         if (job.kind !== 'integration.verify' || job.payload.repoId !== input.repoId || job.payload.candidateId !== input.candidateId || job.payload.checkId !== checkId || job.payload.identity !== execution.identity) throw new Error('verification job does not match exact candidate and check');
+        const dispatch = await this.read(`${this.scope(input)}/${input.candidateId}/dispatch.json`);
+        const current = dispatch?.checks.find((entry) => entry.checkId === checkId);
+        if (!current || current.jobId !== job.id || current.epoch !== job.payload.epoch || current.identity !== execution.identity) throw new Error('verification dispatch was superseded');
+        return job;
       };
-      await fence();
+      const leasedJob = await fence();
       const { root, report, repo } = await this.load(input);
       const producer = await this.source.getPrincipalAsync(principalId);
       // Validate producer and metadata before storing an untrusted artifact.
@@ -95,7 +99,8 @@ export class IntegrationBroker {
       const bytes = this.source._artifactBytes(output);
       const store = this.source.store;
       const artifactRef = { hash: createHash('sha256').update(bytes).digest('hex') };
-      const receipt = createVerificationReceipt({ candidate: report.candidate, policy: repo.integrationPolicy, checkId, producer, execution, artifactRef });
+      const receipt = createVerificationReceipt({ candidate: report.candidate, policy: repo.integrationPolicy, checkId, producer, execution, artifactRef,
+        jobRef: leasedJob ? { id: leasedJob.id, epoch: leasedJob.payload.epoch } : null });
       const receiptRel = `${root}/${input.candidateId}/receipts/${receipt.id}.json`;
       const existing = await this.read(receiptRel);
       if (existing) return existing;
@@ -108,7 +113,7 @@ export class IntegrationBroker {
     });
   }
 
-  async evaluate(input) {
+  async evaluate(input, { forReuse = false } = {}) {
     const { root, report, repo } = await this.load(input);
     const store = this.source.store;
     const rel = `${root}/${input.candidateId}/receipts`;
@@ -121,7 +126,12 @@ export class IntegrationBroker {
       // The store verifies content addresses on read; evaluation also checks bytes.
       if (createHash('sha256').update(bytes).digest('hex') !== receipt.artifactRef.hash) throw new Error('verification artifact integrity mismatch');
     }
-    return evaluateVerification({ candidate: report.candidate, policy: repo.integrationPolicy, receipts });
+    const dispatch = await this.read(`${root}/${input.candidateId}/dispatch.json`);
+    const currentReceipts = receipts.filter((receipt) => {
+      const check = dispatch?.checks.find((entry) => entry.checkId === receipt.checkId);
+      return !check || check.action === 'reused' || (receipt.jobRef?.id === check.jobId && receipt.jobRef?.epoch === check.epoch);
+    });
+    return evaluateVerification({ candidate: report.candidate, policy: repo.integrationPolicy, receipts: currentReceipts, forReuse });
   }
 
   async status(input) {
