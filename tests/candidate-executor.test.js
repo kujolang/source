@@ -7,6 +7,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
+import { readFileSync, readdirSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 import { digest } from '../src/integration-planner.js';
 import { exportCandidate, CandidateContainerExecutor } from '../src/candidate-executor.js';
@@ -115,6 +116,12 @@ test('container executor pins its environment, quotes argv and cleans its exact 
   const f = await fixture(t); const calls = [];
   const spawnProcess = (runtime, args) => {
     const child = new EventEmitter(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
+    const journal = readdirSync(path.join(f.root, 'workspaces')).find(name => name.endsWith('.attempt.json'));
+    assert.ok(journal, 'journal must be published before runtime spawn');
+    const record = JSON.parse(readFileSync(path.join(f.root, 'workspaces', journal), 'utf8'));
+    assert.equal(record.state, 'prepared');
+    assert.equal(record.containerName, args[args.indexOf('--name') + 1]);
+    assert.ok(args.includes(`io.source.attempt=${record.containerName}`));
     calls.push({ runtime, args });
     setImmediate(() => { child.stdout.end('fixture output'); child.emit('close', 0, null); });
     return child;

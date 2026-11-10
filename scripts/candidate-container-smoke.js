@@ -102,6 +102,7 @@ try {
       assert.equal(await removeRuntimeContainer(runtime, record.containerName), true);
       await rm(record.workspace, { recursive: true });
       await rm(result.cleanup.recordPath);
+      if (result.cleanup.attemptRecord) await rm(result.cleanup.attemptRecord);
       result.recovery = { fault: 'injected unavailable cleanup boundary; real running OCI container', containerRemovalConfirmed: true,
         workspacePreservedUntilRemoval: true, currentAndRestartedWorkerBlocked: true };
     }

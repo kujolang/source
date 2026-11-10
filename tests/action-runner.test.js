@@ -320,11 +320,11 @@ test('cancellation propagates to isolated runtime and rejects before spawning wh
   const child = new EventEmitter(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
   let killed = false;
   child.kill = () => { killed = true; child.emit('close', null, 'SIGKILL'); };
-  let spawned = 0;
+  let spawned = 0; let ready; const started = new Promise(resolve => { ready = resolve; });
   const controller = new AbortController();
-  const runner = new IsolatedActionRunner({ image: 'fixture@sha256:abc', workspaceRoot: '/srv/workspaces', spawnProcess: () => { spawned += 1; return child; } });
+  const runner = new IsolatedActionRunner({ image: 'fixture@sha256:abc', workspaceRoot: '/srv/workspaces', spawnProcess: () => { spawned += 1; ready(); return child; } });
   const pending = runner.run({ steps: [{ run: 'sleep 60' }] }, { workspace: '/srv/workspaces/owned', signal: controller.signal });
-  await new Promise(setImmediate);
+  await started;
   controller.abort();
   await assert.rejects(pending, /cancelled/);
   assert.equal(killed, true);
@@ -403,4 +403,43 @@ test('workflow handler preserves uncertain workspaces while revoking its secret 
   });
   await assert.rejects(() => handler({ parameters: { steps: [{ run: 'true' }] } }, { id: 'fixture' }), /cleanup uncertain/);
   assert.equal(preserved, true); assert.equal(revoked, true);
+});
+
+test('workload environment cannot redirect the host runtime but reaches the container unchanged', async () => {
+  let invocation;
+  const runner = new IsolatedActionRunner({ image: 'fixture', workspaceRoot: '/srv/workspaces', removeContainer: async () => true,
+    spawnProcess: (_runtime, args, options) => {
+      invocation = { args, options };
+      const child = new EventEmitter(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
+      setImmediate(() => child.emit('close', 0, null)); return child;
+    } });
+  const env = { PATH: '/fixture-container-path', DOCKER_HOST: 'https://fixture.invalid', TOKEN: 'fixture-token\nsecond-line', SOURCE_ACTION_ENV_0: 'collision-fixture' };
+  await runner.run({ steps: [{ run: 'printf "%s|%s|%s|%s" "$PATH" "$DOCKER_HOST" "$TOKEN" "$SOURCE_ACTION_ENV_0"' }] }, { workspace: '/srv/workspaces/owned', env });
+  assert.equal(invocation.options.env.PATH, process.env.PATH || '/usr/bin:/bin');
+  for (const name of ['DOCKER_HOST', 'TOKEN', 'SOURCE_ACTION_ENV_0']) assert.equal(invocation.options.env[name], undefined);
+  for (const value of Object.values(env)) assert.ok(!invocation.args.some(arg => arg.includes(value)), 'no values in runtime argv');
+  // Execute only this fixed fixture script to verify exact multiline forwarding;
+  // repository workflow commands remain container-only.
+  const { execFile } = await import('node:child_process');
+  const output = await new Promise((resolve, reject) => execFile('/bin/sh', ['-c', invocation.args.at(-1)], { env: invocation.options.env }, (error, stdout) => error ? reject(error) : resolve(stdout)));
+  assert.equal(output, Object.values(env).join('|'));
+});
+
+
+test('live container environment stays separate from host runtime configuration', { skip: !process.env.SOURCE_TEST_CONTAINER_IMAGE }, async (t) => {
+  const { mkdir, rm } = await import('node:fs/promises');
+  const root = await mkdtemp(path.join(tmpdir(), 'source-runtime-env-'));
+  const workspace = path.join(root, 'owned'); await mkdir(workspace);
+  let canRemove = true;
+  t.after(async () => { if (canRemove) await rm(root, { recursive: true, force: true }); });
+  const runner = new IsolatedActionRunner({ runtime: process.env.SOURCE_TEST_CONTAINER_RUNTIME || 'docker', image: process.env.SOURCE_TEST_CONTAINER_IMAGE,
+    workspaceRoot: root, user: `${process.getuid()}:${process.getgid()}`, timeoutMs: 15000 });
+  const script = String.raw`const assert=require('node:assert/strict'); assert.equal(process.env.DOCKER_HOST,'https://fixture.invalid'); assert.equal(process.env.HOME,'/fixture-home'); assert.equal(process.env.TOKEN,'first\nsecond'); assert.equal(Object.keys(process.env).some(k=>/^SOURCE_ACTION_[A-F0-9]{24}_/.test(k)),false); console.log('container environment isolated');`;
+  const quotedScript = "'" + script.replaceAll("'", "'\\''") + "'";
+  try {
+    const result = await runner.run({ steps: [{ run: `node -e ${quotedScript}` }] }, { workspace,
+      env: { DOCKER_HOST: 'https://fixture.invalid', HOME: '/fixture-home', TOKEN: 'first\nsecond' } });
+    assert.equal(result.ok, true, result.stderr); assert.equal(result.cleanupConfirmed, true);
+    assert.match(result.stdout, /container environment isolated/);
+  } catch (error) { canRemove = error.cleanup?.confirmed !== false; throw error; }
 });

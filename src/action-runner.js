@@ -5,12 +5,14 @@
 // default profile is network-less, read-only, capability-dropped, and bounded
 // by CPU, memory, PIDs, output, and wall-clock limits.
 
-import { spawn, execFile } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { randomBytes, verify as verifySignature } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, writeFile, readdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Semaphore } from './concurrency.js';
+import { removeRuntimeContainer, acknowledgeExecutionCleanup, assertExecutionAdmission, prepareExecutionAttempt, updateExecutionAttempt, workspaceIdentity } from './execution-attempts.js';
+export { removeRuntimeContainer } from './execution-attempts.js';
 
 function boundedInteger(value, fallback, min, max) {
   const number = Number(value);
@@ -285,22 +287,6 @@ function killRuntimeProcess(child) {
   try { child.kill('SIGKILL'); } catch { /* process may have already exited */ }
 }
 
-function runtimeCommand(runtime, args) {
-  return new Promise((resolve) => {
-    execFile(runtime, args, { encoding: 'utf8', timeout: 5000, killSignal: 'SIGKILL', maxBuffer: 65536,
-      env: { PATH: process.env.PATH || '/usr/bin:/bin' } }, (error, stdout) => resolve(error ? null : stdout));
-  });
-}
-
-// A failed removal is not proof of absence: the daemon may be unreachable.
-// Only a successful remove or a successful inventory showing absence confirms it.
-export async function removeRuntimeContainer(runtime, name, run = runtimeCommand) {
-  if (!['docker', 'podman'].includes(runtime) || !/^source-action-[0-9]+-[0-9]+-[a-f0-9]{12}$/.test(name)) throw new Error('invalid runtime cleanup identity');
-  if (await run(runtime, ['rm', '--force', name]) !== null) return true;
-  const listed = await run(runtime, ['ps', '--all', '--filter', `name=${name}`, '--format', '{{.Names}}']);
-  return listed !== null && !listed.trim().split('\n').includes(name);
-}
-
 const IMMUTABLE_ACTION_REF = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[0-9a-fA-F]{40}$/;
 
 function canonicalJson(value) {
@@ -505,43 +491,66 @@ export class IsolatedActionRunner {
     return resolved;
   }
 
-  buildArgs({ steps, envKeys = [], containerName = null }, workspace) {
-    const workspacePath = safeWorkspace(this.workspaceRoot, workspace);
+  buildArgs({ steps, envKeys = [], containerName = null, attempt = null, environmentSetup = '' }, workspace) {
+    const workspacePath = safeWorkspace(attempt ? path.dirname(attempt.recordPath) : this.workspaceRoot, workspace);
     const args = ['run', '--rm', '--init', '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges', `--pids-limit=${this.pidsLimit}`, `--memory=${this.memory}`, `--cpus=${this.cpus}`, '--tmpfs', '/tmp:rw,noexec,nosuid,size=64m', '--user', this.user];
     if (containerName) args.push('--name', containerName);
+    if (attempt) args.push('--label', `io.source.attempt=${containerName}`, '--label', `io.source.workspace=${workspaceIdentity(attempt.record.workspace)}`);
     if (!this.allowNetwork) args.push('--network=none');
     args.push('--env', 'CI=true', '--env', 'GITHUB_ACTIONS=true', '--env', 'GITHUB_WORKSPACE=/workspace');
     for (const key of envKeys) args.push('--env', key);
-    args.push('-v', `${workspacePath}:/workspace:rw`, '-w', '/workspace', this.image, '/bin/sh', '-lc', workflowScript(steps));
+    args.push('-v', `${workspacePath}:/workspace:rw`, '-w', '/workspace', this.image, '/bin/sh', '-lc', `${environmentSetup}${workflowScript(steps)}`);
     return args;
   }
 
-  async run({ steps }, { workspace, env = {}, signal } = {}) {
+  async run({ steps }, { workspace, env = {}, signal, managedWorkspace = false, job = null } = {}) {
     signal?.throwIfAborted();
     const resolvedSteps = await this.resolveSteps(steps);
     const safeEnv = safeEnvironment(env);
+    // Runtime clients interpret PATH, HOME, DOCKER_HOST and many other names.
+    // Carry workload values under inert aliases; restore original names only
+    // inside the container shell, preserving multiline values without argv leaks.
+    let prefix;
+    do { prefix = `SOURCE_ACTION_${randomBytes(12).toString('hex').toUpperCase()}_`; }
+    while (Object.keys(safeEnv).some(name => name.startsWith(prefix)));
+    const mapping = Object.entries(safeEnv).map(([name, value], index) => ({ name, value, alias: `${prefix}${index}` }));
+    const forwardedEnv = Object.fromEntries(mapping.map(({ alias, value }) => [alias, value]));
+    const environmentSetup = mapping.length ? 'set -eu\n' + mapping.map(({ name, alias }) => `export ${name}="$${alias}"`).join('\n') + '\nunset ' + mapping.map(({ alias }) => alias).join(' ') + '\n' : '';
     if (this.cleanupBlocked) throw new Error('isolated runner cleanup recovery required');
     let entries;
     try { entries = await readdir(this.workspaceRoot); }
     catch (error) { if (error.code !== 'ENOENT') throw error; entries = []; }
     if (entries.some((name) => /^\.source-action-[0-9]+-[0-9]+-[a-f0-9]{12}\.cleanup\.json$/.test(name))) throw new Error('isolated runner cleanup recovery required');
+    await assertExecutionAdmission(this.workspaceRoot);
     let releaseSlot = await this.slots.acquire();
     if (!releaseSlot) throw new Error('isolated runner capacity exhausted');
     if (signal?.aborted) { releaseSlot(); signal.throwIfAborted(); }
     if (this.cleanupBlocked) { releaseSlot(); throw new Error('isolated runner cleanup recovery required'); }
     const containerName = `source-action-${process.pid}-${Date.now()}-${randomBytes(6).toString('hex')}`;
-    let child;
+    let child; let attempt = null;
     try {
-      const args = this.buildArgs({ steps: resolvedSteps, envKeys: Object.keys(safeEnv), containerName }, workspace);
+      await assertExecutionAdmission(this.workspaceRoot);
+      safeWorkspace(this.workspaceRoot, workspace);
+      if (managedWorkspace) {
+        attempt = await prepareExecutionAttempt({ workspaceRoot: this.workspaceRoot, workspace, runtime: this.runtime, image: this.image, containerName, jobId: job?.id || null });
+        workspace = attempt.record.workspace;
+      }
+      signal?.throwIfAborted();
+      const args = this.buildArgs({ steps: resolvedSteps, envKeys: Object.keys(forwardedEnv), containerName, attempt, environmentSetup }, workspace);
       child = this.spawnProcess(this.runtime, args, {
         detached: process.platform !== 'win32',
         stdio: ['ignore', 'pipe', 'pipe'],
         env: {
           PATH: process.env.PATH || '/usr/bin:/bin',
-          ...safeEnv,
+          ...forwardedEnv,
         },
       });
     } catch (error) {
+      if (attempt) {
+        try { await updateExecutionAttempt(attempt, 'container-removed'); }
+        catch { /* retained prepared record requires operator review */ }
+        error.cleanup = { confirmed: true, attemptRecord: attempt.recordPath };
+      }
       releaseSlot();
       throw error;
     }
@@ -560,7 +569,11 @@ export class IsolatedActionRunner {
       const finish = async (error, result) => {
         let confirmed = false;
         try { confirmed = await this.removeContainer(this.runtime, containerName) === true; } catch { /* retain for recovery */ }
-        const cleanup = { confirmed, runtime: this.runtime, containerName, workspace };
+        const cleanup = { confirmed, runtime: this.runtime, containerName, workspace, ...(attempt ? { attemptRecord: attempt.recordPath } : {}) };
+        if (confirmed && attempt) {
+          try { await updateExecutionAttempt(attempt, 'container-removed'); }
+          catch { error = new Error('execution cleanup journal update failed'); }
+        }
         if (!confirmed) {
           this.cleanupBlocked = true;
           cleanup.recordPath = path.join(path.resolve(this.workspaceRoot), `.${containerName}.cleanup.json`);
@@ -573,7 +586,7 @@ export class IsolatedActionRunner {
         }
         release();
         if (error) { error.cleanup = cleanup; reject(error); }
-        else resolve({ ...result, cleanupConfirmed: true });
+        else resolve({ ...result, cleanupConfirmed: true, ...(attempt ? { attemptRecord: attempt.recordPath } : {}) });
       };
       const timer = setTimeout(() => {
         if (settled) return;
@@ -609,8 +622,7 @@ export class IsolatedActionRunner {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        if (!child.pid && error.code === 'ENOENT') { release(); reject(error); }
-        else void finish(error);
+        void finish(error);
       });
       child.once('close', (code, signal) => {
         if (settled) return;
@@ -634,22 +646,24 @@ export function createGitHubActionsHandler({ runner, workspaceForJob, workspaceM
       ? await workspaceManager.acquire(job)
       : await workspaceForJob(payload, job);
     let leaseId = null;
-    let cleanupConfirmed = true;
+    let cleanupConfirmed = true; let attemptRecord;
     try {
       const leased = secretBroker?.issue ? await secretBroker.issue(payload, job) : null;
       leaseId = leased?.leaseId || null;
       const env = safeEnvironment(leased ? leased.env : await (secretBroker ? secretBroker.get(payload, job) : secretProvider(payload, job)));
-      const result = await runner.run({ steps: parameters.steps }, { workspace, env, ...(signal ? { signal } : {}) });
+      const result = await runner.run({ steps: parameters.steps }, { workspace, env, ...(signal ? { signal } : {}), ...(workspaceManager ? { managedWorkspace: true, job } : {}) });
+      attemptRecord = result.attemptRecord;
       return redactSecretOutput(result, env);
     } catch (error) {
       cleanupConfirmed = error.cleanup?.confirmed !== false;
+      attemptRecord = error.cleanup?.attemptRecord;
       throw error;
     } finally {
       try {
         if (leaseId && secretBroker?.revokeLease) await secretBroker.revoke(leaseId);
       } finally {
         if (workspaceManager) {
-          if (cleanupConfirmed) await workspaceManager.release(job);
+          if (cleanupConfirmed) { await workspaceManager.release(job); await acknowledgeExecutionCleanup(attemptRecord); }
           else workspaceManager.preserve(job);
         }
       }

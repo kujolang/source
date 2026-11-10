@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
 import { mkdir, writeFile, chmod, realpath, readdir, lstat } from 'node:fs/promises';
 import path from 'node:path';
+import { acknowledgeExecutionCleanup } from './execution-attempts.js';
 import { digest } from './integration-planner.js';
 import { EphemeralWorkspaceManager, IsolatedActionRunner } from './action-runner.js';
 
@@ -94,7 +95,7 @@ export class CandidateContainerExecutor {
     if (!Number.isInteger(uid) || !Number.isInteger(gid) || uid === 0) throw new Error('candidate executor requires a non-root POSIX worker');
     this.workspaces = new EphemeralWorkspaceManager({ root: workspaceRoot, maxActive, queue });
     this.runner = new IsolatedActionRunner({ runtime, image, workspaceRoot: this.workspaces.root, timeoutMs, maxOutputBytes, memory, cpus, pidsLimit, maxActive, queue, user: `${uid}:${gid}`, allowNetwork: false, spawnProcess });
-    this.profile = { version: 1, runtime, image, toolVersions: structuredClone(toolVersions), timeoutMs: this.runner.timeoutMs, maxOutputBytes: this.runner.maxOutputBytes, memory: this.runner.memory, cpus: this.runner.cpus, pidsLimit: this.runner.pidsLimit, user: this.runner.user, network: 'none', export: 'git-blobs-regular-files-v1', cleanup: 'confirmed-removal-v1' };
+    this.profile = { version: 1, runtime, image, toolVersions: structuredClone(toolVersions), timeoutMs: this.runner.timeoutMs, maxOutputBytes: this.runner.maxOutputBytes, memory: this.runner.memory, cpus: this.runner.cpus, pidsLimit: this.runner.pidsLimit, user: this.runner.user, network: 'none', export: 'git-blobs-regular-files-v1', cleanup: 'journaled-removal-v2' };
     this.environment = `source-oci-v1:${digest(this.profile)}`;
   }
 
@@ -106,16 +107,18 @@ export class CandidateContainerExecutor {
     const command = check.command.map(quote).join(' ');
     const startedAt = Date.now();
     const workspace = await this.workspaces.acquire(job);
-    let result; let exported; let cleanupConfirmed = true;
+    let result; let exported; let cleanupConfirmed = true; let attemptRecord;
     try {
       exported = await exportCandidate({ repository, candidate, workspace, signal });
       signal?.throwIfAborted();
-      result = await this.runner.run({ steps: [{ run: command }] }, { workspace, signal });
+      result = await this.runner.run({ steps: [{ run: command }] }, { workspace, signal, managedWorkspace: true, job });
+      attemptRecord = result.attemptRecord;
     } catch (error) {
       cleanupConfirmed = error.cleanup?.confirmed !== false;
+      attemptRecord = error.cleanup?.attemptRecord;
       throw error;
     } finally {
-      if (cleanupConfirmed) await this.workspaces.release(job);
+      if (cleanupConfirmed) { await this.workspaces.release(job); await acknowledgeExecutionCleanup(attemptRecord); }
       else this.workspaces.preserve(job);
     }
     const finishedAt = Date.now();
