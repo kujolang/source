@@ -401,3 +401,61 @@ post-report drain did not recur. The admission regression fails before the fix
 Transport, client retry, sync and submit regression: 35/35 pass, zero skips,
 33.02 s (`/tmp/source-stress-diagnostics-tests.log`); lint checks 108 JS files.
 The 250-agent stress gate remains failed, and 1000 agents remain unmeasured.
+
+### Transport cause isolation and bounded submission exchange
+
+Additional 250-agent private-load failures are retained rather than replaced:
+
+| Report | Revision | First failure | Report time |
+|---|---|---|---:|
+| [distributed backend counters](benchmarks/agents-250-repos-10-curl.json) | `7c12a9b` | HTTP submit fetch failed; cause not yet retained | 96.740 s |
+| [hot cause codes](benchmarks/agents-250-repos-1-causes.json) | `3c710f0` | submit `UND_ERR_CONNECT_TIMEOUT` | 90.852 s |
+| [distributed cause codes](benchmarks/agents-250-repos-10-causes.json) | `3c710f0` | submit `UND_ERR_CONNECT_TIMEOUT` | 101.085 s |
+| [distributed single deadline](benchmarks/agents-250-repos-10-deadline.json) | `a70931f` | Git ls-remote HTTP 408 | 72.140 s |
+
+The first three recorded respectively 2062, 2036 and 2050 successful Git backend
+exits before/around the first submit failure and cleanup. Abort counts include
+harness cleanup, so they are not independent root-cause evidence. None reached
+candidate assembly or the equivalent baseline. Neither timeout report received
+an HTTP response for its first failing submission; the mutation outcome remains
+unknown and was not automatically retried.
+
+The local Node v26.12.1 runtime bundles Undici 8.12.2. Inspecting that runtime's
+connector source confirms a separate 10000 ms connect timeout; Source's outer
+request budget could not extend it. Source now uses a single Node HTTP/HTTPS
+JSON exchange whose connection, headers and body share the existing bounded
+AbortSignal. No new dependency or server limit change is involved. Redirects
+are rejected, the response is bounded to 1 MiB and headers to 16 KiB, and only
+explicit pre-admission retryable 429 responses are replayed. See the upstream
+[HTTP request AbortSignal contract](https://nodejs.org/api/http.html#httprequesturl-options-callback).
+
+The post-change 250-agent attempt failed earlier in Git with HTTP 408, not in the
+new JSON transport. It recorded 1076 successful Git backend exits, three aborts,
+1074 HTTP 200 responses and the expected anonymous 401 probe. The 408 was not
+in Source's request-handler status map. This is consistent with Node's automatic
+header timeout response before the request listener, with Source's current
+15-second headers timeout; the full request timeout is 120 seconds. See
+[Node header timeout behavior](https://nodejs.org/api/http.html#serverheaderstimeout).
+This does not prove the cause of every preceding clone failure, nor that the new
+transport makes the 250-agent workload pass. Default timeouts are unchanged.
+
+A contemporaneous macOS sample during the hot cause-code run reported 265 Node
+processes with aggregate RSS 10,836,384 KiB, 982.25 MiB swap used and substantial
+compressed memory. This includes unrelated Node processes and cumulative VM
+statistics; it is evidence of host load, not a causal or peak-resource claim.
+The benchmark still needs per-stage host/resource and event-loop accounting.
+
+Validation: 24 HTTP/client-retry/submit/sync tests pass with zero skips in 23.09 s,
+including stalled headers/body cancellation, redirect refusal, bounded/truncated
+responses, no uncertain mutation replay, private credentials and real Git submit.
+The earlier backend/curl diagnostic regression passed 24 tests; an additional
+real truncated Git HTTP exchange proves numeric curl 18 capture without raw
+stderr. Lint checks 110 JavaScript files. Large-load success remains unproven.
+
+Post-change live PostgreSQL lifecycle fixtures pass 3/3 with zero skips in32.29 s
+(`/tmp/source-http-transport-live.log`). Both default/public and authenticated
+private flows reach exact verification, acceptance, promotion and baseline tree
+equality. The six direct HTTP transport tests also pass, including real HTTPS:
+an untrusted self-signed certificate rejects before any HTTP request reaches the
+server; a child configured with that test CA completes the authenticated exchange.
+No certificate-verification bypass is enabled by the client.

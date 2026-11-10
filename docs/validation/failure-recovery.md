@@ -516,3 +516,21 @@ Live PostgreSQL benchmark default/private fixtures and both isolated semantic
 failure/split cases also pass:5/5, no skips (`/tmp/source-ancestry-live.log`).
 Syntax lint108 and diff checks pass. The earlier348-test main regression remains
 historical; this increment does not claim a repeated full suite.
+
+### Submission transport deadlines and failure observability
+
+The250-agent investigation distinguishes runtime HTTP connection timeout from
+Git subprocess failure. Safe diagnostics now retain numeric curl codes and
+allowlisted HTTP cause codes; server metrics count bounded Git backend outcomes.
+A failed/unknown submission is never automatically replayed. A real truncated
+Git HTTP fixture proves curl18 capture, and no diagnostic includes raw stderr,
+argv, response text or credentials.
+
+The submission JSON client now uses one bounded Node HTTP/HTTPS exchange across
+connection, headers and body, with strict TLS verification, no redirects and
+bounded buffering. Stalled headers/body, truncated/oversized responses, redirect
+credential isolation and unknown-outcome no-replay tests pass. Real TLS tests
+cover rejected untrusted certificates and successful explicitly trusted CA use.
+Live default/private PostgreSQL lifecycles pass after the change. The separate
+250-agent HTTP408/header-timeout investigation remains open; no stress success or
+production readiness follows from these focused regressions.

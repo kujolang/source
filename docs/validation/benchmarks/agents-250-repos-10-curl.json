@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "status": "failed",
+  "phase": "submission",
+  "httpStatuses": {
+    "200": 2060,
+    "401": 1
+  },
+  "date": "2026-11-10T22:36:26.192Z",
+  "agents": 250,
+  "repositories": 10,
+  "concurrency": {
+    "agentProcesses": 250,
+    "workerProcesses": 2,
+    "workerConcurrency": 2
+  },
+  "host": {
+    "platform": "darwin",
+    "arch": "x64",
+    "node": "v26.12.1",
+    "cpuCount": 12,
+    "memoryBytes": 17179869184,
+    "git": "git version 2.42.0"
+  },
+  "fixture": "compatible independent files; fixed host Git-content checker; no repository code execution",
+  "profile": "private-load",
+  "rateLimits": "explicit private-load operator profile; not default capacity",
+  "admissionConfiguration": {
+    "gitPush": {
+      "limit": 1000,
+      "windowMs": 60000
+    },
+    "submit": {
+      "limit": 1000,
+      "windowMs": 60000
+    }
+  },
+  "maxIntegrationProposals": 100,
+  "stages": {},
+  "raw": {
+    "completedClients": []
+  },
+  "limitations": [
+    "loopback single host; no deployed TLS latency",
+    "fixed Git-content verification, not application CI or isolated staging",
+    "no induced worker crash in this measurement",
+    "maximum 1000 agents per harness run; operator batch bound recorded explicitly",
+    "private repositories; explicit 1000/min push and submit limits per shared address; server queue/concurrency defaults unchanged"
+  ],
+  "sourceRevision": "7c12a9bcdecba1d9f1a7da9d08ae962f61ab2675",
+  "harnessSha256": "a048e871e375c1c1cb23f20febd64262150efdadaba9bf90301f3b5c7f93c2c3",
+  "anonymousGitRejected": true,
+  "error": "fetch failed",
+  "failureDiagnostic": null,
+  "gitBackendOutcomes": {
+    "exit_0": 2062,
+    "aborted": 15
+  },
+  "elapsedMs": 96740,
+  "parentCpuMicros": {
+    "user": 11575364,
+    "system": 13250673
+  },
+  "parentPeakRssBytes": 154177536
+}

@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "status": "failed",
+  "phase": "submission",
+  "httpStatuses": {
+    "200": 2045,
+    "401": 1
+  },
+  "date": "2026-11-10T22:40:47.903Z",
+  "agents": 250,
+  "repositories": 10,
+  "concurrency": {
+    "agentProcesses": 250,
+    "workerProcesses": 2,
+    "workerConcurrency": 2
+  },
+  "host": {
+    "platform": "darwin",
+    "arch": "x64",
+    "node": "v26.12.1",
+    "cpuCount": 12,
+    "memoryBytes": 17179869184,
+    "git": "git version 2.42.0"
+  },
+  "fixture": "compatible independent files; fixed host Git-content checker; no repository code execution",
+  "profile": "private-load",
+  "rateLimits": "explicit private-load operator profile; not default capacity",
+  "admissionConfiguration": {
+    "gitPush": {
+      "limit": 1000,
+      "windowMs": 60000
+    },
+    "submit": {
+      "limit": 1000,
+      "windowMs": 60000
+    }
+  },
+  "maxIntegrationProposals": 100,
+  "stages": {},
+  "raw": {
+    "completedClients": []
+  },
+  "limitations": [
+    "loopback single host; no deployed TLS latency",
+    "fixed Git-content verification, not application CI or isolated staging",
+    "no induced worker crash in this measurement",
+    "maximum 1000 agents per harness run; operator batch bound recorded explicitly",
+    "private repositories; explicit 1000/min push and submit limits per shared address; server queue/concurrency defaults unchanged"
+  ],
+  "sourceRevision": "3c710f017e15a388903e1c75f4fe31c30fefeea0",
+  "harnessSha256": "a048e871e375c1c1cb23f20febd64262150efdadaba9bf90301f3b5c7f93c2c3",
+  "anonymousGitRejected": true,
+  "error": "Source submit transport failed; outcome unknown; inspect before retrying",
+  "failureDiagnostic": {
+    "operation": "submit",
+    "kind": "transport",
+    "code": "UND_ERR_CONNECT_TIMEOUT",
+    "timedOut": false,
+    "responseReceived": false,
+    "outcomeUnknown": true
+  },
+  "gitBackendOutcomes": {
+    "exit_0": 2050,
+    "aborted": 9
+  },
+  "elapsedMs": 101085,
+  "parentCpuMicros": {
+    "user": 11830697,
+    "system": 13362182
+  },
+  "parentPeakRssBytes": 170946560
+}

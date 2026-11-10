@@ -272,3 +272,17 @@ the long post-report process drain no longer recurs. Next: classify safe client
 curl failures and backend exits, resolve the observed transport failure, rerun
 250 hot/distributed, then attempt 1000. Sustained/recovery load and the independent
 hosting, isolation and production gates remain open.
+
+## Transport diagnosis checkpoint — 2026-11-10
+
+The 250-agent failures now have stronger evidence: both hot/distributed runs
+reached an HTTP submission connection timeout (`UND_ERR_CONNECT_TIMEOUT`) after
+more than 2000 successful Git backend exits. Replaced the single submission
+fetch exchange with bounded Node HTTP/HTTPS using the existing shared deadline;
+no redirect or uncertain-mutation replay is permitted. A subsequent distributed
+run failed earlier at Git ls-remote with HTTP408, consistent with pre-handler
+header timeout under this local burst. No server timeout or auth/verification
+policy was relaxed. Raw failures and evidence limitations are in concurrency-results.
+Next work remains measurement and transport/admission reliability at250, including
+per-stage resource/event-loop data and timeout policy evaluation, then1000 and the
+separate sustained/recovery, isolation, real-repository and production gates.
