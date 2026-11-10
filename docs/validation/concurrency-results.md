@@ -131,7 +131,7 @@ candidates: their 100% hit result proves correctness, not an expected cache rate
 |---|---|---|
 | 10 | Passed this compatible-file lifecycle | Passed, five repos |
 | 25 | Passed after bounded backoff and gzip fix | Passed with bounded backoff, five repos |
-| 100 | Default profile failed during clone: HTTP 429 | Default profile failed during clone: HTTP 429 (ten repos) |
+| 100 | Default failed admission; private-load lifecycle passed | Default failed admission; private-load passed (ten repos) |
 | 250 | Not measured; beyond harness bound | Not measured |
 | 1,000+ | Not measured; multi-batch orchestration required | Not measured |
 
@@ -258,3 +258,62 @@ SOURCE_TEST_DATABASE_URL='postgresql:///YOUR_DISPOSABLE_DB?host=/tmp' \
 node scripts/benchmarks/integration.js --profile private-load \
   --agents 100 --repos 1 --output /absolute/private-100-hot.json
 ```
+
+
+### 100-agent private-load measurements
+
+Both layouts pass all assertions at revision `5b4c01a`. Raw reports:
+[hot](benchmarks/agents-100-repos-1-private.json) and
+[ten repositories](benchmarks/agents-100-repos-10-private.json). All changes remain
+in the landed ancestry, exact-candidate receipts gate promotion, unverified
+acceptance is rejected, repeats are idempotent and final trees match the baseline.
+Each job completed once; zero failed/abandoned jobs. All active duplicate dispatch
+and completed exact-identity reuse probes passed. The anonymous Git probe returned
+401. There were no 429 responses in this configured private workload.
+
+| Measurement | 100 agents / 1 repo | 100 agents / 10 repos |
+|---|---:|---:|
+| Submission including clone/edit/submit | 44.988 s | 41.559 s |
+| Submission proposals/second | 2.223 | 2.406 |
+| Candidate assembly total | 324.555 s | 52.876 s |
+| Verification phase elapsed | 4.123 s | 6.902 s |
+| Source checks / baseline checks | 1 / 100 | 10 / 100 |
+| Source checker execution total | 3.197 s | 6.921 s |
+| Baseline checker execution total | 187.233 s | 39.940 s |
+| Baseline sequential merge total | 11.624 s | 10.391 s |
+| Promotion total | 0.551 s | 4.117 s |
+| Final HTTP fetch total | 0.694 s | 4.535 s |
+| HTTP received / sent bytes | 515,398 / 1,046,562 | 530,814 / 733,140 |
+| Filesystem / PostgreSQL bytes | 22,585,344 / 3,358,720 | 27,877,376 / 4,218,880 |
+| Entire harness including both workflows and cleanup | 596.123 s | 193.541 s |
+
+Latency milliseconds, nearest-rank p50 / p95 / p99:
+
+| Stage | Hot repo | Ten repos |
+|---|---|---|
+| Clone (100 samples) | 8,519 / 14,320 / 15,099 | 7,820 / 12,993 / 13,638 |
+| Submit after commit (100) | 31,418 / 32,697 / 33,057 | 28,783 / 31,048 / 31,723 |
+| Assembly (1 / 10) | 324,555 / 324,555 / 324,555 | 5,255 / 5,427 / 5,427 |
+| Queue (1 / 10) | 752 / 752 / 752 | 3,289 / 4,002 / 4,002 |
+| Verification execution (1 / 10) | 3,197 / 3,197 / 3,197 | 696 / 756 / 756 |
+
+**Check reduction is not an overall speedup.** This fixture avoids 99 or 90
+checker runs, but Source assembly plus verification-phase time is 328.678 s hot
+and 59.778 s distributed, versus measured baseline merges plus checks of 198.857 s
+and 50.331 s respectively. These components exclude differing submission,
+approval and promotion work; they do not establish an end-to-end comparison.
+Even within those components, the assembler overhead outweighs verification savings.
+
+Source inspection identifies an all-pairs `merge-base --is-ancestor` loop in
+IntegrationPlanner. At 100 proposals it invokes Git up to 9,900 times solely for
+inferred dependencies, in addition to validation and real merge construction.
+The next optimization must preserve real ancestry, dependency closure, deterministic
+candidate identity and all semantic/conflict gates. These reports precede that
+optimization. Repeated distributions, sustained load and larger stages remain
+unmeasured; these single local runs are not production capacity certification.
+
+Profile regression: three tests passed with no skips in 31.11 s
+(`/tmp/source-benchmark-profile-tests.log`), including both default and private
+end-to-end fixtures. An initial profile implementation shadowed the global fetch
+function with a later timing array; corrected to globalThis.fetch before the
+passing run. Product server code/defaults were not changed by this increment.

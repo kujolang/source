@@ -241,3 +241,16 @@ same-file proposals are also accounted for deterministically. Reproduction and
 limitations are in failure-recovery.md and integration-semantic-live.test.js.
 These close those specific adversarial fixtures; they do not replace remaining
 staging, orphan recovery, real-project, scale or production validation gates.
+
+
+## 100-agent measurements — 2026-11-10
+
+Default public/shared-IP hot and ten-repository runs fail during clone admission
+with HTTP429, before completed submissions. A separately declared private-load
+profile (private scoped credentials, bounded1000/min push/submit, other server
+limits unchanged) passes both complete100-agent lifecycles. Raw reports and full
+profile differences are in validation/concurrency-results.md. No default-capacity
+claim is made. Source reduces checker count but all-pairs Git ancestry discovery
+makes assembly expensive enough to outweigh measured verification savings. Next:
+optimize that graph operation without altering candidate semantics, then repeat
+measurements.250/1000 and all other unresolved gates remain open.
