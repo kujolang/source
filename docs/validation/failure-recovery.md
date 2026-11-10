@@ -472,3 +472,25 @@ conflicts with file diagnostics, preserves the selected contents and leaves main
 unchanged. The first assertion used the wrong report field (`proposal` rather
 than `id`); corrected before the passing run. Planner/broker/verification related
 regression: 22/22 pass, zero skips, 48.17 s (`/tmp/source-semantic-related.log`).
+
+## Main application regression after semantic cases — 2026-11-10
+
+At revision `3c3fb18`, all 50 files under tests/**/*.test.js passed: 348 tests,
+348 passes, zero failures/skips/cancellations, 395.241 seconds total. Real local
+PostgreSQL and the pinned Docker Node v26.13.0 image were enabled, including the
+new semantic cases and worker process-death/lease-recovery tests. Each test file
+ran in a separate Node test process with a fresh owned TMPDIR, removed only after
+the file completed. The owned disposable database was dropped at the end.
+
+[Per-file machine-readable report](main-suite-2026-11-10.json) records revision,
+environment, counts and durations. Full local log: /tmp/source-full-semantic.log.
+Reproduce each listed file with `node --test --test-reporter=tap <file>`, setting
+SOURCE_TEST_DATABASE_URL to a disposable database, PGUSER to its operator user,
+SOURCE_TEST_CONTAINER_IMAGE and SOURCE_TEST_CONTAINER_NODE_VERSION as recorded,
+and SOURCE_TEST_CONTAINER_RUNTIME=docker. Allocate a new temporary directory per
+file, set TMPDIR to it, and delete that owned directory after its process exits.
+The run imposed a 240-second per-file timeout; none was reached.
+
+This is the main application suite, not a new run of separate Cloudflare package
+checks, successful Workcell/AppArmor execution, deployed failover/restore,
+100/250/1000 integration workloads, or a production-readiness certification.
