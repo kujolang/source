@@ -37,8 +37,18 @@ export async function submitRequest(url, options, { retry = new ClientRetry(), f
   while (true) {
     // An uncertain response or timeout could follow a committed mutation. Only
     // Source's explicit pre-admission 429 is safe to replay without idempotency.
-    const response = await fetchImpl(url, { ...options, signal: AbortSignal.timeout(retry.timeoutMs()) });
-    const body = await response.json();
+    const signal = AbortSignal.timeout(retry.timeoutMs());
+    let response, body;
+    try {
+      response = await fetchImpl(url, { ...options, signal });
+      body = await response.json();
+    } catch (error) {
+      const codes = ['UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT', 'UND_ERR_SOCKET', 'ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ENOTFOUND'];
+      const code = error?.cause?.code ?? error?.code;
+      const failure = new Error('Source submit transport failed; outcome unknown; inspect before retrying');
+      failure.diagnostic = { operation: 'submit', kind: 'transport', code: codes.includes(code) ? code : null, timedOut: error?.name === 'TimeoutError', responseReceived: Boolean(response), outcomeUnknown: true };
+      throw failure;
+    }
     if (response.status === 429 && body?.retryable === true) {
       await retry.wait('submit', response.headers.get('retry-after'));
       continue;

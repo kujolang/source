@@ -122,3 +122,20 @@ test('real truncated HTTP response retains only numeric curl diagnosis', async (
     return true;
   });
 });
+
+
+test('submit preserves safe nested transport codes but never retries an uncertain mutation', async () => {
+  for (const code of ['UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_SOCKET', 'private-fixture-token']) {
+    let calls = 0;
+    await assert.rejects(() => submitRequest('https://source.invalid/submit', { method: 'POST' }, { fetchImpl: async () => {
+      calls++; throw Object.assign(new Error('private-fixture-token'), { cause: { code, address: 'private-fixture-token' } });
+    } }), (error) => {
+      assert.equal(error.diagnostic.code, code.startsWith('UND_') ? code : null);
+      assert.equal(error.diagnostic.outcomeUnknown, true);
+      assert.equal(error.diagnostic.responseReceived, false);
+      assert.ok(!JSON.stringify(error).includes('private-fixture-token'));
+      return true;
+    });
+    assert.equal(calls, 1);
+  }
+});
