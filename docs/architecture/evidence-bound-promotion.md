@@ -1,0 +1,104 @@
+# Evidence-bound promotion
+
+## Implemented contract
+
+The opt-in local repository broker (`src/integration-broker.js`) promotes the exact
+assembled commit. It never synthesizes a different merge during promotion.
+Required checks come from the operator-configured verification policy. Receipt
+identity includes candidate ID, commit and tree; the full check definition,
+command, tool versions, environment, dependency/config inputs, external-state
+contract, security-policy version and policy itself. Candidate identity also
+includes repository/tenant/branch and active project plus integration policy hash.
+Changing policy creates a new candidate identity even for identical Git contents.
+
+Only configured **service** principals may attest results. HTTP binds the producer
+to the bearer capability rather than accepting a body producer ID. Output is
+preserved in Source's content-addressed artifact store. Promotion checks artifact
+bytes, receipt identity, expiry, outcome and current source proposal eligibility.
+An artifact hash proves integrity, not actual execution or isolation. This
+increment trusts the authorized verifier service's attestation; it does not yet
+provision a worker or execute the command. Tests using fixture receipts are not
+claims that a real project's suite executed in isolation.
+
+Acceptance requires an organization maintainer/admin human plus `accept_change`
+at the API boundary. Promotion additionally requires `promote_integration`.
+Current evidence IDs must match the acceptance snapshot. Policy changes, revised
+or rejected proposals, expired evidence, later failures, modified candidate refs,
+and a stale target prevent promotion. Existing canonical-update routes refuse
+repositories with integration policy enabled. Smart HTTP uses Git receive.hideRefs
+to reject canonical updates for enabled repositories and internal refs for all
+repositories, without replacing existing operator hooks. Filesystem operators
+remain trusted; shell access to the Git store is not an agent capability.
+
+## Durable intent, atomic result and recovery
+
+The broker first commits a promotion intent through the existing store transaction
+and project lock. It then rechecks approval/evidence under a second project lock
+and uses one Git update-ref transaction to:
+
+1. Compare-and-swap the protected target from the recorded base to candidate head.
+2. Create `refs/source/landed/<candidateId>` pointing to that exact head.
+
+Either both refs update or neither does. Competing candidates cannot overwrite the
+winner. The immutable landed ref is the authoritative Git outcome if writing the
+Source outcome record fails or a PostgreSQL transaction rolls back after Git
+success. A retry recognizes the landed receipt and reconstructs the store outcome
+without pushing again, even if policy changed after the completed promotion.
+Rejected attempts and recovery are audited. Source status distinguishes proposed,
+verified, accepted and landed, and reports intents needing reconciliation.
+
+Postgres async project advisory locks coordinate Source instances on shared Git
+storage; Git's own transactional CAS is the final write boundary, not a process
+mutex. The new path never relies on synchronous Postgres pseudo-transactions.
+JSON remains single-process development storage. A real multi-process CLI test
+proves the Git race boundary with independent processes and JSON fixture records;
+it does **not** certify multi-node JSON or PostgreSQL integration failover.
+
+## Operator setup and HTTP use
+
+**Offline activation is required:** stop serving writes and drain in-flight pushes
+before configuring protection. Configuration is an operator CLI/service operation,
+not a live configuration API. A request already admitted before activation may
+have sampled the previous transport policy. Do not enable or rotate policy while
+writers are still active until a drained live configuration protocol is supplied.
+Seed the repository before activation and take a verified backup.
+
+Edit `examples/integration/policy.json` with actual verifier principal IDs, immutable
+environment identity and input/tool versions; example placeholders are not evidence.
+
+```sh
+node bin/source.js integration configure --org O1 --project P1 --repo R1 --principal U1 --policy /absolute/path/policy.json
+node bin/source.js integration plan --org O1 --project P1 --repo R1 --changes C1,C2
+node bin/source.js integration status --org O1 --project P1 --repo R1 --candidate CANDIDATE_ID
+node bin/source.js integration accept --org O1 --project P1 --repo R1 --candidate CANDIDATE_ID --principal U1
+node bin/source.js integration promote --org O1 --project P1 --repo R1 --candidate CANDIDATE_ID --principal U1
+```
+
+API prefix: `/api/v1/orgs/{org}/projects/{project}/repositories/{repo}/integration/{candidateId}`.
+POST `/verification` requires `record_verification`; body contains `checkId`,
+`execution` and original `output`. Execution supplies the identity generated by
+`verificationIdentity`, exact commit/tree, command/environment/input/tool/external
+identities, status, durationMs and startedAt/finishedAt Unix milliseconds.
+POST `/evaluate` or `/status` requires `read_context`; `/accept` requires
+`accept_change`; `/promote` requires `promote_integration`. Scope is project-wide,
+not a single work item. Local CLI calls are trusted administrative operations.
+
+## Migration, rollback and limits
+
+Existing repositories stay in legacy mode until explicit configuration; this is
+not retroactive certification of legacy evidence. Earlier candidates must be
+replanned after enabling the policy. Default-branch changes are refused while
+protection is active. Artifacts-backed batch promotion is not enabled.
+
+For rollback, stop and drain writers, retain a backup of Git refs **and** Source
+records/artifacts, and restore a tested matching version/data snapshot. Do not
+remove landed refs to retry an operation, silently disable policy, or restore only
+the database after a successful Git update. Inspect status and reconcile before
+reopening writes. Backup/restore drills for this new protocol remain required.
+
+Tests: `node --test tests/verification.test.js tests/integration-broker.test.js`.
+They cover exact inputs/expiry/producer rejection, current policy changes,
+acceptance, protected HTTP and legacy bypass denial, two independent CLI promoters,
+and injected post-Git outcome failure. Actual process death, PostgreSQL failover,
+tag protection, isolated execution, operator UI and end-to-end real-project
+migration are still required by the active mission.

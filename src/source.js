@@ -31,6 +31,7 @@ import { nextId, nextIdAsync, randomHex } from './ids.js';
 import { normalizeEvalSummary, normalizeEvalManifest, normalizeEvalRun, readEvalArtifacts } from './integrations/kujo.js';
 import { scanSecrets } from './scan.js';
 import { IntegrationPlanner, digest } from './integration-planner.js';
+import { IntegrationBroker } from './integration-broker.js';
 import { JobQueue } from './job-queue.js';
 import { translateGitHubActions } from './integrations/github-actions.js';
 import { KeyedSemaphore, Semaphore } from './concurrency.js';
@@ -54,6 +55,7 @@ export class Source {
     this.store = store ?? new Store(dataRoot);
     this.capabilities = new CapabilityService(this.store);
     this.jobs = new JobQueue(this.store);
+    this.integration = new IntegrationBroker(this);
     this.canonicalLocks = new KeyedSemaphore({ capacity: 1, queue: 256, maxKeys: 100_000 });
     const requestedCanonicalConcurrency = Number(canonicalRepoConcurrency);
     this.canonicalRepoConcurrency = Number.isFinite(requestedCanonicalConcurrency)
@@ -369,6 +371,7 @@ export class Source {
       const repo = await this.getRepositoryAsync(orgId, projectId, repoId);
       if (!repo) throw new Error(`repository not found: ${repoId}`);
       if (name != null && !/^[A-Za-z0-9._-]{1,120}$/.test(String(name))) throw new Error('invalid repository name');
+      if (defaultBranch != null && repo.integrationPolicy) throw new Error('protected integration default branch requires an operator migration');
       if (defaultBranch != null && (repo.artifacts || artifactsBinding(new GitRepo(repo.barePath)))) throw new Error('bound Artifacts default branch is immutable');
       if (defaultBranch != null && !/^[A-Za-z0-9._/-]{1,200}$/.test(String(defaultBranch))) throw new Error('invalid default branch');
       const updated = { ...repo, ...(name == null ? {} : { name: String(name) }), ...(defaultBranch == null ? {} : { defaultBranch: String(defaultBranch) }) };
@@ -956,11 +959,11 @@ export class Source {
       }
       const planner = new IntegrationPlanner(repo.barePath);
       const baseCommit = await planner.git(['rev-parse', `refs/heads/${repo.defaultBranch}`]);
-      const report = await planner.assemble({ baseCommit, proposals, ...{
+      const report = await planner.assemble({ baseCommit, proposals, context: { orgId, projectId, repoId, branch: repo.defaultBranch, policyHash: digest({ project: policy, integration: repo.integrationPolicy || null }) }, ...{
         exclusivePaths: policy.integration?.exclusivePaths ?? ['migrations/', 'generated/'],
         dependencyGroups: policy.integration?.dependencyGroups ?? [],
       } });
-      const snapshot = { ...report, orgId, projectId, repoId, branch: repo.defaultBranch, policyHash: digest(policy) };
+      const snapshot = { ...report, orgId, projectId, repoId, branch: repo.defaultBranch, policyHash: digest({ project: policy, integration: repo.integrationPolicy || null }) };
       if (report.candidate) await this._asyncWrite(`${this._projectRel(orgId, projectId)}/integration/${repoId}/${report.candidate.id}.json`, snapshot);
       await this._asyncAudit({ event: 'integration.plan', orgId, projectId, repoId, candidateId: report.candidate?.id || null, accepted: report.candidate?.proposals.map((p) => p.id) || [], rejected: report.rejected, conflicts: report.conflicts });
       return snapshot;
@@ -1321,6 +1324,7 @@ export class Source {
     }
     if (targets.length === 0) throw new Error('no repository changes to update');
 
+    if (targets.some((t) => this.getRepository(orgId, projectId, t.repoId)?.integrationPolicy)) throw new Error('protected repository requires integration broker promotion');
     if (targets.some((t) => this.gitRepo(orgId, projectId, t.repoId).artifacts)) throw new Error('Artifacts repositories require asynchronous canonical promotion');
     const results = [];
     for (const t of targets) {
@@ -1481,6 +1485,7 @@ export class Source {
             const index = nextTarget++;
             if (index >= targets.length) return;
             const target = targets[index];
+            if ((await this.getRepositoryAsync(orgId, projectId, target.repoId))?.integrationPolicy) throw new Error('protected repository requires integration broker promotion');
             const git = this.gitRepo(orgId, projectId, target.repoId);
             if (!(await git.hasCommitAsync(target.headCommit))) {
               results[index] = { repoId: target.repoId, ok: false, reason: 'head commit not present in repository' };

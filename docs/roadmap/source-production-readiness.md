@@ -16,7 +16,13 @@ remains active. This ledger does not narrow the definition of done.
 
 ## Ordered remaining implementation
 
-1. Authoritative merge broker and protected local canonical branches/tags;
+1. Broker foundation implemented: exact-candidate service receipts, human
+   acceptance, Git target plus landed-ref transaction, repeat/lost-ack recovery,
+   HTTP and legacy-path protection and status/CLI. Seven broker fixtures include
+   independent promoters and a post-Git process exit. Clean regression: 282 tests,
+   275 pass, seven PostgreSQL skips, zero failures (41 files, 128.91 seconds). Still required: live
+   drained activation, tag protection and actual PostgreSQL/failover validation.
+   Extend the authoritative merge broker and protected local canonical branches/tags;
    explicit capabilities and acceptance, durable intents/outcomes, CAS, stale
    candidate rejection, lost-ack reconciliation and multi-process recovery.
    Prevent legacy canonical routes bypassing the broker. Retain Artifacts guards.
@@ -63,9 +69,9 @@ remains active. This ledger does not narrow the definition of done.
 ## Deliverables and gates
 
 Baseline report and partial integration architecture exist. Still required:
-`docs/architecture/verification-planner.md`, `evidence-bound-promotion.md`,
-`hosting-readiness.md`; `docs/validation/concurrency-results.md`,
-`failure-recovery.md`; benchmark scripts, configuration examples, operator and
+`docs/architecture/hosting-readiness.md`; `docs/validation/concurrency-results.md`;
+verification-planner, evidence-bound-promotion and failure-recovery now document
+implemented foundations and their remaining gates; benchmark scripts, configuration examples, operator and
 migration/rollback guidance, final limitation inventory and A–G mission report.
 
 Initial usable gate requires every invariant in attachment section 9, including

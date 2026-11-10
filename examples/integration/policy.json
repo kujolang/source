@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "securityPolicyVersion": "1",
+  "checks": [
+    {
+      "id": "combined-integration",
+      "version": "1",
+      "command": ["npm", "test"],
+      "toolVersions": { "node": "26.12.1", "npm": "replace-with-tested-version" },
+      "environment": "replace-with-immutable-worker-image-digest",
+      "inputs": { "lockfile": "replace-with-lockfile-sha256", "configuration": "replace-with-config-sha256" },
+      "externalState": { "serviceContract": "replace-with-contract-version-or-none" },
+      "deterministic": false,
+      "maxAgeMs": 900000,
+      "producers": ["replace-with-trusted-service-principal-id"]
+    }
+  ]
+}

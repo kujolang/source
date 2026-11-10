@@ -1123,6 +1123,24 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           return json(res, 200, selectFields(p, fields));
         }
 
+        const brokerRoute = rest.match(/^\/repositories\/([A-Za-z0-9_-]+)\/integration\/([a-f0-9]{64})\/(verification|evaluate|accept|promote|status)$/);
+        if (brokerRoute && req.method === 'POST') {
+          const operation = brokerRoute[3];
+          const action = { verification: ACTIONS.record_verification, status: ACTIONS.read_context, evaluate: ACTIONS.read_context, accept: ACTIONS.accept_change, promote: ACTIONS.promote_integration }[operation];
+          const authorization = await authorizeRequestAsync(src.capabilities, req, action, { org: orgId, project: projectId });
+          if (!authorization.ok) return json(res, authorization.status, { error: authorization.error });
+          const scope = { orgId, projectId, repoId: brokerRoute[1], candidateId: brokerRoute[2], principalId: authorization.cap.principalId };
+          const release = await gitSlots.acquire();
+          if (!release) return json(res, 503, { error: 'Git service busy; retry later' });
+          try {
+            if (operation === 'verification') {
+              const body = await readBody(req, maxJsonBodyBytes);
+              return json(res, 201, await src.integration.record({ ...scope, checkId: body.checkId, execution: body.execution, output: body.output }));
+            }
+            return json(res, 200, await src.integration[operation](scope));
+          } finally { release(); }
+        }
+
         const integrationRoute = rest.match(/^\/repositories\/([A-Za-z0-9_-]+)\/integration(?:\/([a-f0-9]{64}))?$/);
         if (integrationRoute && (req.method === 'GET' || req.method === 'POST')) {
           const g = await guard(src, req, req.method === 'POST' ? ACTIONS.plan_integration : ACTIONS.read_context, { org: orgId, project: projectId });

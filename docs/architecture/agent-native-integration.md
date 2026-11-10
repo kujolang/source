@@ -53,17 +53,17 @@ node bin/source.js integration show --org O1 --project P1 --repo R1 --candidate 
 ```
 
 These commands manage the local server store like the existing administration
-commands. Remote clients use the scoped HTTP interface. There is deliberately no
-integration promotion command until the exact-candidate broker is implemented.
+commands. Remote clients use the scoped HTTP interface. Opted-in repositories can now use the exact-candidate broker described in
+`evidence-bound-promotion.md`; legacy repositories do not gain protection implicitly.
 
 ## Scope still required
 
-Verification-failure splitting, protected local canonical refs, durable promotion
-receipts, policy-bound evidence and workflow execution remain subsequent
-increments. The optional integrationPolicy transport guard is plumbing for that
-next broker; this increment does not provision or enable it. Existing legacy
-promotion is not made safe by merely constructing a candidate. Reports are
-proposed state only, and the complete mission is not yet satisfied.
+The exact-candidate broker now provides explicit protection opt-in, service
+receipts, maintainer acceptance, transactional Git promotion and lost-outcome
+reconciliation. See `evidence-bound-promotion.md` for the offline configuration
+requirement and tested boundary. Verification-failure splitting, isolated worker
+execution, impact planning, real PostgreSQL integration recovery, operator UI and
+complete mission benchmarks remain outstanding. This is not production certification.
 
 ## Reproduce
 

@@ -326,6 +326,14 @@ export async function run(argv) {
       }
       case 'integration': {
         const scope = { orgId: flag('--org') || 'O1', projectId: flag('--project') || 'P1', repoId: flag('--repo') };
+        if (sub === 'configure') {
+          print(await src.integration.configure({ ...scope, principalId: flag('--principal') || 'U1', policy: JSON.parse(readFileSync(flag('--policy'), 'utf8')) }));
+          return;
+        }
+        if (['status', 'evaluate', 'accept', 'promote'].includes(sub)) {
+          print(await src.integration[sub]({ ...scope, candidateId: flag('--candidate'), principalId: flag('--principal') || 'U1' }));
+          return;
+        }
         if (sub === 'plan') {
           print(await src.planIntegrationAsync({ ...scope, changeIds: (flag('--changes') || '').split(',').filter(Boolean) }));
           return;
@@ -552,6 +560,8 @@ export async function run(argv) {
           '  org create|list|show [--name <n> --slug <s>]',
           '  org member add --org <o> --principal <id> [--role member|maintainer|admin]',
           '  project create|list|show --org <o> [--name --slug]',
+          '  integration configure --repo <r> --policy <file> --principal <maintainer> (offline operator setup)',
+          '  integration status|evaluate|accept|promote --repo <r> --candidate <id> --principal <maintainer>',
           '  integration plan --org <o> --project <p> --repo <r> --changes C1,C2',
           '  integration show --org <o> --project <p> --repo <r> --candidate <id>',
           '  canonical update --org <o> --project <p> --change <c>',

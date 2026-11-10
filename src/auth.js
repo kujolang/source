@@ -31,6 +31,8 @@ export const ACTIONS = {
   dispatch_workflow: 'dispatch_workflow',
   git_push: 'git_push',
   plan_integration: 'plan_integration',
+  record_verification: 'record_verification',
+  promote_integration: 'promote_integration',
 };
 
 // Extract a bearer credential from an Authorization header.

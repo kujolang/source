@@ -1,0 +1,187 @@
+// Source-owned control-plane service; callers at HTTP boundaries must authorize
+// capabilities and supply the authenticated principal, never a body producer ID.
+import { createHash } from 'node:crypto';
+import { IntegrationPlanner, digest } from './integration-planner.js';
+import { validateVerificationPolicy, createVerificationReceipt, evaluateVerification } from './verification.js';
+
+export class IntegrationBroker {
+  constructor(source) { this.source = source; }
+
+  scope(input) {
+    const { orgId, projectId, repoId, candidateId } = input;
+    if (![orgId, projectId, repoId].every((id) => typeof id === 'string' && /^[A-Za-z0-9_-]+$/.test(id))) throw new Error('invalid integration scope');
+    if (candidateId != null && !/^[a-f0-9]{64}$/.test(candidateId)) throw new Error('invalid candidate ID');
+    return `orgs/${orgId}/projects/${projectId}/integration/${repoId}`;
+  }
+
+  async read(rel) {
+    const store = this.source.store;
+    return store.readJsonAsync ? store.readJsonAsync(rel) : store.readJson(rel);
+  }
+
+  async human(orgId, principalId) {
+    const principal = await this.source.getPrincipalAsync(principalId);
+    const membership = await this.source.getOrgMembershipAsync(orgId, principalId);
+    if (principal?.type !== 'human' || !['admin', 'maintainer'].includes(membership?.role)) throw new Error('integration acceptance requires an organization maintainer');
+    return principal;
+  }
+
+  async configure({ orgId, projectId, repoId, principalId, policy }) {
+    this.scope({ orgId, projectId, repoId });
+    validateVerificationPolicy(policy);
+    await this.human(orgId, principalId);
+    return this.source._projectMutationAsync(orgId, projectId, async () => {
+      const repo = await this.source.getRepositoryAsync(orgId, projectId, repoId);
+      if (!repo || repo.artifacts) throw new Error('integration broker requires a local repository');
+      const planner = new IntegrationPlanner(repo.barePath);
+      await planner.git(['rev-parse', '--verify', `refs/heads/${repo.defaultBranch}`]);
+      repo.integrationPolicy = structuredClone(policy);
+      await this.source._asyncWrite(`orgs/${orgId}/projects/${projectId}/repos/${repoId}.json`, repo);
+      await this.source._asyncAudit({ event: 'integration.configure', orgId, projectId, repoId, principalId, policyHash: digest(policy) });
+      return repo;
+    });
+  }
+
+  async load(input, { currentPolicy = true } = {}) {
+    const root = this.scope(input);
+    const report = await this.source.getIntegrationAsync(input);
+    const repo = await this.source.getRepositoryAsync(input.orgId, input.projectId, input.repoId);
+    if (!report?.candidate || !repo?.integrationPolicy || repo.artifacts) throw new Error('configured integration candidate not found');
+    const { id, ...body } = report.candidate;
+    if (id !== input.candidateId || digest(body) !== id) throw new Error('candidate snapshot integrity mismatch');
+    const policy = await this.source.getPolicyAsync(input.orgId, input.projectId);
+    if (currentPolicy && report.policyHash !== digest({ project: policy, integration: repo.integrationPolicy })) throw new Error('candidate policy changed; replan and reverify');
+    if (currentPolicy) {
+      for (const proposal of report.candidate.proposals) {
+        const change = await this.source.getChangeAsync(input.orgId, input.projectId, proposal.id);
+        const revision = change?.repositoryChanges?.find((entry) => entry.repoId === input.repoId);
+        if (!revision || revision.headCommit !== proposal.headCommit || revision.baseCommit !== proposal.baseCommit || ['rejected', 'revision_requested'].includes(change.decisionState)) throw new Error('candidate proposal changed or is no longer eligible');
+      }
+    }
+    if (report.branch !== repo.defaultBranch) throw new Error('candidate target changed');
+    const planner = new IntegrationPlanner(repo.barePath);
+    if (await planner.git(['rev-parse', `refs/source/candidates/${id}`]) !== report.candidate.headCommit || await planner.git(['rev-parse', `${report.candidate.headCommit}^{tree}`]) !== report.candidate.tree) throw new Error('candidate Git identity mismatch');
+    return { root, report, repo, planner };
+  }
+
+  async record(input) {
+    const { orgId, projectId, principalId, checkId, execution, output } = input;
+    return this.source._projectMutationAsync(orgId, projectId, async () => {
+      const { root, report, repo } = await this.load(input);
+      const producer = await this.source.getPrincipalAsync(principalId);
+      // Validate producer and metadata before storing an untrusted artifact.
+      createVerificationReceipt({ candidate: report.candidate, policy: repo.integrationPolicy, checkId, producer, execution, artifactRef: { hash: '0'.repeat(64) } });
+      if (typeof output !== 'string' || !output.length) throw new Error('original execution output is required');
+      const receiptPath = `${root}/${input.candidateId}/receipts`;
+      const receiptIds = this.source.store.listJsonAsync ? await this.source.store.listJsonAsync(receiptPath, { limit: 1001 }) : this.source.store.listJson(receiptPath, { limit: 1001 });
+      const bytes = this.source._artifactBytes(output);
+      const store = this.source.store;
+      const artifactRef = { hash: createHash('sha256').update(bytes).digest('hex') };
+      const receipt = createVerificationReceipt({ candidate: report.candidate, policy: repo.integrationPolicy, checkId, producer, execution, artifactRef });
+      const receiptRel = `${root}/${input.candidateId}/receipts/${receipt.id}.json`;
+      const existing = await this.read(receiptRel);
+      if (existing) return existing;
+      if (receiptIds.length >= 1000) throw new Error('candidate receipt limit exceeded');
+      if (store.putArtifactAsync) await store.putArtifactAsync(bytes); else store.putArtifact(bytes);
+      await this.source._asyncWrite(receiptRel, receipt);
+      await this.source._asyncAudit({ event: 'integration.verification', orgId, projectId, repoId: input.repoId, candidateId: input.candidateId, receiptId: receipt.id, status: execution.status, principalId });
+      return receipt;
+    });
+  }
+
+  async evaluate(input) {
+    const { root, report, repo } = await this.load(input);
+    const store = this.source.store;
+    const rel = `${root}/${input.candidateId}/receipts`;
+    const ids = store.listJsonAsync ? await store.listJsonAsync(rel, { limit: 1001 }) : store.listJson(rel, { limit: 1001 });
+    if (ids.length > 1000) throw new Error('candidate receipt limit exceeded');
+    const receipts = await Promise.all(ids.map((id) => this.read(`${rel}/${id}.json`)));
+    for (const receipt of receipts) {
+      const bytes = store.getArtifactAsync ? await store.getArtifactAsync(receipt.artifactRef.hash) : store.getArtifact(receipt.artifactRef.hash);
+      if (!bytes) throw new Error('verification artifact missing');
+      // The store verifies content addresses on read; evaluation also checks bytes.
+      if (createHash('sha256').update(bytes).digest('hex') !== receipt.artifactRef.hash) throw new Error('verification artifact integrity mismatch');
+    }
+    return evaluateVerification({ candidate: report.candidate, policy: repo.integrationPolicy, receipts });
+  }
+
+  async status(input) {
+    const { root, report } = await this.load(input, { currentPolicy: false });
+    const acceptance = await this.read(`${root}/${input.candidateId}/acceptance.json`);
+    const intent = await this.read(`${root}/${input.candidateId}/intent.json`);
+    const outcome = await this.read(`${root}/${input.candidateId}/outcome.json`);
+    let evaluation;
+    try { evaluation = await this.evaluate(input); }
+    catch (error) { evaluation = { ok: false, reason: error.message }; }
+    const accepted = acceptance && evaluation.ok && digest(acceptance.receipts) === digest(evaluation.checks.map((check) => check.receiptId));
+    return { candidate: report.candidate, state: outcome?.state === 'landed' ? 'landed' : accepted ? 'accepted' : evaluation.ok ? 'verified' : 'proposed', evaluation, acceptance, intent, outcome, reconciliationRequired: Boolean(intent && !outcome) };
+  }
+
+  async accept(input) {
+    await this.human(input.orgId, input.principalId);
+    return this.source._projectMutationAsync(input.orgId, input.projectId, async () => {
+      const { root, report } = await this.load(input);
+      const evaluation = await this.evaluate(input);
+      if (!evaluation.ok) throw new Error('candidate verification requirements not satisfied');
+      const acceptance = { candidateId: input.candidateId, headCommit: report.candidate.headCommit, policyHash: report.policyHash, principalId: input.principalId, receipts: evaluation.checks.map((check) => check.receiptId), acceptedAt: Date.now() };
+      const existing = await this.read(`${root}/${input.candidateId}/acceptance.json`);
+      if (existing && existing.policyHash === acceptance.policyHash && digest(existing.receipts) === digest(acceptance.receipts)) return existing;
+      await this.source._asyncWrite(`${root}/${input.candidateId}/acceptance.json`, acceptance);
+      await this.source._asyncAudit({ event: 'integration.accept', orgId: input.orgId, projectId: input.projectId, repoId: input.repoId, candidateId: input.candidateId, principalId: input.principalId, receipts: acceptance.receipts });
+      return acceptance;
+    });
+  }
+
+  async promote(input) {
+    const { orgId, projectId, candidateId } = input;
+    await this.human(orgId, input.principalId);
+    // Commit the intent before touching Git. The second transaction may roll back
+    // after Git commits; the atomic landed ref remains the reconciliation record.
+    const prepared = await this.source._projectMutationAsync(orgId, projectId, async () => {
+      const { root, report, planner } = await this.load(input, { currentPolicy: false });
+      const landedRef = `refs/source/landed/${candidateId}`;
+      let landed = '';
+      try { landed = await planner.git(['rev-parse', '--verify', landedRef]); } catch { /* not landed */ }
+      if (landed) {
+        if (landed !== report.candidate.headCommit) throw new Error('landed receipt integrity mismatch');
+        const outcome = { state: 'landed', candidateId, headCommit: landed, recovered: true };
+        await this.source._asyncWrite(`${root}/${candidateId}/outcome.json`, outcome);
+        await this.source._asyncAudit({ event: 'integration.recover', orgId, projectId, repoId: input.repoId, ...outcome });
+        return outcome;
+      }
+      await this.load(input);
+      const acceptance = await this.read(`${root}/${candidateId}/acceptance.json`);
+      const evaluation = await this.evaluate(input);
+      if (!acceptance || !evaluation.ok || acceptance.policyHash !== report.policyHash || digest(acceptance.receipts) !== digest(evaluation.checks.map((check) => check.receiptId))) throw new Error('current exact-candidate evidence and acceptance required');
+      const intent = { state: 'promoting', candidateId, expected: report.candidate.baseCommit, headCommit: report.candidate.headCommit, branch: report.branch, acceptanceHash: digest(acceptance) };
+      await this.source._asyncWrite(`${root}/${candidateId}/intent.json`, intent);
+      await this.source._asyncAudit({ event: 'integration.intent', orgId, projectId, repoId: input.repoId, ...intent });
+      return intent;
+    });
+    if (prepared.state === 'landed') return prepared;
+    return this.source._projectMutationAsync(orgId, projectId, async () => {
+      await this.human(orgId, input.principalId);
+      const { root, report, planner } = await this.load(input);
+      const acceptance = await this.read(`${root}/${candidateId}/acceptance.json`);
+      const evaluation = await this.evaluate(input);
+      if (!acceptance || digest(acceptance) !== prepared.acceptanceHash || !evaluation.ok || digest(acceptance.receipts) !== digest(evaluation.checks.map((check) => check.receiptId))) throw new Error('promotion authorization changed');
+      const landedRef = `refs/source/landed/${candidateId}`;
+      try {
+        await planner.git(['update-ref', '--stdin'], {}, `start\nupdate refs/heads/${report.branch} ${prepared.headCommit} ${prepared.expected}\ncreate ${landedRef} ${prepared.headCommit}\nprepare\ncommit\n`);
+      } catch (error) {
+        let landed = '';
+        try { landed = await planner.git(['rev-parse', '--verify', landedRef]); } catch { /* no outcome */ }
+        if (landed !== prepared.headCommit) {
+          await this.source._asyncAudit({ event: 'integration.reject', orgId, projectId, repoId: input.repoId, candidateId, reason: 'stale branch or Git transaction failure' });
+          const outcome = { state: 'rejected', candidateId, reason: 'stale branch or Git transaction failure; replan before retry' };
+          await this.source._asyncWrite(`${root}/${candidateId}/outcome.json`, outcome);
+          return outcome;
+        }
+      }
+      const outcome = { state: 'landed', candidateId, headCommit: prepared.headCommit, recovered: false };
+      await this.source._asyncWrite(`${root}/${candidateId}/outcome.json`, outcome);
+      await this.source._asyncAudit({ event: 'integration.land', orgId, projectId, repoId: input.repoId, ...outcome });
+      return outcome;
+    });
+  }
+}
