@@ -317,3 +317,38 @@ Profile regression: three tests passed with no skips in 31.11 s
 end-to-end fixtures. An initial profile implementation shadowed the global fetch
 function with a later timing array; corrected to globalThis.fetch before the
 passing run. Product server code/defaults were not changed by this increment.
+
+### Independent-head ancestry optimization: 100-agent reruns
+
+Revision `d488cca` passed both unchanged private-load workloads. Raw reports:
+[one repository](benchmarks/agents-100-repos-1-ancestry.json) and
+[ten repositories](benchmarks/agents-100-repos-10-ancestry.json). Their harness
+SHA-256 matches the preceding private-load runs. Only impossible ancestry
+comparisons are pruned; real merges and exact-candidate gates remain enforced.
+
+| Measurement | 100 agents / 1 repo | 100 agents / 10 repos |
+|---|---:|---:|
+| Assembly before | 324.555 s | 52.876 s |
+| Assembly after | 24.784 s | 24.634 s |
+| Submission | 47.965 s | 40.618 s |
+| Verification phase | 5.140 s | 6.502 s |
+| Source checker execution | 4.013 s | 6.584 s |
+| Baseline checks | 192.217 s | 39.992 s |
+| Baseline merges | 12.140 s | 10.413 s |
+| Entire harness including both workflows | 306.322 s | 164.340 s |
+
+All proposals remained in landed ancestry; unverified acceptance was rejected,
+promotion was idempotent, and final trees matched the sequential baseline.
+One / ten jobs completed once with zero failed or abandoned jobs, 99 / 90
+checks avoided, and all coalescing/reuse probes passed. Anonymous reads returned
+401; no request returned 429. This is the explicitly configured private profile,
+not default server capacity.
+
+Assembly declined about 92% hot and 53% distributed in these individual runs.
+Source assembly plus verification phase measured 29.924 / 31.135 seconds versus
+baseline merges plus checks of 204.358 / 50.405 seconds. These are component
+comparisons with a fixed Git-content checker, not an end-to-end application CI
+speedup. Dependent ancestry chains may still require quadratic comparisons.
+Repeated sustained runs, 250/1000-agent stages, recovery under load, and complete
+host resource accounting remain unproven. The harness elapsed time includes both
+workflows and cleanup and must not be presented as Source application latency.
