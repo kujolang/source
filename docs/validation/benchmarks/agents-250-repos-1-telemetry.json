@@ -1,0 +1,1491 @@
+{
+  "version": 2,
+  "status": "failed",
+  "phase": "submission",
+  "httpStatuses": {
+    "200": 2244,
+    "201": 3,
+    "401": 1
+  },
+  "date": "2026-11-10T23:06:44.393Z",
+  "agents": 250,
+  "repositories": 1,
+  "concurrency": {
+    "agentProcesses": 250,
+    "workerProcesses": 2,
+    "workerConcurrency": 2
+  },
+  "host": {
+    "platform": "darwin",
+    "arch": "x64",
+    "node": "v26.12.1",
+    "cpuCount": 12,
+    "memoryBytes": 17179869184,
+    "git": "git version 2.42.0"
+  },
+  "fixture": "compatible independent files; fixed host Git-content checker; no repository code execution",
+  "profile": "private-load",
+  "rateLimits": "explicit private-load operator profile; not default capacity",
+  "admissionConfiguration": {
+    "gitPush": {
+      "limit": 1000,
+      "windowMs": 60000
+    },
+    "submit": {
+      "limit": 1000,
+      "windowMs": 60000
+    }
+  },
+  "maxIntegrationProposals": 250,
+  "stages": {},
+  "raw": {
+    "completedClients": [
+      {
+        "index": 87,
+        "repoIndex": 0,
+        "changeId": "C2",
+        "workId": "W2",
+        "sessionId": "S2",
+        "evidenceId": "E2",
+        "baseCommit": "f2e93a5b41d9953e4a0038761b3fca017cc46703",
+        "headCommit": "14f74b574a3364afc988654c06c91a137c2275b5",
+        "cloneMs": 5197.988089,
+        "submitMs": 70236.035162,
+        "totalMs": 75912.341522
+      },
+      {
+        "index": 125,
+        "repoIndex": 0,
+        "changeId": "C1",
+        "workId": "W1",
+        "sessionId": "S1",
+        "evidenceId": "E1",
+        "baseCommit": "f2e93a5b41d9953e4a0038761b3fca017cc46703",
+        "headCommit": "53c7f3e265c29ad5778951991996e4c51646e2da",
+        "cloneMs": 5002.244194,
+        "submitMs": 69346.09837899999,
+        "totalMs": 74846.031782
+      },
+      {
+        "index": 207,
+        "repoIndex": 0,
+        "changeId": "C3",
+        "workId": "W6",
+        "sessionId": "S3",
+        "evidenceId": "E3",
+        "baseCommit": "f2e93a5b41d9953e4a0038761b3fca017cc46703",
+        "headCommit": "7a0db410436069dbb3e0d86135dc37c639f10f3d",
+        "cloneMs": 5745.187086,
+        "submitMs": 71040.050661,
+        "totalMs": 77270.508902
+      }
+    ]
+  },
+  "limitations": [
+    "loopback single host; no deployed TLS latency",
+    "fixed Git-content verification, not application CI or isolated staging",
+    "no induced worker crash in this measurement",
+    "maximum 1000 agents per harness run; operator batch bound recorded explicitly",
+    "private repositories; explicit 1000/min push and submit limits per shared address; server queue/concurrency defaults unchanged"
+  ],
+  "sourceRevision": "3a8f21efbaf26eb7b1e7f46251d66d13d2745e9d",
+  "harnessSha256": "e0a44e124d7a0c63778b300d027ff05ce018802c61acc8a87305021cfb391f36",
+  "telemetrySha256": "b5a9d79c6f1115019853efe5d8fab50a7d4a0abb5cb6a2833546c674815f1397",
+  "httpTimeouts": {
+    "headersMs": 15000,
+    "requestMs": 120000,
+    "keepAliveMs": 5000
+  },
+  "anonymousGitRejected": true,
+  "error": "Source submit transport failed; outcome unknown; inspect before retrying",
+  "failureDiagnostic": {
+    "operation": "submit",
+    "kind": "transport",
+    "code": "ECONNRESET",
+    "timedOut": false,
+    "responseReceived": false,
+    "outcomeUnknown": true
+  },
+  "telemetry": {
+    "scope": "API/harness process per stage; host free bytes include all activity, not memory available or attributable usage; sampled RSS can miss peaks",
+    "sampleIntervalMs": 1000,
+    "eventLoopResolutionMs": 20,
+    "stages": [
+      {
+        "phase": "setup",
+        "wallMs": 15735.931952,
+        "parentCpuMicros": {
+          "user": 1212983,
+          "system": 1065077
+        },
+        "parentEventLoop": {
+          "idle": 8114.7449320000005,
+          "active": 7621.190795998614,
+          "utilization": 0.48431761083253483
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 495,
+          "p50": 20.791295,
+          "p95": 59.408383,
+          "p99": 132.644863,
+          "max": 611.844095
+        },
+        "samples": 15,
+        "parentSampledPeakRssBytes": 106823680,
+        "hostMinimumFreeBytes": 26329088
+      },
+      {
+        "phase": "submission",
+        "wallMs": 77825.116553,
+        "parentCpuMicros": {
+          "user": 9540939,
+          "system": 5993987
+        },
+        "parentEventLoop": {
+          "idle": 9634.102134,
+          "active": 68191.07229198937,
+          "utilization": 0.8762084093603685
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 1693,
+          "p50": 26.673151,
+          "p95": 145.358847,
+          "p99": 246.022143,
+          "max": 670.564351
+        },
+        "samples": 76,
+        "parentSampledPeakRssBytes": 158162944,
+        "hostMinimumFreeBytes": 19271680
+      },
+      {
+        "phase": "cleanup",
+        "wallMs": 3365.383296999993,
+        "parentCpuMicros": {
+          "user": 1091470,
+          "system": 6293912
+        },
+        "parentEventLoop": {
+          "idle": 960.622747999998,
+          "active": 2404.774314003618,
+          "utilization": 0.7145588677051725
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 113,
+          "p50": 20.021247,
+          "p95": 22.888447,
+          "p99": 53.739519,
+          "max": 69.861375
+        },
+        "samples": 5,
+        "parentSampledPeakRssBytes": 169377792,
+        "hostMinimumFreeBytes": 915197952
+      }
+    ]
+  },
+  "childResources": [
+    {
+      "role": "worker",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "worker",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": {
+        "cpuMicros": {
+          "user": 268010,
+          "system": 80830
+        },
+        "peakRssBytes": 55263232,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": {
+        "cpuMicros": {
+          "user": 256237,
+          "system": 77551
+        },
+        "peakRssBytes": 55472128,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 264457,
+          "system": 87377
+        },
+        "peakRssBytes": 54493184,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 261425,
+          "system": 85479
+        },
+        "peakRssBytes": 54657024,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 257014,
+          "system": 77168
+        },
+        "peakRssBytes": 54804480,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    }
+  ],
+  "gitBackendOutcomes": {
+    "exit_0": 2244
+  },
+  "elapsedMs": 96932,
+  "parentCpuMicros": {
+    "user": 11847679,
+    "system": 13353899
+  },
+  "parentPeakRssBytes": 170016768
+}

@@ -541,3 +541,22 @@ end-to-end speedup claim. Earlier timeout failures remain part of the evidence.
 One passing distributed private run does not demonstrate sustained reliability,
 default-profile capacity, a passing 250-agent hot repository, or 1000-agent support.
 No server timeout, authentication or verification policy was loosened for this run.
+
+### 250-agent hot-repository telemetry failure
+
+The [250-agent / one-repository report](benchmarks/agents-250-repos-1-telemetry.json)
+at `3a8f21e` failed during submission after 96.932 seconds including cleanup.
+The client reported `ECONNRESET`, no response received, and an unknown submission
+outcome; it did not replay the mutation. HTTP counters recorded three successful
+submissions, 2244 successful Git responses and the expected anonymous 401. All
+2244 recorded Git backend exits were zero. No assembly, verification, promotion
+or baseline result is claimed for this run.
+
+During the 77.825-second submission telemetry phase, parent event-loop utilization
+was 0.876; delay p50/p95/p99/max was 26.673/145.359/246.022/670.564 ms. Sampled
+parent peak RSS was 158,162,944 bytes and host free memory reached 19,271,680 bytes.
+These parent-only observations do not identify the reset's cause or measure
+client scheduling delays, Git descendants or available memory. Only five of 252
+child resource reports were available after cleanup. A passing distributed run
+does not establish hot-repository reliability; this failure remains an open
+load milestone. Limits, timeouts and authentication were unchanged.
