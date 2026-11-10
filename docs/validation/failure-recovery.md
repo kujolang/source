@@ -519,7 +519,7 @@ historical; this increment does not claim a repeated full suite.
 
 ### Submission transport deadlines and failure observability
 
-The250-agent investigation distinguishes runtime HTTP connection timeout from
+The 250-agent investigation distinguishes runtime HTTP connection timeout from
 Git subprocess failure. Safe diagnostics now retain numeric curl codes and
 allowlisted HTTP cause codes; server metrics count bounded Git backend outcomes.
 A failed/unknown submission is never automatically replayed. A real truncated

@@ -253,7 +253,7 @@ profile differences are in validation/concurrency-results.md. No default-capacit
 claim is made. Source reduces checker count but all-pairs Git ancestry discovery
 makes assembly expensive enough to outweigh measured verification savings. Next:
 optimize that graph operation without altering candidate semantics, then repeat
-measurements.250/1000 and all other unresolved gates remain open.
+measurements. 250/1000 and all other unresolved gates remain open.
 
 ## Stress-stage checkpoint — 2026-11-10
 
@@ -286,3 +286,16 @@ policy was relaxed. Raw failures and evidence limitations are in concurrency-res
 Next work remains measurement and transport/admission reliability at250, including
 per-stage resource/event-loop data and timeout policy evaluation, then1000 and the
 separate sustained/recovery, isolation, real-repository and production gates.
+
+## Distributed stress evidence — 2026-11-10
+
+At `b94afc3`, 250 real agent processes across ten repositories pass the complete
+private-load lifecycle, including baseline tree equality, all proposal ancestry,
+exact verification, acceptance/promotion, idempotency and cleanup. Submission
+104.540 s; assembly 62.785 s; verification phase 9.369 s; 10 completed jobs versus 250
+baseline checks. Per-stage parent event-loop/CPU/sampled-memory telemetry and all 252
+Node child resource reports are retained. No timeout/auth/verification limit was
+relaxed. This supersedes the blanket status that no 250-agent run has passed;
+it does not invalidate prior intermittent failures. 250 hot, repeated/sustained
+load, 1000 agents, recovery and complete host-resource accounting remain open,
+alongside the independent real-project/isolation/production gates.

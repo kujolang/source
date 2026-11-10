@@ -452,10 +452,92 @@ The earlier backend/curl diagnostic regression passed 24 tests; an additional
 real truncated Git HTTP exchange proves numeric curl 18 capture without raw
 stderr. Lint checks 110 JavaScript files. Large-load success remains unproven.
 
-Post-change live PostgreSQL lifecycle fixtures pass 3/3 with zero skips in32.29 s
+Post-change live PostgreSQL lifecycle fixtures pass 3/3 with zero skips in 32.29 s
 (`/tmp/source-http-transport-live.log`). Both default/public and authenticated
 private flows reach exact verification, acceptance, promotion and baseline tree
 equality. The six direct HTTP transport tests also pass, including real HTTPS:
 an untrusted self-signed certificate rejects before any HTTP request reaches the
 server; a child configured with that test CA completes the authenticated exchange.
 No certificate-verification bypass is enabled by the client.
+
+### Per-phase telemetry (report version 2)
+
+Revision `b94afc3` adds a 20 ms event-loop delay histogram and 1 s memory samples
+in the API/harness process, separated into setup, submission, assembly,
+verification, promotion, baseline and cleanup phases. Failed runs retain the
+failed phase and cleanup measurements. Each phase reports CPU microseconds,
+event-loop utilization and p50/p95/p99/max delay, sampled parent RSS peak, and
+minimum observed host free bytes. Host free memory is not available memory or
+memory attributable to Source; sampling may miss peaks.
+
+Agent/worker processes report lifetime CPU and peak RSS at normal result, error
+or stopped messages. A child killed before reporting has an explicit null resource
+record. Summing these per-process peaks does not give simultaneous peak memory.
+These fields exclude Git descendants, PostgreSQL and other host processes and
+therefore do not constitute complete host accounting. No raw environment,
+arguments or credentials are recorded. Reports include the telemetry helper hash,
+source revision and actual HTTP timeout settings.
+
+A real event-loop stall regression passes; both default/private PostgreSQL
+lifecycle fixtures pass with complete phase/resource records (3 tests, zero skips,
+30.23 s). Lint checks 112 JavaScript files. Instrumentation adds measurement
+overhead; it does not change admission, authorization, verification or timeout
+policy, and is not itself a fix for the intermittent load failures.
+
+### First passing 250-agent distributed run
+
+The [250-agent / ten-repository private-load report](benchmarks/agents-250-repos-10-telemetry.json)
+at `b94afc3` passes every lifecycle assertion. All 250 proposals remain in landed
+ancestry; exact verification gates acceptance; unverified acceptance is rejected;
+repeat promotion is idempotent; baseline and Source final trees match. Ten jobs
+completed once with zero failed/abandoned jobs, all ten coalescing and exact reuse
+probes pass, and 240 checker executions are avoided. All 252 Node child resource
+reports are present. HTTP outcomes: 2284 successful Git responses, 250 submissions,
+and the expected anonymous 401; all 2284 recorded Git backend exits were zero.
+
+| Measurement | 250 agents / 10 repositories |
+|---|---:|
+| Submission including clone/edit/submit | 104.540 s |
+| Submission proposals/second | 2.391 |
+| Assembly total | 62.785 s |
+| Verification phase elapsed | 9.369 s |
+| Source checks / baseline checks | 10 / 250 |
+| Source checker execution total | 14.821 s |
+| Baseline checker execution total | 169.222 s |
+| Baseline sequential merge total | 26.400 s |
+| Promotion calls total | 4.434 s |
+| Final HTTP fetch total | 4.522 s |
+| HTTP received / sent bytes | 1,284,309 / 1,960,804 |
+| Filesystem / PostgreSQL bytes | 58,818,560 / 7,847,936 |
+| Entire harness including both workflows and cleanup | 434.642 s |
+
+Nearest-rank latency milliseconds, p50 / p95 / p99:
+
+| Stage | Observed quantiles |
+|---|---|
+| Clone (250 samples) | 18,768 / 31,347 / 32,826 |
+| Submit after commit (250) | 69,471 / 76,056 / 78,756 |
+| Assembly (10) | 6,253 / 6,649 / 6,649 |
+| Queue (10) | 3,750 / 4,954 / 4,954 |
+| Checker execution (10) | 1,420 / 1,730 / 1,730 |
+
+Submission-phase parent event-loop utilization measured 0.906, with delay
+p50/p95/p99/max 28.131/99.287/447.480/881.852 ms. Parent CPU consumed 13.501 s user
+and 8.129 s system during that 104.552 s telemetry phase. Event-loop utilization is
+not CPU utilization; these observations do not establish why earlier runs timed
+out. Sampled parent peak RSS was 189,820,928 bytes. Host free bytes reached a
+sampled minimum 19,468,288 during submission and recovered above 4.8 billion during
+assembly, but this is neither attributable nor available-memory accounting.
+
+Agent lifetime peak RSS p50/p95/p99 was 54,628,352/55,492,608/55,820,288 bytes;
+agent CPU totals 67.630 s user and 21.984 s system. The sum of per-process lifetime
+RSS peaks is not a simultaneous physical-memory peak and can count shared pages
+multiple times. Git/PG resource usage and recovery under load remain unmeasured.
+
+Assembly plus verification-phase components total 72.154 s, versus baseline
+merges plus checks 195.623 s. They exclude different submission/review/promotion
+work and use the fixed Git-content checker, so this is not an application CI or
+end-to-end speedup claim. Earlier timeout failures remain part of the evidence.
+One passing distributed private run does not demonstrate sustained reliability,
+default-profile capacity, a passing 250-agent hot repository, or 1000-agent support.
+No server timeout, authentication or verification policy was loosened for this run.
