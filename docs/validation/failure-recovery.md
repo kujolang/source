@@ -438,3 +438,37 @@ OCI executor smoke. A compatible runtime is still required for the Workcell gate
 Workcell/export/control-adapter focused regression: 20/20 pass, no skips, 6.99 s
 (`/tmp/source-workcell-tmp-tests.log`); syntax lint107 and diff checks pass.
 No new full-suite or successful Workcell execution claim is made.
+
+## Live semantic failures and ten-way conflicts — 2026-11-10
+
+`tests/integration-semantic-live.test.js` uses independent Git clones and real OCI
+execution through CandidateContainerExecutor, then records the actual outputs in
+Source's broker. Two components change different files but share a capacity limit.
+All component unit checks pass. In the interaction case, each proposal also passes
+integration alone, while the merged candidate fails integration. In the faulty-
+proposal case, fresh split checks identify the failing proposal. Both cases deny
+acceptance of the combined candidate and reject a genuine passing singleton
+execution submitted under the combined candidate's identity.
+
+Split candidates require new evidence even when their tree matches a previously
+verified singleton. When both split children pass, both may be accepted against
+the original base, but only the first can land: the second is rejected after the
+target advances. Thus a semantic interaction cannot be bypassed by independently
+promoting both green halves. The final canonical content retains the safe half.
+This fixture distinguishes an interaction from a single faulty change; splitting
+is diagnostic, not a promise that every failure has one culpable proposal.
+
+Two live scenarios pass, zero skips, 29.69 s (`/tmp/source-semantic-live.log`), with
+Docker and the pinned Node v26.13.0 image from container/candidate-smoke.json.
+Run explicitly using SOURCE_TEST_CONTAINER_IMAGE and
+SOURCE_TEST_CONTAINER_NODE_VERSION; without them this live suite is skipped.
+No untrusted candidate code executes on the host. The local JSON control store is
+used serially; existing PostgreSQL multi-process queue tests cover that separate
+boundary, not these application checks.
+
+A further real-Git test starts ten concurrent incompatible edits to one file.
+The planner deterministically retains one proposal, reports all nine excluded
+conflicts with file diagnostics, preserves the selected contents and leaves main
+unchanged. The first assertion used the wrong report field (`proposal` rather
+than `id`); corrected before the passing run. Planner/broker/verification related
+regression: 22/22 pass, zero skips, 48.17 s (`/tmp/source-semantic-related.log`).

@@ -161,3 +161,18 @@ test('failed-batch diagnostics split independently and retain dependency closure
   assert.equal(split.children.every((child) => child.candidate.context.splitParent === independent.candidate.id), true);
   assert.equal((await planner.split(split.children[0].candidate)).children.length, 0);
 });
+
+test('ten concurrent incompatible edits retain one proposal and report every excluded conflict deterministically', async (t) => {
+  const { base, bare, planner, proposal } = await fixture(t);
+  const proposals = await Promise.all(Array.from({ length: 10 }, (_, i) => proposal(`conflict-${i}`, (cwd) => writeFile(path.join(cwd, 'shared.txt'), `incompatible owner ${i}\n`))));
+  const report = await planner.assemble({ baseCommit: base, proposals });
+  assert.deepEqual(await planner.assemble({ baseCommit: base, proposals: [...proposals].reverse() }), report);
+  assert.equal(report.candidate.proposals.length, 1);
+  assert.equal(report.conflicts.length, 9);
+  const accepted = report.candidate.proposals[0].id;
+  assert.deepEqual(report.conflicts.map(item => item.id).sort(), proposals.filter(item => item.id !== accepted).map(item => item.id).sort());
+  for (const conflict of report.conflicts) assert.match(JSON.stringify(conflict), /shared\.txt/);
+  const winner = proposals.find(item => item.id === accepted);
+  assert.equal(await git(bare, 'show', `${report.candidate.headCommit}:shared.txt`), await git(bare, 'show', `${winner.headCommit}:shared.txt`));
+  assert.equal(await git(bare, 'rev-parse', 'main'), base);
+});

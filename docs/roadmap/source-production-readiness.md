@@ -229,3 +229,15 @@ the Docker policy gate but refuses execution because this daemon lacks AppArmor.
 A compatible approved runtime remains necessary; the requirement was not relaxed.
 See validation/container/workcell-smoke-blocked.json and the reproducible
 scripts/workcell-candidate-smoke.js command.
+
+## Semantic adversarial validation increment — 2026-11-10
+
+Live OCI checks now demonstrate unit-pass/integration-fail for clean Git merges
+that touch different files sharing a semantic constraint. Split verification
+identifies either a single faulty proposal or a pairwise interaction, requires
+fresh exact-candidate evidence, and cannot bypass combined failure by landing
+both individually green children against a stale base. Ten concurrent conflicting
+same-file proposals are also accounted for deterministically. Reproduction and
+limitations are in failure-recovery.md and integration-semantic-live.test.js.
+These close those specific adversarial fixtures; they do not replace remaining
+staging, orphan recovery, real-project, scale or production validation gates.
