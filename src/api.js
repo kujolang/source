@@ -1123,10 +1123,10 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           return json(res, 200, selectFields(p, fields));
         }
 
-        const brokerRoute = rest.match(/^\/repositories\/([A-Za-z0-9_-]+)\/integration\/([a-f0-9]{64})\/(verification|evaluate|accept|promote|status)$/);
+        const brokerRoute = rest.match(/^\/repositories\/([A-Za-z0-9_-]+)\/integration\/([a-f0-9]{64})\/(verification|evaluate|accept|promote|status|split)$/);
         if (brokerRoute && req.method === 'POST') {
           const operation = brokerRoute[3];
-          const action = { verification: ACTIONS.record_verification, status: ACTIONS.read_context, evaluate: ACTIONS.read_context, accept: ACTIONS.accept_change, promote: ACTIONS.promote_integration }[operation];
+          const action = { verification: ACTIONS.record_verification, split: ACTIONS.plan_integration, status: ACTIONS.read_context, evaluate: ACTIONS.read_context, accept: ACTIONS.accept_change, promote: ACTIONS.promote_integration }[operation];
           const authorization = await authorizeRequestAsync(src.capabilities, req, action, { org: orgId, project: projectId });
           if (!authorization.ok) return json(res, authorization.status, { error: authorization.error });
           const scope = { orgId, projectId, repoId: brokerRoute[1], candidateId: brokerRoute[2], principalId: authorization.cap.principalId };

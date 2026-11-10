@@ -113,3 +113,22 @@ test('different migration files remain exclusive and failed dependencies cannot 
   assert.equal(blocked.candidate.proposals.length, 1);
   assert.equal(blocked.rejected[0].id, 'child');
 });
+
+test('failed-batch diagnostics split independently and retain dependency closure', async (t) => {
+  const { base, planner, proposal } = await fixture(t);
+  const a = await proposal('a', (cwd) => writeFile(path.join(cwd, 'a'), 'a'));
+  const b = await proposal('b', (cwd) => writeFile(path.join(cwd, 'b'), 'b'));
+  const c = await proposal('c', (cwd) => writeFile(path.join(cwd, 'c'), 'c'), a.headCommit);
+  const assembled = await planner.assemble({ baseCommit: base, proposals: [a, b, c] });
+  const first = await planner.split(assembled.candidate);
+  assert.deepEqual(first, await planner.split(assembled.candidate));
+  assert.equal(first.children.length, 1);
+  assert.match(first.blocked[0].reason, /full failed batch/);
+  assert.equal(first.children[0].candidate.proposals[0].id, 'a');
+  assert.notEqual(first.children[0].candidate.id, assembled.candidate.id);
+  const independent = await planner.assemble({ baseCommit: base, proposals: [a, b] });
+  const split = await planner.split(independent.candidate);
+  assert.deepEqual(split.children.map((child) => child.candidate.proposals.map((p) => p.id)), [['a'], ['b']]);
+  assert.equal(split.children.every((child) => child.candidate.context.splitParent === independent.candidate.id), true);
+  assert.equal((await planner.split(split.children[0].candidate)).children.length, 0);
+});

@@ -159,3 +159,39 @@ test('a promoter process exits after Git commit and a fresh process reconciles t
   assert.equal(JSON.parse(result.stdout).recovered, true);
   assert.equal(f.src.gitRepo(f.org.id, f.project.id, f.repo.id).revParse('main'), item.report.candidate.headCommit);
 });
+
+test('failed integration checks split a batch without transferring evidence or acceptance', async (t) => {
+  const f = await setup(t); const a = await f.propose('split-a'); const b = await f.propose('split-b');
+  const report = await f.src.planIntegrationAsync({ ...f.scope, changeIds: [a.change.id, b.change.id] });
+  const item = { report, input: { ...f.scope, candidateId: report.candidate.id } };
+  await assert.rejects(() => f.src.integration.split(item.input), /recorded failed/);
+  await f.verify(item, 'fail');
+  await assert.rejects(() => f.src.integration.accept(item.input), /not satisfied/);
+  const split = await f.src.integration.split(item.input);
+  assert.equal(split.children.length, 2);
+  for (const child of split.children) {
+    const input = { ...f.scope, candidateId: child.candidate.id };
+    assert.equal((await f.src.integration.status(input)).state, 'proposed');
+    assert.equal((await f.src.integration.evaluate(input)).ok, false);
+    await assert.rejects(() => f.src.integration.accept(input), /not satisfied/);
+  }
+  assert.equal(f.src.gitRepo(f.org.id, f.project.id, f.repo.id).revParse('main'), f.baseCommit);
+});
+
+test('tool gate parses original artifacts; context-only checks and contradictory green claims are denied', async (t) => {
+  const f = await setup(t);
+  f.policy.checks[0].adapter = 'fence';
+  await f.src.integration.configure({ ...f.scope, policy: f.policy });
+  const item = await f.propose('adapter');
+  const output = { schema_version: 1, version: '1.0.0', status: 'passed', summary: { errors: 0, skipped_files: 0 }, violations: [], skipped_files: [] };
+  const record = (report, status = 'pass') => f.src.integration.record({ ...item.input, principalId: f.service.id, checkId: 'integration', execution: f.execution(item.report, status), output: typeof report === 'string' ? report : JSON.stringify(report) });
+  await assert.rejects(() => record({ ...output, status: 'failed' }), /does not support/);
+  await assert.rejects(() => record({ ...output, schema_version: 99 }), /contract/);
+  await record(output);
+  assert.equal((await f.src.integration.evaluate(item.input)).ok, true);
+  // A crashed tool may produce no JSON, but its failed execution must still supersede a pass.
+  await record('tool crashed before producing JSON', 'fail');
+  assert.equal((await f.src.integration.evaluate(item.input)).ok, false);
+  f.policy.checks[0].adapter = 'casefile';
+  await assert.rejects(() => f.src.integration.configure({ ...f.scope, policy: f.policy }), /context-only/);
+});

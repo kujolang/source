@@ -1,6 +1,7 @@
 // Source-owned control-plane service; callers at HTTP boundaries must authorize
 // capabilities and supply the authenticated principal, never a body producer ID.
 import { createHash } from 'node:crypto';
+import { normalizeControlArtifact } from './integrations/control-tools.js';
 import { IntegrationPlanner, digest } from './integration-planner.js';
 import { validateVerificationPolicy, createVerificationReceipt, evaluateVerification } from './verification.js';
 
@@ -72,6 +73,16 @@ export class IntegrationBroker {
       // Validate producer and metadata before storing an untrusted artifact.
       createVerificationReceipt({ candidate: report.candidate, policy: repo.integrationPolicy, checkId, producer, execution, artifactRef: { hash: '0'.repeat(64) } });
       if (typeof output !== 'string' || !output.length) throw new Error('original execution output is required');
+      const check = repo.integrationPolicy.checks.find((item) => item.id === checkId);
+      if (check.adapter && execution.status === 'pass') {
+        const artifact = normalizeControlArtifact(check.adapter, JSON.parse(output));
+        if (!artifact.gate || artifact.validity !== 'valid') throw new Error('tool artifact does not support a passing verification');
+        if (check.adapter === 'workcell') {
+          const raw = JSON.parse(output);
+          const revision = raw.source_commit ?? raw.source?.commit;
+          if (revision !== report.candidate.headCommit) throw new Error('Workcell artifact revision differs from exact candidate');
+        }
+      }
       const receiptPath = `${root}/${input.candidateId}/receipts`;
       const receiptIds = this.source.store.listJsonAsync ? await this.source.store.listJsonAsync(receiptPath, { limit: 1001 }) : this.source.store.listJson(receiptPath, { limit: 1001 });
       const bytes = this.source._artifactBytes(output);
@@ -115,6 +126,27 @@ export class IntegrationBroker {
     catch (error) { evaluation = { ok: false, reason: error.message }; }
     const accepted = acceptance && evaluation.ok && digest(acceptance.receipts) === digest(evaluation.checks.map((check) => check.receiptId));
     return { candidate: report.candidate, state: outcome?.state === 'landed' ? 'landed' : accepted ? 'accepted' : evaluation.ok ? 'verified' : 'proposed', evaluation, acceptance, intent, outcome, reconciliationRequired: Boolean(intent && !outcome) };
+  }
+
+  async split(input) {
+    return this.source._projectMutationAsync(input.orgId, input.projectId, async () => {
+      const { root, report, repo, planner } = await this.load(input);
+      const evaluation = await this.evaluate(input);
+      if (!evaluation.checks.some((check) => check.reason === 'latest execution fail')) throw new Error('batch splitting requires a recorded failed verification');
+      if (await planner.git(['rev-parse', `refs/heads/${report.branch}`]) !== report.candidate.baseCommit) throw new Error('target changed; replan before splitting');
+      const policy = await this.source.getPolicyAsync(input.orgId, input.projectId);
+      const split = await planner.split(report.candidate, {
+        exclusivePaths: policy.integration?.exclusivePaths ?? ['migrations/', 'generated/'],
+        dependencyGroups: policy.integration?.dependencyGroups ?? [],
+      });
+      for (const child of split.children) {
+        if (!child.candidate) continue;
+        await this.source._asyncWrite(`${root}/${child.candidate.id}.json`, { ...child, orgId: input.orgId, projectId: input.projectId, repoId: input.repoId, branch: repo.defaultBranch, policyHash: report.policyHash, splitParent: input.candidateId });
+      }
+      await this.source._asyncWrite(`${root}/${input.candidateId}/split.json`, split);
+      await this.source._asyncAudit({ event: 'integration.split', orgId: input.orgId, projectId: input.projectId, repoId: input.repoId, candidateId: input.candidateId, children: split.children.map((child) => child.candidate?.id).filter(Boolean), blocked: split.blocked });
+      return split;
+    });
   }
 
   async accept(input) {

@@ -61,9 +61,10 @@ commands. Remote clients use the scoped HTTP interface. Opted-in repositories ca
 The exact-candidate broker now provides explicit protection opt-in, service
 receipts, maintainer acceptance, transactional Git promotion and lost-outcome
 reconciliation. See `evidence-bound-promotion.md` for the offline configuration
-requirement and tested boundary. Verification-failure splitting, isolated worker
-execution, impact planning, real PostgreSQL integration recovery, operator UI and
-complete mission benchmarks remain outstanding. This is not production certification.
+requirement and tested boundary. Failed-batch splitting and conservative impact
+selection are implemented below and in `verification-planner.md`. Isolated worker
+execution, real PostgreSQL integration recovery, operator UI and complete mission
+benchmarks remain outstanding. This is not production certification.
 
 ## Reproduce
 
@@ -76,7 +77,8 @@ risk. These are correctness fixtures, not production-capacity measurements.
 `node --test tests/integration-api.test.js tests/git-http.test.js tests/artifacts.test.js`
 checks project authorization, persisted proposal identity, repeat planning/readback,
 canonical preservation and reserved-ref rejection alongside existing Artifacts
-transport recovery. The tests do not yet demonstrate a broker or a production gate.
+transport recovery. These fixtures test planning and transport; broker fixtures are documented in
+`evidence-bound-promotion.md`. They do not establish a production gate.
 
 ## Increment validation — 2026-11-10
 
@@ -106,3 +108,20 @@ all failures rather than stopping at the first. Test logs are local transient
 files `/tmp/source-agent-native-isolated-regression.log` and
 `/tmp/source-agent-native-worker.log`. No live Postgres, container, staging or
 production claim follows from these results.
+
+## Failed-batch splitting
+
+`POST .../integration/{candidateId}/split` requires `plan_integration`, a recorded
+failed required check, the unchanged candidate policy/proposals and unchanged
+target base. The local CLI equivalent is `integration split` with normal scope
+and candidate options. It deterministically halves the proposal order, includes
+each half's full dependency closure, and persists new child candidates plus an
+inspectable split report. Children inherit neither verification nor acceptance.
+They require their own exact-candidate checks. If a half requires the entire
+failed batch, the report explains the coupling instead of claiming isolation.
+Single-proposal failures require agent revision. Repeated splitting is stable;
+operators may recursively verify/split failing children. This is dependency-aware
+fault isolation, not a claim to identify every semantic interaction automatically.
+
+Isolated execution and durable dispatch still remain. Planner and broker tests cover dependency closure, child identity,
+repeatability, failed-check admission and absence of inherited evidence.

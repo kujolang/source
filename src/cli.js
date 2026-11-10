@@ -330,7 +330,7 @@ export async function run(argv) {
           print(await src.integration.configure({ ...scope, principalId: flag('--principal') || 'U1', policy: JSON.parse(readFileSync(flag('--policy'), 'utf8')) }));
           return;
         }
-        if (['status', 'evaluate', 'accept', 'promote'].includes(sub)) {
+        if (['status', 'evaluate', 'accept', 'promote', 'split'].includes(sub)) {
           print(await src.integration[sub]({ ...scope, candidateId: flag('--candidate'), principalId: flag('--principal') || 'U1' }));
           return;
         }
@@ -561,7 +561,7 @@ export async function run(argv) {
           '  org member add --org <o> --principal <id> [--role member|maintainer|admin]',
           '  project create|list|show --org <o> [--name --slug]',
           '  integration configure --repo <r> --policy <file> --principal <maintainer> (offline operator setup)',
-          '  integration status|evaluate|accept|promote --repo <r> --candidate <id> --principal <maintainer>',
+          '  integration status|evaluate|accept|promote|split --repo <r> --candidate <id> --principal <maintainer>',
           '  integration plan --org <o> --project <p> --repo <r> --changes C1,C2',
           '  integration show --org <o> --project <p> --repo <r> --candidate <id>',
           '  canonical update --org <o> --project <p> --change <c>',

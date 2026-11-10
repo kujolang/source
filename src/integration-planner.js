@@ -58,6 +58,41 @@ export class IntegrationPlanner {
     return result;
   }
 
+  // Split diagnostics always create new candidates requiring their own evidence.
+  // A child includes all proposal prerequisites, even across the split boundary.
+  async split(candidate, options = {}) {
+    const { id, ...body } = candidate || {};
+    if (!id || digest(body) !== id || !Array.isArray(candidate.proposals)) throw new Error('invalid split candidate');
+    if (candidate.proposals.length < 2) return { parentId: id, children: [], blocked: [{ proposals: candidate.proposals.map((p) => p.id), reason: 'single proposal requires agent revision' }] };
+    const byId = new Map(candidate.proposals.map((p) => [p.id, p]));
+    const midpoint = Math.floor(candidate.proposals.length / 2);
+    const partitions = [candidate.proposals.slice(0, midpoint), candidate.proposals.slice(midpoint)];
+    const children = [];
+    const blocked = [];
+    for (const partition of partitions) {
+      const included = new Set();
+      const visit = (proposal) => {
+        if (included.has(proposal.id)) return;
+        included.add(proposal.id);
+        for (const dependency of proposal.dependsOn) {
+          if (!byId.has(dependency)) throw new Error('split dependency missing from parent candidate');
+          visit(byId.get(dependency));
+        }
+      };
+      partition.forEach(visit);
+      if (included.size === candidate.proposals.length) {
+        blocked.push({ proposals: partition.map((p) => p.id), reason: 'dependency closure requires the full failed batch; compare the other child before revising dependent proposals' });
+        continue;
+      }
+      const proposals = candidate.proposals.filter((p) => included.has(p.id));
+      const report = await this.assemble({ ...options, baseCommit: candidate.baseCommit, proposals,
+        context: { ...candidate.context, splitParent: id, splitProposals: proposals.map((p) => p.id) },
+      });
+      children.push(report);
+    }
+    return { parentId: id, children, blocked };
+  }
+
   async assemble({ baseCommit, proposals, exclusivePaths = ['migrations/', 'generated/'], dependencyGroups = [], context = {} }) {
     if (!oid.test(baseCommit)) throw new Error('baseCommit must be a full Git object ID');
     if (!Array.isArray(proposals) || !proposals.length || proposals.length > this.maxProposals) throw new Error('invalid proposal batch size');

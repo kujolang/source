@@ -90,3 +90,17 @@ A new regression runs each test file with its own TMPDIR and deletes only that
 owned directory after process exit, reducing accumulated test storage. Preserve
 all user repositories and unrelated disk contents. External production/security
 certification remains unproven and is not substituted with local tests.
+
+## Verification intelligence increment — 2026-11-10
+
+Dependency-preserving failed-batch splitting now exists through API/CLI and
+creates child candidates without inherited evidence/approval. Conservative impact
+selection now retains all mandatory checks, requires explicit complete coverage,
+and accounts for renamed paths, dependency closure and sensitive/failure paths.
+Ten source-inspected tool adapters classify reports; seven can gate trusted
+service attestations, while Spec/RunLedger/CaseFile remain context-only. See the
+verification planner for pinned source revisions and compatibility limits.
+
+This supersedes the corresponding missing portions of items 3–4 above. It does
+not complete interrupted-assembly drills, isolated execution, durable dispatch,
+real-tool lifecycle validation or benchmarks. The full mission remains active.

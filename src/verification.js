@@ -1,5 +1,7 @@
 // Exact-candidate verification contracts. Hashing proves identity/integrity;
 // trusted service authorization (not the hash) establishes who may attest.
+import { planVerification } from './impact-planner.js';
+import { gateAdapters } from './integrations/control-tools.js';
 import { digest } from './integration-planner.js';
 
 const hash = /^[a-f0-9]{64}$/;
@@ -13,6 +15,9 @@ export function validateVerificationPolicy(policy) {
   for (const check of policy.checks) {
     if (!text(check.id) || ids.has(check.id) || !text(check.version)) throw new Error('invalid or duplicate check identity');
     ids.add(check.id);
+    if (check.adapter != null && !gateAdapters.includes(check.adapter)) throw new Error('unsupported or context-only verification adapter');
+    if (check.tier != null && ![0, 1, 2, 3].includes(check.tier)) throw new Error('invalid verification tier');
+    if (check.optionalByImpact != null && typeof check.optionalByImpact !== 'boolean') throw new Error('invalid applicability flag');
     if (!Array.isArray(check.command) || !check.command.length || !check.command.every(text)) throw new Error('check requires an explicit command argument array');
     if (!map(check.toolVersions) || !Object.keys(check.toolVersions).length || !Object.values(check.toolVersions).every(text)) throw new Error('check requires pinned tool versions');
     if (!text(check.environment) || !map(check.inputs) || !map(check.externalState)) throw new Error('check requires environment, input and external-state identities');
@@ -54,7 +59,9 @@ export function createVerificationReceipt({ candidate, policy, checkId, producer
 
 export function evaluateVerification({ candidate, policy, receipts, now = Date.now(), forReuse = false }) {
   validateVerificationPolicy(policy);
-  const checks = policy.checks.map((check) => {
+  const plan = planVerification(candidate, policy);
+  const selected = new Set(plan.checks.map((check) => check.id));
+  const checks = policy.checks.filter((check) => selected.has(check.id)).map((check) => {
     const identity = verificationIdentity(candidate, policy, check.id);
     if (forReuse && !check.deterministic) return { checkId: check.id, satisfied: false, reason: 'environment-dependent check must rerun' };
     const matching = receipts.filter((receipt) => {
@@ -67,5 +74,5 @@ export function evaluateVerification({ candidate, policy, receipts, now = Date.n
     if (latest.execution.status !== 'pass') return { checkId: check.id, satisfied: false, reason: `latest execution ${latest.execution.status}`, receiptId: latest.id };
     return { checkId: check.id, satisfied: true, reason: forReuse ? 'identical deterministic verification identity remains valid' : 'exact candidate verified', receiptId: latest.id };
   });
-  return { ok: checks.every((check) => check.satisfied), checks };
+  return { ok: checks.length > 0 && checks.every((check) => check.satisfied), checks, plan };
 }
