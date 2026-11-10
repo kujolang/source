@@ -94,6 +94,54 @@ under `/git/`: public repositories allow anonymous reads; private reads and all
 pushes require a Git capability. See [API authorization](docs/source/19-capability-auth.md)
 and [Git transport](docs/source/22-git-transport-auth.md).
 
+## Keep GitHub as origin
+
+Create an empty repository in the local Source UI first, with the same default
+branch as your existing repository. Issue a project-scoped Git capability with
+`node bin/source.js git-cap --org O1 --project P1 --principal U1` from the Source
+checkout (using the server's `SOURCE_DATA`). Use the returned credential through
+`SOURCE_CREDENTIAL`, or your Git credential helper; do not put it in remote URLs.
+
+From your existing working repository, invoke the Source CLI by its absolute path:
+
+```bash
+# Replace the path and IDs with your checkout and Source repository.
+node /path/to/source/bin/source.js sync --url http://127.0.0.1:8787/git/O1/P1/R1.git
+
+# Repeat synchronization later; preview with --dry-run.
+node /path/to/source/bin/source.js sync --dry-run
+node /path/to/source/bin/source.js sync
+
+# Submit a committed feature for Source review, leaving GitHub as origin.
+node /path/to/source/bin/source.js submit --intent "Describe the change"
+```
+
+`sync --url` adds a remote named `source` if absent and refuses to replace an
+existing URL. It copies **local branches and tags** in one atomic push, without
+forcing updates or deleting destination refs. It preserves `origin`, upstream
+tracking, and your working files. GitHub-only branches, uncommitted files, Git LFS
+objects, submodule repositories, issues and pull requests are not copied. Create
+and sync each submodule separately if needed. An incompatible branch or tag
+rejects the entire push. Sync is explicit; no background job is installed.
+
+Both commands select `--remote NAME`, then `git config source.remote NAME`, then
+`source` if present, otherwise `origin` for existing Source clones. The selected
+remote must have a Source HTTP(S) URL. `sync --url` defaults to `source` when no
+explicit/configured remote exists. Use `--cwd /path/to/repo` to run against another
+checkout. A sync dry run requires an existing remote and cannot use `--url`.
+
+Submission fetches the selected Source remote's current default branch to compute
+the proposal base. `submit --url` remains an **API base URL override**; it is not a
+Git remote selector. Submit feature commits **before** syncing that feature onto
+Source's default branch: a commit already present there has no change to submit.
+Direct sync copies Git refs and does not create review decisions or evidence.
+Use it for initial imports and secondary copies; use submit/review/promotion when
+Source should gate changes. Artifacts-backed repositories retain their push policy.
+
+For several repositories, create their Source repositories once, then run `sync
+--cwd /path/to/repo --url <its Source Git URL>` for each. Subsequent runs only need
+`sync --cwd /path/to/repo`. Back up the Source data directory separately.
+
 ## Cloudflare Workers and Artifacts
 
 The hybrid design keeps Source's review service in Node.js. A Cloudflare Worker

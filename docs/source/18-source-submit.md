@@ -26,11 +26,11 @@ commands which operate on the local data root.
 
 ```text
 1. confirm inside a Git working tree
-2. read `remote.origin.url`, parse {project, repo}
-3. determine base = merge-base(HEAD, origin/<default-branch>)
+2. select --remote, source.remote config, source, or origin; parse {org, project, repo}
+3. fetch selected Source default branch; determine base = merge-base(HEAD, FETCH_HEAD)
 4. determine head = HEAD
 5. reject empty changes (base == head)
-6. push head to a contribution ref (so it is present in the bare repo)
+6. push head to the selected Source URL on a contribution ref (so it is present in the bare repo)
 7. POST /api/v1/projects/{project}/submit
 ```
 
@@ -65,7 +65,7 @@ see a Change id and a clear statement of what is still required.
 
 ## Design decisions
 
-- **Base commit is the fork point** (`git merge-base HEAD origin/<default>`),
+- **Base commit is the fork point** (`git merge-base HEAD FETCH_HEAD`, after fetching the selected Source default branch),
   not the contributor's assumption. The Change is tied to the exact source state
   it was based on; a later non-fast-forward is caught by the canonical-state
   update guard.
@@ -106,3 +106,19 @@ see a Change id and a clear statement of what is still required.
 - `06-change-model.md` — base/head commit semantics.
 - `09-agent-protocol.md` — the machine interface this flow uses.
 - `16-mvp-results.md` — next-phase status.
+
+## Secondary remotes and imports
+
+GitHub may remain `origin`. Add Source with `source sync --url
+http://127.0.0.1:8787/git/O1/P1/R1.git` from an existing clone, then use `source
+submit`. Select another remote with `--remote backup` or `git config source.remote
+backup`. Explicit selection takes precedence over config, followed by a remote
+named `source`, then `origin`. Invalid selections fail rather than silently
+falling back. The Source default branch is refreshed before calculating the base;
+GitHub tracking refs are never used for a secondary-remote submission.
+
+`source sync` atomically pushes local branches and tags without force or deletion.
+It requires an existing Source repository, preserves origin/upstream settings,
+and does not create lifecycle evidence. It does not copy GitHub-only branches or
+Git LFS data. Use `--cwd` for each local repository and `--dry-run` with an already
+configured remote to preview. See the README for the complete setup flow.

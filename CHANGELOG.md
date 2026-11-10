@@ -2,6 +2,12 @@
 
 All notable changes to Source are recorded here.
 
+## [Unreleased]
+
+- Submit through a secondary Source remote while GitHub stays `origin`, with explicit or configured remote selection and a freshly fetched Source proposal base.
+- Add `source sync` for atomic, non-forced copying of local branches and tags, including remote setup, per-repository `--cwd`, and dry-run previews.
+- Keep client-only submit/sync commands independent of local server storage.
+
 ## [0.1.1] — 2026-10-21
 
 - Require patched Node.js versions and update dependency requirements.
