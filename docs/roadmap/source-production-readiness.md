@@ -80,7 +80,9 @@ remains active. This ledger does not narrow the definition of done.
 ## Deliverables and gates
 
 Baseline report and partial integration architecture exist. Still required:
-`docs/architecture/hosting-readiness.md`; `docs/validation/concurrency-results.md`;
+`docs/validation/concurrency-results.md`;
+`docs/architecture/hosting-readiness.md` now records the capability inventory and
+secondary-remote, migration and rollback gates;
 verification-planner, evidence-bound-promotion and failure-recovery now document
 implemented foundations and their remaining gates; benchmark scripts, configuration examples, operator and
 migration/rollback guidance, final limitation inventory and A–G mission report.

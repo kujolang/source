@@ -61,10 +61,11 @@ source git-cap --org O1 --project P1 --principal U1
 source git-cap --org O1 --project P1 --principal U1 --read-only
 ```
 
-A contributor then uses the credential as the password in the Git URL:
+Use a credential helper or enter the capability as the password when Git prompts.
+Keep credentials out of remote URLs and use HTTPS outside local development:
 
 ```text
-git clone http://source:<credential>@host/git/O1/P1/main.git
+git clone https://host/git/O1/P1/main.git
 ```
 
 ## Interaction with `source submit`
@@ -75,14 +76,17 @@ option or `SOURCE_CREDENTIAL`) and sends it as Basic auth on the push. A
 contributor needs a git credential but still does not need to understand Source
 concepts — the low-friction onboarding ramp is preserved.
 
-## Deliberately not built
+## Protection and transport limits
 
-- **Ref-level push policy** — a `git_push` capability authorizes push to any
-  ref in the project. Restricting anonymous contribution pushes to
-  `refs/heads/source-submit-*` (or similar) is a later phase.
-- **TLS** — the transport is still plain HTTP; TLS termination is a deployment
-  concern (see `16-mvp-results.md`).
-- **SSH transport** — only smart HTTP is implemented.
+Source rejects client writes to its internal ref namespace. For repositories
+with an integration policy, smart-HTTP also rejects direct updates to the
+protected default branch; the evidence-bound broker performs promotion. Policy
+activation is an offline administrative operation with writers drained. General
+branch-pattern rules and protected-tag policies remain missing. See
+`../architecture/evidence-bound-promotion.md` for the current protection boundary.
+
+TLS is supported in process and through a reverse proxy; see
+`23-tls-deployment.md`. SSH transport is not implemented.
 
 ## Tests
 
