@@ -53,18 +53,29 @@ remains active. This ledger does not narrow the definition of done.
 2. Ten same-file agents: compatible fixture passes; conflicting pair passes;
    ten-way incompatible workload remains.
 3. Different files/shared dependency: risk report passes; executed semantic checks remain.
-4–5. Concurrent promotion and branch moves after verification: new broker tests remain.
-6–8. Assembly/promotion process death and lost acknowledgment: deterministic rebuild
-   and existing Artifacts recovery exist; real new broker crash drills remain.
-9–11. Duplicate jobs, stale dependency cache and forged evidence: existing queue
-   dedupe is a foundation; exact-candidate integration tests remain.
-12–13. Unit pass/integration fail and batch failure splitting: remain.
-14. Unauthorized bypass: internal-ref push rejected; local canonical/legacy bypass
-   tests remain.
+4–5. Concurrent promotion and branch moves after verification: broker tests pass,
+   including independent CLI promoters and exact-evidence/target rechecks.
+6. Assembly process death: SIGKILL after commit-tree and retained-ref update
+   recovers deterministically in competing fresh processes; target remains intact.
+7–8. Promotion death/lost acknowledgment: independent promoter exit and fresh
+   reconciliation pass; injected PostgreSQL outcome rollback retains landed Git
+   proof. Machine/power loss and database-primary failover remain unverified.
+9. Duplicate/recovered verification: real CLI SIGKILL before/after receipt storage
+   and two competing replacement workers pass using natural lease expiry. A
+   missing receipt reruns; a persisted deterministic receipt is reused once.
+10–11. Stale dependency cache and forged evidence: exact-identity contract and
+   HTTP producer rejection pass; live changing external-service contracts remain.
+12. Required-check failure blocks acceptance; real unit-pass/integration-fail
+   workload execution remains to be demonstrated in isolation.
+13. Failed-batch splitting and dependency closure pass without transferring
+   evidence or approval; real workload diagnostic effectiveness remains.
+14. Unauthorized bypass: internal/canonical smart-HTTP ref push and local
+   legacy promotion denial pass for opted-in protected repositories.
 15. Sustained push workload: representative benchmark remains.
 16. Workflow/log secrets: existing action tests; new integrated execution tests remain.
-17–18. Storage failure and competing instances/failover: existing store/writer tests;
-   integration intent and multi-process broker tests remain.
+17–18. PostgreSQL rollback, lost Git acknowledgment, competing instance retirement/
+   promotion, and real multi-process verification recovery pass. Full primary
+   failover and restoration after partial Git/database loss remain unverified.
 
 ## Deliverables and gates
 

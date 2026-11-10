@@ -50,6 +50,35 @@ test('ten concurrent Git clients assemble a deterministic candidate with complet
   assert.equal(await git(bare, 'rev-parse', `refs/source/candidates/${first.candidate.id}`), first.candidate.headCommit);
 });
 
+for (const boundary of ['commit-tree', 'update-ref']) test(`assembler SIGKILL after ${boundary} recovers deterministically in fresh processes`, { timeout: 30000 }, async (t) => {
+  const { root, base, bare, planner, proposal } = await fixture(t);
+  const proposals = await Promise.all(['first', 'second'].map((id) => proposal(id, (cwd) => writeFile(path.join(cwd, id), id))));
+  const script = path.join(root, 'assembler.mjs');
+  await writeFile(script, `
+import { IntegrationPlanner } from ${JSON.stringify(new URL('../src/integration-planner.js', import.meta.url).href)};
+const planner = new IntegrationPlanner(${JSON.stringify(bare)});
+const git = planner.git.bind(planner);
+planner.git = async (...args) => {
+  const result = await git(...args);
+  if (process.env.SOURCE_FIXTURE_KILL === '1' && args[0][0] === ${JSON.stringify(boundary)}) process.kill(process.pid, 'SIGKILL');
+  return result;
+};
+console.log(JSON.stringify(await planner.assemble(${JSON.stringify({ baseCommit: base, proposals })})));
+`);
+  await assert.rejects(() => exec(process.execPath, [script], { env: { ...process.env, SOURCE_FIXTURE_KILL: '1' }, timeout: 15000 }), (error) => error.signal === 'SIGKILL');
+  assert.equal(await git(bare, 'rev-parse', 'main'), base);
+  const refs = (await git(bare, 'for-each-ref', '--format=%(refname)', 'refs/source/candidates')).split('\n').filter(Boolean);
+  assert.equal(refs.length, boundary === 'commit-tree' ? 0 : 1);
+  const recovered = await Promise.all([0, 1].map(() => exec(process.execPath, [script], { env: { ...process.env, SOURCE_FIXTURE_KILL: '0' }, timeout: 15000 }).then((result) => JSON.parse(result.stdout))));
+  assert.deepEqual(recovered[0], recovered[1]);
+  assert.deepEqual(recovered[0], await planner.assemble({ baseCommit: base, proposals }));
+  const candidate = recovered[0].candidate;
+  assert.equal(await git(bare, 'rev-parse', `refs/source/candidates/${candidate.id}`), candidate.headCommit);
+  assert.equal(await git(bare, 'rev-parse', 'main'), base, 'interrupted assembly never promotes');
+  for (const item of proposals) assert.ok(await planner.ancestor(item.headCommit, candidate.headCommit));
+  for (const id of ['first', 'second']) assert.equal(await git(bare, 'show', `${candidate.headCommit}:${id}`), id);
+});
+
 test('same-file harmless edits merge but conflicting edits and binaries are reported', async (t) => {
   const { base, planner, proposal } = await fixture(t);
   const proposals = await Promise.all(Array.from({ length: 10 }, (_, i) => proposal(`agent-${i}`, (cwd) => writeFile(path.join(cwd, 'shared.txt'), Array.from({ length: 100 }, (_, j) => j === i * 10 ? `agent ${i}` : `line ${j}`).join('\n') + '\n'))));

@@ -12,13 +12,15 @@ This is increment evidence, not the full production-recovery gate.
 | Policy changes after verification | integration-broker.test.js | Original candidate/receipt remain inspectable; new policy gets another candidate identity; old evidence cannot accept it |
 | Wrong commit/tree/config/dependency/tool/environment | verification.test.js | Exact identity mismatch requires re-verification |
 | Expired receipt or later failed execution | verification.test.js | Prior successful result cannot authorize promotion |
+| Assembler SIGKILL after commit-tree or retained-ref update | integration-planner.test.js | Fresh competing processes reconstruct identical candidate/ancestry; canonical branch never moves |
+| CLI verification worker SIGKILL before/after receipt persistence | verification-dispatch-live.test.js, live PostgreSQL | Natural lease expiry and competing fresh workers rerun only missing evidence; persisted deterministic receipt is reused |
 
-The concurrent-process and process-exit fixtures use real local Git and Source
-JSON fixture records. They demonstrate the Git write/reconciliation protocol,
-not distributed JSON support. JSON is still documented as single-process local
-storage. PostgreSQL integration crash/failover tests and real host/power-loss
-storage durability remain unverified. An intentional child exit is not a power
-failure or a deployment disaster-recovery exercise.
+The promoter process fixtures use real local Git and Source JSON records; they
+demonstrate the Git write/reconciliation protocol, not distributed JSON support.
+JSON remains single-process local storage. The CLI verification worker crash
+fixtures use live PostgreSQL and separate processes. Database-primary failover
+and real host/power-loss durability remain unverified. Killing a worker is not a
+power failure or a deployment disaster-recovery exercise.
 
 ## Recovery procedure
 
@@ -35,11 +37,11 @@ failure or a deployment disaster-recovery exercise.
 5. Back up Git refs together with Source records and artifacts before repair.
    A database-only restore can discard acceptance while leaving Git ahead.
 
-Still required by the mission: process death during assembly/before Git commit,
-real PostgreSQL rollback and competing-instance failover, restore after partial
-storage loss, verification-worker crash/cancellation, isolated environment cleanup,
-bounded retries under outages and measured recovery times under representative
-load. Those gates stay open in the work ledger.
+Still required by the mission: interruption inside a Git operation, primary
+database/host failover, restoration after partial storage loss, isolated runtime
+orphan cleanup, and measured recovery under representative load. Controlled
+assembly/verification process-death and PostgreSQL rollback boundaries are now
+covered by the increments below; they do not close those broader recovery gates.
 
 ## Regression receipt
 
@@ -194,3 +196,35 @@ Retirement is explicit rather than inferred from unrelated proposals. Runtime
 abort/teardown remains a worker responsibility; database fencing is not evidence
 that an unreachable container was removed. These tests do not close the pending
 isolated staging, multi-process failover, hosting or scale gates.
+
+## Real assembler and verification process death — 2026-11-10
+
+Two live PostgreSQL CLI-worker crash tests passed in 30.26 seconds, with no skips
+or failures (`/tmp/source-worker-process-crash.log`). A test-owned worker is killed
+with SIGKILL immediately before receipt persistence or immediately after the
+handler saves its receipt, before queue completion. Two new CLI worker processes
+use the real queue and wait for natural lease expiry; no test SQL changes lease
+timestamps. Both cases complete the candidate and promote it after human
+acceptance. The before-persistence case executes preflight twice because the
+first execution had no durable result. The after-persistence case executes it
+once and recovers the same receipt with `reused: true`; the job has exactly two
+claim attempts. Fixture execution logs make duplicate execution observable.
+
+The planner suite passed eight tests in 30.83 seconds
+(`/tmp/source-assembler-process-crash.log`), including SIGKILL immediately after
+the first commit-tree operation and immediately after retaining the candidate
+ref. Two fresh assembler processes recover concurrently and return identical
+candidate records. Every proposal remains an ancestor, both contributed files
+are present, the immutable candidate ref agrees with the report, and the canonical
+branch remains at its original base. The early-crash case has no retained ref;
+the late-crash case retains exactly one. These are actual child-process deaths,
+not thrown exceptions or edited leases.
+
+Lint checked 99 JavaScript files and diff checks passed. This increment changes
+tests and validation records only; no new full-regression result is claimed.
+The verification executor remains a controlled real-Git-reading fixture. These
+tests establish queue/broker recovery, not container isolation, orphan teardown,
+host/power-loss durability or database-primary failover. A PostgreSQL client
+deprecation warning about overlapping queries on one transaction client was
+observed; it did not fail these tests and is not a certification of future driver
+compatibility.

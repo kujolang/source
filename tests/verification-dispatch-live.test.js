@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { Source } from '../src/source.js';
 import { PostgresStore } from '../src/postgres-store.js';
@@ -69,7 +70,7 @@ async function fixture(t) {
     assert.equal(await src.jobs.complete({ id: job.id, workerId: job.workerId, leaseToken: job.leaseToken, result }), true);
     return { job, result };
   };
-  return { src, peer, store, schema, scope, input, policy, report, service, execute, handler, run, replacement };
+  return { src, peer, store, schema, root, scope, input, policy, report, service, execute, handler, run, replacement };
 }
 
 test('concurrent dispatch coalesces exact checks, enforces dependencies and reuses deterministic receipts', { skip: !dsn }, async (t) => {
@@ -230,4 +231,92 @@ test('promotion and retirement serialize across Source instances without undoing
   const head = (await exec('git', ['--git-dir', repo.barePath, 'rev-parse', 'main'])).stdout.trim();
   assert.equal(head, status.state === 'landed' ? f.report.candidate.headCommit : f.report.candidate.baseCommit);
   assert.equal(Boolean(status.retirement), status.state === 'cancelled');
+});
+
+for (const phase of ['before', 'after']) test(`real CLI worker death ${phase} receipt persistence recovers once across competing workers`, { skip: !dsn, timeout: 90000 }, async (t) => {
+  const f = await fixture(t);
+  const dispatched = await f.src.verification.dispatch(f.input);
+  const handlerPath = path.join(f.root, 'crash-handler.mjs');
+  const executionsPath = path.join(f.root, 'executions.jsonl');
+  await writeFile(handlerPath, `
+import { createVerificationHandler } from ${JSON.stringify(new URL('../src/verification-dispatcher.js', import.meta.url).href)};
+import { appendFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+const exec = promisify(execFile);
+export function createHandlers({ source }) {
+  const handler = createVerificationHandler({ source, principalId: ${JSON.stringify(f.service.id)}, executor: {
+    async execute({ candidate, check, identity, repository }) {
+      const startedAt = Date.now();
+      const output = (await exec('git', ['--git-dir', repository, 'show', candidate.headCommit + ':value'])).stdout;
+      if (output !== 'candidate') throw new Error('wrong candidate bytes');
+      await appendFile(${JSON.stringify(executionsPath)}, JSON.stringify({ checkId: check.id, pid: process.pid }) + '\\n');
+      if (process.env.SOURCE_FIXTURE_CRASH === 'before') process.kill(process.pid, 'SIGKILL');
+      const finishedAt = Date.now();
+      return { output, execution: { identity, commit: candidate.headCommit, tree: candidate.tree,
+        command: check.command, environment: check.environment, inputs: check.inputs,
+        externalState: check.externalState, toolVersions: check.toolVersions, status: 'pass',
+        startedAt, finishedAt, durationMs: finishedAt - startedAt } };
+    }
+  } });
+  return { 'integration.verify': async (...args) => {
+    const result = await handler(...args);
+    if (process.env.SOURCE_FIXTURE_CRASH === 'after') process.kill(process.pid, 'SIGKILL');
+    return result;
+  } };
+}
+`);
+  const children = [];
+  const start = (name, crash = false) => {
+    const child = spawn(process.execPath, [fileURLToPath(new URL('../bin/source.js', import.meta.url)),
+      '--store', 'postgres', '--schema', f.schema, 'worker', '--handler-module', handlerPath,
+      '--worker-id', name, '--worker-concurrency', '1', '--worker-lease-ms', '5000',
+      '--worker-poll-ms', '25', '--worker-max-poll-ms', '100', '--worker-shutdown-timeout-ms', '2000'],
+    { env: { ...process.env, SOURCE_DATA: f.root, SOURCE_DATABASE_URL: dsn, SOURCE_FIXTURE_CRASH: crash || '' }, stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = '';
+    const collect = (bytes) => { output = (output + bytes.toString()).slice(-16384); };
+    child.stdout.on('data', collect); child.stderr.on('data', collect);
+    const closed = new Promise((resolve) => { child.once('error', (error) => resolve({ error })); child.once('close', (code, signal) => resolve({ code, signal })); });
+    const state = { child, closed, output: () => output }; children.push(state); return state;
+  };
+  const bounded = async (promise, ms, message) => {
+    let timer;
+    try { return await Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); })]); }
+    finally { clearTimeout(timer); }
+  };
+  try {
+    const crashed = start(`crash-${phase}-receipt`, phase);
+    const exit = await bounded(crashed.closed, 30000, 'crashing worker did not exit');
+    assert.equal(exit.signal, 'SIGKILL', crashed.output());
+    const preflight = dispatched.checks.find((check) => check.checkId === 'preflight');
+    const before = await f.store.getJobAsync({ ...f.scope, id: preflight.jobId });
+    assert.equal(before.status, 'leased'); assert.equal(before.attempts, 1);
+    const receiptId = (await f.src.integration.evaluate(f.input)).checks.find((check) => check.checkId === 'preflight').receiptId;
+    assert.equal(Boolean(receiptId), phase === 'after', 'only a persisted receipt may survive SIGKILL');
+    const recovery = [start('recovery-a'), start('recovery-b')];
+    // Let the real lease expire; do not change database lease timestamps.
+    await bounded((async () => {
+      while (await f.src.jobs.count(f.scope)) {
+        for (const state of recovery) assert.equal(state.child.exitCode, null, state.output());
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    })(), 30000, 'replacement workers did not drain verification');
+    const jobs = await f.src.jobs.list(f.scope);
+    assert.ok(jobs.every((job) => job.status === 'completed'), JSON.stringify(jobs));
+    const recovered = jobs.find((job) => job.id === preflight.jobId);
+    assert.equal(recovered.attempts, 2);
+    assert.equal(Boolean(recovered.result.reused), phase === 'after');
+    if (phase === 'after') assert.equal(recovered.result.receiptId, receiptId);
+    const executions = (await readFile(executionsPath, 'utf8')).trim().split('\n').map(JSON.parse);
+    assert.deepEqual(executions.map((entry) => entry.checkId).sort(), phase === 'after' ? ['combined', 'preflight', 'staging'] : ['combined', 'preflight', 'preflight', 'staging']);
+    assert.equal((await f.src.integration.evaluate(f.input)).ok, true);
+    await f.src.integration.accept(f.input);
+    assert.equal((await f.src.integration.promote(f.input)).state, 'landed');
+  } finally {
+    for (const state of children) {
+      if (state.child.exitCode == null && state.child.signalCode == null) state.child.kill('SIGTERM');
+      try { await bounded(state.closed, 5000, 'worker shutdown timed out'); }
+      catch { state.child.kill('SIGKILL'); await state.closed; }
+    }
+  }
 });
