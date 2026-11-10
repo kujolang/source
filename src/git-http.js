@@ -106,7 +106,7 @@ export function gitHttpBackend({
     // `git http-backend` copies HTTP_GIT_PROTOCOL into GIT_PROTOCOL.
     if (headers['git-protocol']) env.HTTP_GIT_PROTOCOL = headers['git-protocol'];
 
-    const child = spawnProcess('git', [...(hooksPath ? ['-c', `core.hooksPath=${hooksPath}`] : []), '-c', 'receive.hideRefs=refs/source/', ...(protectedRef ? ['-c', `receive.hideRefs=${protectedRef}`] : []), 'http-backend'], { env, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawnProcess('git', ['--no-replace-objects', ...(hooksPath ? ['-c', `core.hooksPath=${hooksPath}`] : []), '-c', 'receive.hideRefs=refs/source/', '-c', 'receive.hideRefs=refs/replace/', ...(protectedRef ? ['-c', `receive.hideRefs=${protectedRef}`] : []), 'http-backend'], { env, stdio: ['pipe', 'pipe', 'pipe'] });
     const stdout = [];
     const stderr = [];
     let outputBytes = 0;

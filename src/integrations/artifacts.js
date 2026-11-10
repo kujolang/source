@@ -65,7 +65,7 @@ export async function artifactsGit(args, { cwd, token } = {}) {
     GIT_CONFIG_VALUE_0: token ? `Authorization: Bearer ${token}` : '',
   });
   try {
-    const { stdout } = await exec('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'credential.helper=',
+    const { stdout } = await exec('git', ['--no-replace-objects', '-c', 'core.hooksPath=/dev/null', '-c', 'credential.helper=',
       '-c', 'http.followRedirects=false', ...args], { cwd, env, encoding: 'utf8', timeout: 60000, maxBuffer: 8 * 1024 * 1024 });
     return stdout.trim();
   } catch { throw new Error('Artifacts Git operation failed or timed out; retry accepted promotion to reconcile'); }

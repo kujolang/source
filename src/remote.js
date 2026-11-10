@@ -4,7 +4,7 @@ import { ClientRetry } from './client-retry.js';
 
 export function git(args, cwd, { timeoutMs = 120000 } = {}) {
   return new Promise((resolve, reject) => {
-    execFile('git', args, { cwd, encoding: 'utf8', timeout: timeoutMs, env: { ...process.env, LC_ALL: 'C' } }, (err, stdout, stderr) => {
+    execFile('git', ['--no-replace-objects', ...args], { cwd, encoding: 'utf8', timeout: timeoutMs, env: { ...process.env, LC_ALL: 'C' } }, (err, stdout, stderr) => {
       if (err) {
         err.httpStatus = Number(stderr.match(/The requested URL returned error: (\d{3})/i)?.[1]) || null;
         err.curlCode = Number(stderr.match(/\bcurl ([0-9]{1,3})\b/i)?.[1]) || null;

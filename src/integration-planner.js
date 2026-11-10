@@ -31,7 +31,7 @@ export class IntegrationPlanner {
     // Do not inherit Git object-directory, config injection or tracing variables.
     const clean = {};
     for (const key of ['PATH', 'HOME', 'TMPDIR', 'SYSTEMROOT']) if (process.env[key]) clean[key] = process.env[key];
-    const pending = exec('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgSign=false', ...args], {
+    const pending = exec('git', ['--no-replace-objects', '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgSign=false', ...args], {
       cwd: this.barePath, encoding: 'utf8', timeout: this.timeoutMs, maxBuffer: 8 * 1024 * 1024,
       env: { ...clean, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_ATTR_NOSYSTEM: '1', ...env },
     });

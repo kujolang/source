@@ -17,8 +17,9 @@ function validateRevision(value) {
   }
 }
 
+// Object IDs must identify original stored bytes, never mutable replacement refs.
 function run(args, opts = {}) {
-  return execFileSync('git', args, {
+  return execFileSync('git', ['--no-replace-objects', ...args], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     ...opts,
@@ -29,7 +30,7 @@ const execFileAsync = promisify(execFile);
 
 async function runAsync(args, opts = {}) {
   const { trim = true, ...execOptions } = opts;
-  const { stdout } = await execFileAsync('git', args, {
+  const { stdout } = await execFileAsync('git', ['--no-replace-objects', ...args], {
     encoding: 'utf8',
     maxBuffer: 32 * 1024 * 1024,
     ...execOptions,

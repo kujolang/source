@@ -534,3 +534,18 @@ cover rejected untrusted certificates and successful explicitly trusted CA use.
 Live default/private PostgreSQL lifecycles pass after the change. The separate
 250-agent HTTP408/header-timeout investigation remains open; no stress success or
 production readiness follows from these focused regressions.
+
+### Replacement-ref substitution regression
+
+Three real-Git regressions failed before the fix: a Git push capability could
+create `refs/replace/<commit>`; a replacement commit without a synthetic token
+caused contribution credential findings to omit it; and the same proposal ID
+and commit ID produced a different candidate report after replacement.
+`/tmp/source-replace-before.log` records all three failures.
+
+Source now disables replacement-object interpretation at its Git command
+boundaries and rejects replacement-ref mutation over smart HTTP. Existing refs
+are ignored rather than deleted. `/tmp/source-replace-after.log` records all
+three regressions passing in 4.74 s. The scan fixture uses a generated synthetic
+pattern, never a real credential. This verifies the concrete substitution path,
+not a claim that pattern-based scanning detects all possible credentials.

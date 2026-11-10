@@ -167,3 +167,22 @@ The benchmark accepts up to 1000 real agent processes and records its explicit
 `maxIntegrationProposals` setting (at least 100, otherwise the largest per-repo
 proposal count). It does not claim simulated requests are concurrent agents.
 Large stages remain unverified until a raw report records their outcome.
+
+### Original Git object identity
+
+Source-owned Git reads, candidate planning, HTTP transport and the Artifacts
+operator bridge run with `git --no-replace-objects`. The client uses the same
+rule when resolving and submitting local commits. An object ID identifies its
+stored bytes, not a mutable `refs/replace/*` overlay. Existing replacement refs
+are preserved for operator inspection but ignored by these paths; HTTP pushes
+cannot create, change or delete that reserved namespace. The isolated candidate
+exporters already disable replacement objects explicitly.
+
+This closes a reproduced gap in which an ordinary Git push capability could
+install a replacement ref, hide a synthetic credential from contribution scans,
+and alter planner output while retaining the original proposal commit ID.
+Real-Git regression tests verify unchanged candidate reports, original file reads
+and synchronous/asynchronous scan findings despite an existing replacement ref,
+plus rejection of replacement-ref pushes. Git documents the relevant
+[replacement-object switch](https://git-scm.com/docs/git-replace.html) and
+[hidden receive refs](https://git-scm.com/docs/git-config#Documentation/git-config.txt-receivehideRefs).

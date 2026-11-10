@@ -81,3 +81,28 @@ test('repository file reads preserve exact UTF-8 whitespace', async () => {
   const git = src.gitRepo(org.id, project.id, repo.id);
   assert.equal(await git.showFileAsync('main', 'spaces.txt'), content);
 });
+
+test('replacement refs cannot hide committed credentials from contribution evidence or repository reads', async () => {
+  const { src, org, project, human } = freshSource();
+  const { repo, work, head: base } = seedRepo(src, org.id, project.id);
+  const fixtureToken = 'gh' + 'p_' + 'x'.repeat(36); // synthetic, never a real credential
+  writeFileSync(path.join(work, 'credential.txt'), `${fixtureToken}\n`);
+  writeFileSync(path.join(work, 'feature.txt'), 'feature\n');
+  run(['add', '.'], work); run(['commit', '-m', 'original proposal'], work);
+  const original = run(['rev-parse', 'HEAD'], work);
+  run(['push', 'origin', 'HEAD:refs/heads/original'], work);
+  run(['reset', '--hard', base], work);
+  writeFileSync(path.join(work, 'feature.txt'), 'feature\n');
+  run(['add', '.'], work); run(['commit', '-m', 'replacement without credential'], work);
+  const replacement = run(['rev-parse', 'HEAD'], work);
+  run(['push', 'origin', 'HEAD:refs/heads/replacement'], work);
+  run(['replace', original, replacement], repo.barePath);
+  const contribution = await src.submitContributionAsync({ orgId: org.id, projectId: project.id, repoRef: repo.id, baseCommit: base, headCommit: original, principalId: human.id, intent: 'replacement fixture' });
+  assert.ok(contribution.findings.some((finding) => finding.name === 'github_token'));
+  assert.equal(contribution.securityEvidence.validity, 'invalid');
+  assert.ok(src.scanChangeSecrets({ orgId: org.id, projectId: project.id, changeId: contribution.change.id }).some((f) => f.name === 'github_token'));
+  const git = src.gitRepo(org.id, project.id, repo.id);
+  assert.equal(await git.showFileAsync(original, 'credential.txt'), `${fixtureToken}\n`);
+  assert.ok(git.diff(base, original).includes('credential.txt'));
+  assert.ok((await git.changedFilesAsync(base, original)).some((name) => name.includes('credential.txt')));
+});

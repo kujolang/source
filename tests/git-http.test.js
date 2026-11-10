@@ -366,3 +366,15 @@ test('disconnected Git requests waiting for admission do not start a backend aft
   const metrics = await (await fetch(`${base}/metrics`)).text();
   assert.match(metrics, /source_git_backend_outcomes_total\{outcome="exit_0"\} 1/);
 });
+
+test('Git push capability cannot create replacement refs that reinterpret canonical objects', async () => {
+  const { src, org, project, human } = freshSource();
+  const { repo, base: originalBase, head } = seedRepo(src, org.id, project.id);
+  const cap = gitCap(src, org.id, project.id, human.id);
+  await withServer(src, async (base) => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'source-replacement-ref-'));
+    await run(['clone', authedUrl(base, `/git/${org.id}/${project.id}/${repo.id}.git`, cap.credential), cwd]);
+    await assert.rejects(() => run(['push', 'origin', `${originalBase}:refs/replace/${head}`], cwd), /hidden ref/);
+    assert.equal(src.gitRepo(org.id, project.id, repo.id).revParse(`refs/replace/${head}`), '');
+  });
+});

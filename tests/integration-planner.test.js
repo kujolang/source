@@ -240,3 +240,12 @@ test('explicit larger batch assembles 101 independent real Git proposals without
   assert.equal(await git(bare, 'rev-parse', 'main'), base);
   for (const maxProposals of [0, 1001, NaN, Infinity, 1.5]) assert.throws(() => new IntegrationPlanner(bare, { maxProposals }), /integer from 1 to 1000/);
 });
+
+test('replacement refs cannot substitute proposal content or candidate identity', async (t) => {
+  const { base, bare, planner, proposal } = await fixture(t);
+  const original = await proposal('original', (cwd) => writeFile(path.join(cwd, 'original.txt'), 'original\n'));
+  const replacement = await proposal('replacement', (cwd) => writeFile(path.join(cwd, 'substituted.txt'), 'substitution\n'));
+  const expected = await planner.assemble({ baseCommit: base, proposals: [original] });
+  await git(bare, 'replace', original.headCommit, replacement.headCommit);
+  assert.deepEqual(await planner.assemble({ baseCommit: base, proposals: [original] }), expected);
+});
