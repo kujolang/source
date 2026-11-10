@@ -254,3 +254,21 @@ claim is made. Source reduces checker count but all-pairs Git ancestry discovery
 makes assembly expensive enough to outweigh measured verification savings. Next:
 optimize that graph operation without altering candidate semantics, then repeat
 measurements.250/1000 and all other unresolved gates remain open.
+
+## Stress-stage checkpoint — 2026-11-10
+
+The independent-head optimization is now implemented and both 100-agent private
+layouts passed with assembly totals of 24.784 s hot / 24.634 s distributed.
+Source now exposes a validated operator batch ceiling from 1 through 1000,
+default 100; a real-Git 101-proposal assembly regression passes. This replaces
+the earlier hardcoded service ceiling, not the outstanding stress acceptance gate.
+
+Four 250-agent private-load attempts are recorded in concurrency-results: both
+layouts failed during submission. Diagnostic reruns identify clone transport
+failures (Git exit 128), not a proven local spawn or HTTP admission rejection.
+No assembly/promotion capacity claim follows. Investigation also reproduced and
+fixed admission of disconnected queued clients; 35 focused regressions pass and
+the long post-report process drain no longer recurs. Next: classify safe client
+curl failures and backend exits, resolve the observed transport failure, rerun
+250 hot/distributed, then attempt 1000. Sustained/recovery load and the independent
+hosting, isolation and production gates remain open.

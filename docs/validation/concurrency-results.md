@@ -382,3 +382,22 @@ Git slot. The API now checks disconnection after admission and before starting
 Git. A separate client diagnostic change retains only allowlisted process facts
 and a fixed error category, never raw stderr, command arguments or credentials.
 These fixes require reruns; the 250-agent milestone is not yet satisfied.
+
+The diagnostic reruns at `37f240c` also failed during clone:
+[hot](benchmarks/agents-250-repos-1-diagnostic.json) and
+[distributed](benchmarks/agents-250-repos-10-diagnostic.json). Both report
+`kind=transport`, Git exit code 128, no process error code or signal, and
+`killed=false`. Hot recorded 448 HTTP 200 responses and 36.510 s; distributed
+recorded 472 and 40.917 s. Each includes the expected anonymous 401 probe, no
+HTTP 429, and no completed client result before abort. The diagnostics distinguish
+these from local spawn errors, but do not yet identify the transport failure's
+root cause; server backend exit/error counters and safe curl-code classification
+are the next evidence needed. Do not infer a host process limit from these reports.
+
+The wrapper measured full process lifetimes of 36.849 s hot and 41.192 s
+distributed, compared with report times of 36.510 / 40.917 s. The prior two-minute
+post-report drain did not recur. The admission regression fails before the fix
+(two backend starts) and passes afterward (only the live request starts one).
+Transport, client retry, sync and submit regression: 35/35 pass, zero skips,
+33.02 s (`/tmp/source-stress-diagnostics-tests.log`); lint checks 108 JS files.
+The 250-agent stress gate remains failed, and 1000 agents remain unmeasured.
