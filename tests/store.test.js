@@ -332,3 +332,22 @@ if (PG_DSN) {
     assert.equal(humanActivity.decisions.length, 1);
   });
 }
+
+
+for (const [name, create] of [['JSON', () => new Store(tmp())], ['SQLite', () => new SqliteStore(tmp())]]) {
+  test(`${name} listing resumes after a missing cursor and isolates literal prefixes`, async () => {
+    const store = create();
+    try {
+      store.writeJson('org_a/items/A.json', {});
+      store.writeJson('org_a/items/C.json', {});
+      store.writeJson('orgXa/items/B.json', {});
+      store.writeJson('org_a/items/nested/child.json', {});
+      assert.deepEqual(store.listJson('org_a/items'), ['A', 'C']);
+      assert.deepEqual(store.listJson('org_a/items', { cursor: 'B', limit: 1 }), ['C']);
+      assert.deepEqual(store.listJson('org_a/items', { cursor: 'Z', limit: 1 }), []);
+      if (store.listJsonAsync) {
+        assert.deepEqual(await store.listJsonAsync('org_a/items', { cursor: 'B', limit: 1 }), ['C']);
+      }
+    } finally { store.db?.close(); }
+  });
+}

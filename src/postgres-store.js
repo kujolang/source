@@ -1096,67 +1096,35 @@ class PostgresStore {
     });
   }
 
-  listJson(dirRel, { cursor, limit, includeDirs = false } = {}) {
-    const normalized = dirRel.endsWith('/') ? dirRel.slice(0, -1) : dirRel;
-    const prefix = `${normalized}/`;
-    const where = `WHERE path LIKE ${escapeSqlLiteral(`${prefix}%`)}`;
-    const limitClause = Number.isInteger(limit) && limit > 0 ? ` LIMIT ${Math.min(limit, MAX_BULK_RECORD_READS)}` : '';
-
-    const rows = this._fetchJsonRows(`
-      SELECT path
-      FROM ${this._qualified('records')}
-      ${where}
-      ORDER BY path
-      ${limitClause}
-    `);
-
-    const names = rows
-      .map((r) => r.path)
-      .map((p) => {
-        if (typeof p !== 'string' || !p.startsWith(`${normalized}/`)) return null;
-        const rest = p.slice(normalized.length + 1);
-        if (!rest) return null;
-        if (rest.includes('/')) {
-          if (!includeDirs) return null;
-          return rest.split('/')[0];
-        }
-        if (!rest.endsWith('.json')) return null;
-        return rest.slice(0, -'.json'.length);
-      })
-      .filter(Boolean)
-      .sort();
-    let out = [...new Set(names)];
-    if (cursor) {
-      const start = out.indexOf(cursor);
-      out = start >= 0 ? out.slice(start + 1) : out;
-    }
-    if (Number.isInteger(limit) && limit > 0) {
-      out = out.slice(0, Math.min(limit, 1001));
-    }
-    return out;
-  }
-
-  async listJsonAsync(dirRel, { cursor, limit, includeDirs = false } = {}) {
+  _listJsonQuery(dirRel, { cursor, limit, includeDirs = false } = {}) {
     const normalized = dirRel.endsWith('/') ? dirRel.slice(0, -1) : dirRel;
     const prefix = `${normalized}/`;
     const limitClause = Number.isInteger(limit) && limit > 0 ? ` LIMIT ${Math.min(limit, MAX_BULK_RECORD_READS)}` : '';
-    const restExpr = `substring(path from ${prefix.length + 1})`;
+    const restExpr = `substring(path from ${[...prefix].length + 1})`;
     const nameExpr = includeDirs
       ? `CASE WHEN position('/' in ${restExpr}) > 0 THEN split_part(${restExpr}, '/', 1)
              WHEN ${restExpr} LIKE '%.json' THEN left(${restExpr}, length(${restExpr}) - 5)
              ELSE NULL END`
       : `CASE WHEN position('/' in ${restExpr}) = 0 AND ${restExpr} LIKE '%.json'
              THEN left(${restExpr}, length(${restExpr}) - 5) ELSE NULL END`;
-    const cursorClause = cursor ? `AND (${nameExpr}) > ${escapeSqlLiteral(cursor)}` : '';
-    const rows = await this._fetchJsonRowsAsync(`
-      SELECT DISTINCT ${nameExpr} AS name
+    const cursorClause = cursor ? `AND (${nameExpr}) COLLATE "C" > ${escapeSqlLiteral(cursor)}` : '';
+    return `
+      SELECT DISTINCT (${nameExpr}) COLLATE "C" AS name
       FROM ${this._qualified('records')}
-      WHERE path LIKE ${escapeSqlLiteral(`${prefix}%`)}
+      WHERE starts_with(path, ${escapeSqlLiteral(prefix)})
         ${cursorClause}
         AND (${nameExpr}) IS NOT NULL
       ORDER BY name
       ${limitClause}
-    `);
+    `;
+  }
+
+  listJson(dirRel, options = {}) {
+    return this._fetchJsonRows(this._listJsonQuery(dirRel, options)).map((row) => row.name).filter(Boolean);
+  }
+
+  async listJsonAsync(dirRel, options = {}) {
+    const rows = await this._fetchJsonRowsAsync(this._listJsonQuery(dirRel, options));
     return rows.map((row) => row.name).filter(Boolean);
   }
 

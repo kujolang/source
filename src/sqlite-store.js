@@ -78,7 +78,7 @@ export class SqliteStore {
   // directory. Mirrors the JSON store's readdir of a directory.
   listJson(dirRel, { cursor, limit, includeDirs = false } = {}) {
     const prefix = dirRel.endsWith('/') ? dirRel : `${dirRel}/`;
-    const rows = this.db.prepare('SELECT path FROM records WHERE path LIKE ?').all(`${prefix}%`);
+    const rows = this.db.prepare('SELECT path FROM records WHERE substr(path, 1, length(?)) = ?').all(prefix, prefix);
     const names = rows
       .map((r) => {
         const rest = r.path.slice(prefix.length);
@@ -89,11 +89,7 @@ export class SqliteStore {
         return rest.endsWith('.json') ? rest.slice(0, -'.json'.length) : null;
       })
       .filter(Boolean);
-    let out = [...new Set(names)].sort();
-    if (cursor) {
-      const start = out.indexOf(cursor);
-      out = start >= 0 ? out.slice(start + 1) : out;
-    }
+    let out = [...new Set(names)].sort().filter((name) => !cursor || name > cursor);
     if (Number.isInteger(limit) && limit > 0) {
       out = out.slice(0, Math.min(limit, 1001));
     }

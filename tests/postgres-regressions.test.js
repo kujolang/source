@@ -68,3 +68,23 @@ test('independent Postgres Source instances retain concurrent evidence relations
   const updated = await src.getChangeAsync(org.id, project.id, change.id);
   assert.deepEqual(new Set(updated.evidence), new Set(evidence.map(e => e.id)));
 });
+
+
+test('Postgres listing applies literal scope, unique children and cursor before limit', { skip: !dsn }, async (t) => {
+  const schema = `source_listing_${process.pid}_${Date.now()}`;
+  const store = new PostgresStore({ dsn, schema });
+  t.after(async () => { await store.pool.query(`DROP SCHEMA "${schema}" CASCADE`); await store.closeAsync(); });
+  for (const path of ['org_a/items/A.json', 'org_a/items/C.json', 'orgXa/items/B.json',
+    'org_a/items/0nested/one.json', 'org_a/items/0nested/two.json', 'org_a/items/0nested/three.json',
+    'org_a/items/Z.json', 'org_a/items/a.json', 'org_🦊/items/A.json']) {
+    await store.writeJsonAsync(path, {});
+  }
+  for (const list of [store.listJson.bind(store), store.listJsonAsync.bind(store)]) {
+    assert.deepEqual(await list('org_a/items', { limit: 2 }), ['A', 'C']);
+    assert.deepEqual(await list('org_a/items', { cursor: 'B', limit: 2 }), ['C', 'Z']);
+    assert.deepEqual(await list('org_a/items', { cursor: 'C', limit: 2 }), ['Z', 'a']);
+    assert.deepEqual(await list('org_a/items', { includeDirs: true, limit: 2 }), ['0nested', 'A']);
+    assert.deepEqual(await list('org_a/items', { cursor: 'z', limit: 2 }), []);
+    assert.deepEqual(await list('org_🦊/items'), ['A']);
+  }
+});

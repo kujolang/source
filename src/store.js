@@ -79,11 +79,7 @@ export class Store {
         if (e.isFile() && e.name.endsWith('.json')) out.push(e.name.slice(0, -'.json'.length));
         else if (includeDirs && e.isDirectory()) out.push(e.name);
       }
-      const unique = [...new Set(out)].sort();
-      if (cursor) {
-        const start = unique.indexOf(cursor);
-        unique.splice(0, start >= 0 ? start + 1 : 0);
-      }
+      const unique = [...new Set(out)].sort().filter((name) => !cursor || name > cursor);
       if (Number.isInteger(limit) && limit > 0) unique.splice(Math.min(limit, 1001));
       return unique;
     } catch (e) {
@@ -99,11 +95,7 @@ export class Store {
       const out = entries
         .filter((e) => (e.isFile() && e.name.endsWith('.json')) || (includeDirs && e.isDirectory()))
         .map((e) => e.isFile() ? e.name.slice(0, -'.json'.length) : e.name);
-      const unique = [...new Set(out)].sort();
-      if (cursor) {
-        const start = unique.indexOf(cursor);
-        unique.splice(0, start >= 0 ? start + 1 : 0);
-      }
+      const unique = [...new Set(out)].sort().filter((name) => !cursor || name > cursor);
       if (Number.isInteger(limit) && limit > 0) unique.splice(Math.min(limit, 1_001));
       return unique;
     } catch (e) {
