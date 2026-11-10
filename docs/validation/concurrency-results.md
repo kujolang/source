@@ -23,7 +23,8 @@ node scripts/benchmarks/integration.js \
 The current harness accepts 1–100 agents. Source's integration planner accepts
 at most 100 proposals per candidate. Larger stages require explicit multi-batch
 and stale-proposal orchestration; the harness does not lower requested concurrency
-or bypass that limit. Server rate/admission/authentication defaults are unchanged.
+or bypass that limit. The default benchmark profile keeps server settings unchanged;
+the separately named private-load profile below declares its operator configuration.
 A same-address burst above ten submissions can encounter the default rate limit;
 a failed run records failure, not capacity.
 
@@ -130,7 +131,7 @@ candidates: their 100% hit result proves correctness, not an expected cache rate
 |---|---|---|
 | 10 | Passed this compatible-file lifecycle | Passed, five repos |
 | 25 | Passed after bounded backoff and gzip fix | Passed with bounded backoff, five repos |
-| 100 | Not measured | Not measured |
+| 100 | Default profile failed during clone: HTTP 429 | Default profile failed during clone: HTTP 429 (ten repos) |
 | 250 | Not measured; beyond harness bound | Not measured |
 | 1,000+ | Not measured; multi-batch orchestration required | Not measured |
 
@@ -213,3 +214,47 @@ The earlier failure remains in the record. Both pilot layouts now have passing
 runs, but the distributed run predates the gzip fix and neither run demonstrates
 sustained load or application CI. Different throttle timing and jitter prevent
 attributing the elapsed-time difference between hot runs solely to the fix.
+
+
+## 100-agent default-profile admission result
+
+At application revision `1c74c3d`, both requested 100-agent layouts failed during
+initial HTTP cloning, before any client completed submission:
+
+| Layout | HTTP 200 | HTTP 429 | Elapsed including cleanup |
+|---|---:|---:|---:|
+| One hot repo | 120 | 16 | 16.931 s |
+| Ten repos | 118 | 4 | 21.786 s |
+
+Raw reports: [hot](benchmarks/agents-100-repos-1.json) and
+[distributed](benchmarks/agents-100-repos-10.json). Ordinary Git clone does not use
+the submit client's bounded backoff. All clients share one address, so the default
+120/min public-read limit stops this onboarding burst. The harness aborts after
+the first error; these counts are not eventual outcomes for all clients. No
+candidate, queue, promotion or verification throughput is established by the runs.
+
+## Explicit private-load profile
+
+`--profile private-load` is a separate operator-configured workload. It uses only
+private repositories and distinct project-scoped read_source/git_push/submit_change
+capabilities, including authenticated clone, submit and final fetch. An anonymous
+Git probe must be rejected, and returned sessions must preserve the authenticated
+principal. Credentials stay in IPC/memory and are not written into reports or
+remote URLs. Verification and promotion policy are unchanged.
+
+For this profile only, the harness configures the existing bounded per-address
+push and submit limits to 1,000/min each. Git/API concurrency, queue sizes,
+worker concurrency and all other server limits retain defaults. This lets the
+100-agent test measure storage/assembly/queue contention instead of terminating
+at anonymous onboarding admission. It is not a change to Source's product defaults
+or evidence that the default profile supports that burst. Rate-policy selection
+is deployment-specific; the synthetic profile is not a recommended public-server
+configuration. Passing results, if any, must always be labeled private-load.
+
+Example (use an owned disposable PostgreSQL database):
+
+```bash
+SOURCE_TEST_DATABASE_URL='postgresql:///YOUR_DISPOSABLE_DB?host=/tmp' \
+node scripts/benchmarks/integration.js --profile private-load \
+  --agents 100 --repos 1 --output /absolute/private-100-hot.json
+```

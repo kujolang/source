@@ -9,6 +9,7 @@ import { tmpdir, cpus, totalmem } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { authenticatedGit } from '../../src/remote.js';
 const exec = promisify(execFile);
 const script = fileURLToPath(import.meta.url);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -34,7 +35,8 @@ async function verify(repository, commit, expected) {
 async function agent(config) {
   const { submitFromWorkingDir } = await import('../../src/submit.js');
   const started = performance.now();
-  await git(config.root, 'clone', config.url, config.cwd);
+  if (config.privateProfile) await authenticatedGit(config.credential, config.url, config.root)(['clone', config.url, config.cwd]);
+  else await git(config.root, 'clone', config.url, config.cwd);
   const cloneMs = performance.now() - started;
   await git(config.cwd, 'config', 'user.name', `agent-${config.index}`);
   await git(config.cwd, 'config', 'user.email', `agent-${config.index}@fixture.invalid`);
@@ -45,6 +47,7 @@ async function agent(config) {
   await git(config.cwd, 'add', '.'); await git(config.cwd, 'commit', '-m', `agent ${config.index}`);
   const submitStarted = performance.now();
   const result = await submitFromWorkingDir({ cwd: config.cwd, credential: config.credential });
+  if (config.privateProfile) assert.equal(result.session.principal, config.principalId, 'private submit retains authenticated principal');
   assert.equal(await git(config.cwd, 'remote', 'get-url', 'origin'), 'git@github.com:fixture/unchanged.git');
   return { index: config.index, repoIndex: config.repoIndex, changeId: result.change.id, workId: result.work.id, sessionId: result.session.id, evidenceId: result.evidence.id, baseCommit: result.change.baseCommit, headCommit: result.change.headCommit, cloneMs, submitMs: performance.now() - submitStarted, totalMs: performance.now() - started };
 }
@@ -79,9 +82,13 @@ async function worker(config) {
 
 async function main() {
   const args = process.argv.slice(2); const flag = (name, fallback) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
-  if (args.includes('--help')) { console.log('SOURCE_TEST_DATABASE_URL=<disposable database> node scripts/benchmarks/integration.js --agents 10 --repos 1 --output /absolute/report.json'); return; }
+  if (args.includes('--help')) { console.log('SOURCE_TEST_DATABASE_URL=<disposable database> node scripts/benchmarks/integration.js --agents 10 --repos 1 --profile default|private-load --output /absolute/report.json'); return; }
   const agents = Number(flag('--agents', 10)), repos = Number(flag('--repos', 1));
   if (![agents, repos].every(Number.isSafeInteger) || agents < 1 || agents > 100 || repos < 1 || repos > agents || Math.ceil(agents / repos) > 100) throw new Error('current harness supports 1-100 agents and 1..agents repositories; larger candidate orchestration remains unimplemented');
+  const profile = flag('--profile', 'default');
+  if (!['default', 'private-load'].includes(profile)) throw new Error('unknown benchmark profile');
+  const privateProfile = profile === 'private-load';
+  const rateLimit = privateProfile ? { gitPush: { limit: 1000, windowMs: 60000 }, submit: { limit: 1000, windowMs: 60000 } } : {};
   const dsn = process.env.SOURCE_TEST_DATABASE_URL;
   const output = flag('--output');
   if (!dsn || !output || !path.isAbsolute(output)) throw new Error('SOURCE_TEST_DATABASE_URL and an absolute --output are required');
@@ -92,7 +99,7 @@ async function main() {
   const schema = `source_bench_${process.pid}_${Date.now()}`;
   let store, server; const children = [], sockets = []; const executions = [], workerErrors = [];
   const cpuBefore = process.cpuUsage(); const began = Date.now();
-  const report = { version: 1, status: 'running', phase: 'setup', httpStatuses: {}, date: new Date().toISOString(), agents, repositories: repos, concurrency: { agentProcesses: agents, workerProcesses: 2, workerConcurrency: 2 }, host: { platform: process.platform, arch: process.arch, node: process.version, cpuCount: cpus().length, memoryBytes: totalmem() }, fixture: 'compatible independent files; fixed host Git-content checker; no repository code execution', rateLimits: 'unchanged server defaults', stages: {}, raw: {}, limitations: ['loopback single host; no deployed TLS latency', 'fixed Git-content verification, not application CI or isolated staging', 'no induced worker crash in this measurement', 'maximum 100 agents per harness run', 'default same-address submit/read/push rate limits apply'] };
+  const report = { version: 1, status: 'running', phase: 'setup', httpStatuses: {}, date: new Date().toISOString(), agents, repositories: repos, concurrency: { agentProcesses: agents, workerProcesses: 2, workerConcurrency: 2 }, host: { platform: process.platform, arch: process.arch, node: process.version, cpuCount: cpus().length, memoryBytes: totalmem() }, fixture: 'compatible independent files; fixed host Git-content checker; no repository code execution', profile, rateLimits: privateProfile ? 'explicit private-load operator profile; not default capacity' : 'unchanged server defaults', admissionConfiguration: rateLimit, stages: {}, raw: {}, limitations: ['loopback single host; no deployed TLS latency', 'fixed Git-content verification, not application CI or isolated staging', 'no induced worker crash in this measurement', 'maximum 100 agents per harness run', privateProfile ? 'private repositories; explicit 1000/min push and submit limits per shared address; server queue/concurrency defaults unchanged' : 'default same-address submit/read/push rate limits apply'] };
   const spawnRole = (role, config) => {
     const child = fork(script, [`--${role}`], { stdio: ['ignore', 'pipe', 'pipe', 'ipc'], env: { ...env(), ...(role === 'worker' ? { PGUSER: config.databaseUser } : {}) } });
     let stderr = ''; child.stderr.on('data', (chunk) => { if (stderr.length < 16384) stderr += chunk; }); child.stdout.resume();
@@ -125,7 +132,7 @@ async function main() {
     await source.addOrgMemberAsync({ orgId: org.id, principalId: human.id, role: 'maintainer' });
     const records = [];
     for (let i = 0; i < repos; i++) {
-      const project = await source.createProjectAsync({ orgId: org.id, name: `project${i}`, slug: `project${i}`, visibility: 'public' });
+      const project = await source.createProjectAsync({ orgId: org.id, name: `project${i}`, slug: `project${i}`, visibility: privateProfile ? 'private' : 'public' });
       const scope = { orgId: org.id, projectId: project.id };
       const repo = await source.createRepositoryAsync({ ...scope, name: `repo${i}` });
       const cwd = path.join(root, `seed${i}`); await mkdir(cwd);
@@ -137,18 +144,26 @@ async function main() {
       await source.integration.configure({ ...scope, repoId: repo.id, principalId: human.id, policy });
       records.push({ scope, repo, base, policy });
     }
-    server = await startServer(source, { port: 0, host: '127.0.0.1' });
+    server = await startServer(source, { port: 0, host: '127.0.0.1', rateLimit });
     server.on('connection', (socket) => sockets.push(socket));
     server.prependListener('request', (_req, res) => res.once('finish', () => { report.httpStatuses[res.statusCode] = (report.httpStatuses[res.statusCode] || 0) + 1; }));
     const baseUrl = `http://127.0.0.1:${server.address().port}`;
     const workers = Array.from({ length: 2 }, (_, i) => spawnRole('worker', { dsn, databaseUser, schema, root, serviceId: service.id, workerId: `benchmark-${i}` }));
     await Promise.all(workers.map((entry) => entry.wait('ready')));
-    const clients = [];
+    const clients = []; const clientConfigs = [];
+    if (privateProfile) {
+      const record = records[0];
+      const response = await globalThis.fetch(`${baseUrl}/git/${org.id}/${record.scope.projectId}/${record.repo.id}.git/info/refs?service=git-upload-pack`);
+      assert.equal(response.status, 401, 'private load profile never grants anonymous Git access');
+      await response.arrayBuffer();
+      report.anonymousGitRejected = true;
+    }
     for (let i = 0; i < agents; i++) {
       const record = records[i % repos];
       const principal = await source.createPrincipalAsync({ type: 'service', name: `agent-${i}` });
-      const cap = await source.capabilities.issueAsync({ principalId: principal.id, allowed: ['read_source', 'git_push'], scope: { org: record.scope.orgId, project: record.scope.projectId } });
-      clients.push(spawnRole('agent', { root, cwd: path.join(root, `agent${i}`), index: i, repoIndex: i % repos, url: `${baseUrl}/git/${org.id}/${record.scope.projectId}/${record.repo.id}.git`, credential: cap.credential }));
+      const cap = await source.capabilities.issueAsync({ principalId: principal.id, allowed: ['read_source', 'git_push', ...(privateProfile ? ['submit_change'] : [])], scope: { org: record.scope.orgId, project: record.scope.projectId } });
+      const config = { root, cwd: path.join(root, `agent${i}`), index: i, repoIndex: i % repos, url: `${baseUrl}/git/${org.id}/${record.scope.projectId}/${record.repo.id}.git`, credential: cap.credential, principalId: principal.id, privateProfile };
+      clientConfigs.push(config); clients.push(spawnRole('agent', config));
     }
     await Promise.all(clients.map((entry) => entry.wait('ready')));
     report.phase = 'submission';
@@ -207,7 +222,11 @@ async function main() {
       assert.equal(await git(record.repo.barePath, 'rev-parse', 'main'), plan.candidate.headCommit);
       for (const proposal of selected) await git(record.repo.barePath, 'merge-base', '--is-ancestor', proposal.headCommit, plan.candidate.headCommit);
       const cwd = path.join(root, `agent${selected[0].index}`), fetchAt = performance.now();
-      await git(cwd, 'fetch', 'source'); fetch.push(performance.now() - fetchAt);
+      if (privateProfile) {
+        const client = clientConfigs[selected[0].index];
+        await authenticatedGit(client.credential, client.url, cwd)(['fetch', 'source']);
+      } else await git(cwd, 'fetch', 'source');
+      fetch.push(performance.now() - fetchAt);
       assert.equal(await git(cwd, 'rev-parse', 'source/main'), plan.candidate.headCommit);
     }
     report.raw.promotionMs = promotion; report.raw.fetchMs = fetch; report.stages.promotionMs = stats(promotion); report.stages.fetchMs = stats(fetch);

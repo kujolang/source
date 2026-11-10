@@ -30,11 +30,16 @@ test('benchmark checker rejects missing, corrupted and unexpected candidate cont
   await assert.rejects(() => check(1), /no unexpected files/);
 });
 
-test('benchmark completes real HTTP submissions, separate workers and exact promotions across repositories', { skip: !process.env.SOURCE_TEST_DATABASE_URL, timeout: 90000 }, async (t) => {
+for (const profile of ['default', 'private-load']) test(`benchmark completes real HTTP submissions, separate workers and exact promotions across repositories: ${profile}`, { skip: !process.env.SOURCE_TEST_DATABASE_URL, timeout: 90000 }, async (t) => {
   const root = await mkdtemp(path.join(tmpdir(), 'source-bench-lifecycle-')); t.after(() => rm(root, { recursive: true, force: true }));
   const output = path.join(root, 'report.json');
-  await exec(process.execPath, [script, '--agents', '2', '--repos', '2', '--output', output], { env: process.env, timeout: 80000, maxBuffer: 4 * 1024 * 1024 });
+  await exec(process.execPath, [script, '--profile', profile, '--agents', '2', '--repos', '2', '--output', output], { env: process.env, timeout: 80000, maxBuffer: 4 * 1024 * 1024 });
   const report = JSON.parse(await readFile(output, 'utf8'));
+  assert.equal(report.profile, profile);
+  if (profile === 'private-load') {
+    assert.equal(report.anonymousGitRejected, true);
+    assert.deepEqual(report.admissionConfiguration, { gitPush: { limit: 1000, windowMs: 60000 }, submit: { limit: 1000, windowMs: 60000 } });
+  }
   assert.equal(report.status, 'passed'); assert.equal(report.raw.proposals.length, 2); assert.equal(report.raw.executions.length, 2);
   assert.equal(report.stages.submission.cloneMs.samples, 2); assert.equal(report.stages.promotionMs.samples, 2);
   assert.equal(report.stages.verification.completed, 2); assert.equal(report.stages.reuse.hits, 2);

@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "status": "failed",
+  "phase": "submission",
+  "httpStatuses": {
+    "200": 120,
+    "429": 16
+  },
+  "date": "2026-11-10T21:43:27.045Z",
+  "agents": 100,
+  "repositories": 1,
+  "concurrency": {
+    "agentProcesses": 100,
+    "workerProcesses": 2,
+    "workerConcurrency": 2
+  },
+  "host": {
+    "platform": "darwin",
+    "arch": "x64",
+    "node": "v26.12.1",
+    "cpuCount": 12,
+    "memoryBytes": 17179869184,
+    "git": "git version 2.42.0"
+  },
+  "fixture": "compatible independent files; fixed host Git-content checker; no repository code execution",
+  "rateLimits": "unchanged server defaults",
+  "stages": {},
+  "raw": {
+    "completedClients": []
+  },
+  "limitations": [
+    "loopback single host; no deployed TLS latency",
+    "fixed Git-content verification, not application CI or isolated staging",
+    "no induced worker crash in this measurement",
+    "maximum 100 agents per harness run",
+    "default same-address submit/read/push rate limits apply"
+  ],
+  "sourceRevision": "1c74c3dc543692443befe03e5c0b32234fb43545",
+  "harnessSha256": "bf20650897bd2c6a91f4b1e83d06c112607eee3782a31d0b62cc99bdb180b1d2",
+  "error": "Command failed: git -c core.hooksPath=/dev/null -c commit.gpgSign=false clone http://127.0.0.1:57786/git/O1/P1/R1.git /private/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-lifecycle-bench-Ng4TIQ/agent22\nCloning into '/private/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-lifecycle-bench-Ng4TIQ/agent22'...\nerror: RPC failed; HTTP 429 curl 22 The requested URL returned error: 429\nfatal: expected flush after ref listing\n",
+  "elapsedMs": 16931,
+  "parentCpuMicros": {
+    "user": 1775538,
+    "system": 1833167
+  },
+  "parentPeakRssBytes": 109961216
+}
