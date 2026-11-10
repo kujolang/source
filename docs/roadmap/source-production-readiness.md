@@ -104,3 +104,17 @@ verification planner for pinned source revisions and compatibility limits.
 This supersedes the corresponding missing portions of items 3–4 above. It does
 not complete interrupted-assembly drills, isolated execution, durable dispatch,
 real-tool lifecycle validation or benchmarks. The full mission remains active.
+
+## Queue foundation increment — 2026-11-10
+
+The original impact/broker regression is now clean after freeing disk capacity:
+293 tests, 286 pass, seven PostgreSQL skips. A separate disposable PostgreSQL
+baseline passed 22 tests without skips. See failure-recovery for actual evidence.
+
+The existing queue now supports bounded operator priority, scoped
+terminal cancellation, expired-lease rejection and worker/runner abort propagation.
+Ephemeral workspace cleanup is fenced by the job's lease-attempt identity.
+This supplies primitives for item 5; it does not yet connect candidate identities,
+reuse, coalescing, supersession or execution receipts to the queue. The full
+attached mission remains active and all later environment/hosting/scale gates
+remain required.

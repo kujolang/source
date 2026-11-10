@@ -1244,6 +1244,20 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           return workflow ? json(res, 200, selectFields(workflow, fields)) : json(res, 404, { error: 'workflow not found' });
         }
 
+        const cancelJobRoute = rest.match(/^\/jobs\/([A-Za-z0-9_-]+)\/cancel$/);
+        if (cancelJobRoute && req.method === 'POST') {
+          // Cancellation is project-wide authority, never inferred from enqueue.
+          const authorization = await authorizeRequestAsync(src.capabilities, req, ACTIONS.cancel_job, { org: orgId, project: projectId });
+          if (!authorization.ok) return json(res, authorization.status, { error: authorization.error });
+          const body = await readBody(req, maxJsonBodyBytes);
+          const outcome = await src._projectMutationAsync(orgId, projectId, async () => {
+            const cancelled = await src.jobs.cancel({ id: cancelJobRoute[1], orgId, projectId, reason: body.reason });
+            if (cancelled) await src._asyncAudit({ event: 'job.cancel', orgId, projectId, jobId: cancelled.id, principalId: authorization.cap.principalId });
+            return cancelled;
+          });
+          return json(res, outcome ? 200 : 409, outcome || { error: 'job not cancellable in this scope' });
+        }
+
         if (rest === '/jobs' && req.method === 'GET') {
           const jobWorkId = url.searchParams.get('work') || null;
           const g = await guard(src, req, ACTIONS.read_jobs, { org: orgId, project: projectId, work: jobWorkId });

@@ -81,3 +81,24 @@ and the disposable database were removed after completion. Evidence logs:
 `/tmp/source-postgres-baseline.log`. These successful runs supersede the disk-
 limited attempts for regression acceptance. They do not establish the new broker's
 PostgreSQL crash/failover behavior or production capacity; those gates remain open.
+
+## Queue cancellation and priority — 2026-11-10
+
+The complete regression with a disposable live PostgreSQL database passed all
+304 tests across 44 files, zero skips/failures (127.42 seconds). It includes new
+priority/dependency ordering, old-schema upgrade, cross-store expired lease
+rejection, cancelled lease fencing, ten cancellation-versus-completion races and
+HTTP cancellation capability/audit checks. Evidence:
+`/tmp/source-queue-complete-regression.log`.
+
+Final review then found and fixed workspace cleanup ownership across attempts:
+the manager now keys each workspace by job ID and lease token and rejects duplicate
+acquisition. The affected worker/action-runner suite passed all 36 tests after
+that final change (`/tmp/source-queue-final-worker.log`); syntax lint checks 94
+files. The full suite was not rerun after that isolated workspace change.
+
+Cancellation tests demonstrate durable queue fencing and signal propagation,
+not live container teardown. The Docker daemon remains unavailable locally.
+Custom handlers must observe abort signals and fence writes; candidate-aware
+dispatcher receipt fencing, durable reuse/supersession, staging and cost accounting
+remain required. No claim of production capacity follows from these tests.

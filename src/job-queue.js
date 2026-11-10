@@ -6,11 +6,11 @@ export class JobQueue {
     this.store = store;
   }
 
-  async enqueue({ kind, payload = {}, availableAt = new Date(), orgId = null, projectId = null, workId = null, maxAttempts = 5, maxQueueDepth = null, dedupeKey = null, dependsOn = [] }) {
+  async enqueue({ kind, payload = {}, availableAt = new Date(), orgId = null, projectId = null, workId = null, maxAttempts = 5, maxQueueDepth = null, dedupeKey = null, dependsOn = [], priority = 0 }) {
     if (typeof this.store.enqueueJobAsync !== 'function') {
       throw new Error('durable job queue requires a Postgres-backed store');
     }
-    return this.store.enqueueJobAsync({ kind, payload, availableAt, orgId, projectId, workId, maxAttempts, maxQueueDepth, dedupeKey, dependsOn });
+    return this.store.enqueueJobAsync({ kind, payload, availableAt, orgId, projectId, workId, maxAttempts, maxQueueDepth, dedupeKey, dependsOn, priority });
   }
 
   async enqueueBatch({ jobs, maxQueueDepth = null }) {
@@ -23,6 +23,11 @@ export class JobQueue {
       throw new Error('durable job queue requires a Postgres-backed store');
     }
     return this.store.claimJobsAsync({ workerId, limit, leaseMs, maxAttempts, projectBurst });
+  }
+
+  async cancel({ id, orgId, projectId, reason }) {
+    if (typeof this.store.cancelJobAsync !== 'function') throw new Error('durable job queue requires a Postgres-backed store');
+    return this.store.cancelJobAsync({ id, orgId, projectId, reason });
   }
 
   async complete({ id, workerId, leaseToken, result = null }) {

@@ -119,18 +119,46 @@ export class SourceWorker {
     const handler = this.handlers[job.kind];
     let heartbeat;
     let timeout;
+    let leaseDeadline;
     const controller = new AbortController();
+    let rejectLease;
+    const leaseLost = new Promise((_resolve, reject) => { rejectLease = reject; });
+    let heartbeatPending = false;
+    let executionEnded = false;
     this.activeJobs += 1;
     try {
       if (typeof handler !== 'function') throw new Error(`no handler registered for job kind: ${job.kind}`);
+      const renewDeadline = (expiresAt) => {
+        clearTimeout(leaseDeadline);
+        const remaining = Date.parse(expiresAt) - Date.now();
+        const delay = Number.isFinite(remaining) ? Math.max(0, Math.min(remaining, this.leaseMs)) : this.leaseMs;
+        leaseDeadline = setTimeout(() => {
+          const error = new Error('worker lease heartbeat deadline exceeded');
+          controller.abort(error);
+          rejectLease(error);
+        }, delay);
+        leaseDeadline.unref?.();
+      };
+      renewDeadline(job.leasedUntil);
       const heartbeatMs = Math.max(1, Math.floor(this.leaseMs / 3));
       heartbeat = setInterval(() => {
-        this.queue.extend({ id: job.id, workerId: this.workerId, leaseToken: job.leaseToken, leaseMs: this.leaseMs }).catch(() => {});
+        if (heartbeatPending || controller.signal.aborted) return;
+        heartbeatPending = true;
+        Promise.resolve().then(() => this.queue.extend({ id: job.id, workerId: this.workerId, leaseToken: job.leaseToken, leaseMs: this.leaseMs }))
+          .then((lease) => {
+            if (lease === null || lease === false) throw new Error('worker job lease lost or cancelled');
+            if (!executionEnded && !controller.signal.aborted) renewDeadline(lease?.leased_until);
+          }).catch((error) => {
+            if (executionEnded) return;
+            controller.abort(error);
+            rejectLease(error);
+          }).finally(() => { heartbeatPending = false; });
       }, heartbeatMs);
       const resultPromise = Promise.resolve().then(() => handler(job.payload, job, { signal: controller.signal }));
       const result = this.handlerTimeoutMs
         ? await Promise.race([
           resultPromise,
+          leaseLost,
           new Promise((resolve, reject) => {
             timeout = setTimeout(() => {
               controller.abort(new Error('worker handler timeout'));
@@ -139,8 +167,10 @@ export class SourceWorker {
             timeout.unref?.();
           }),
         ])
-        : await resultPromise;
-      await this.queue.complete({ id: job.id, workerId: this.workerId, leaseToken: job.leaseToken, result });
+        : await Promise.race([resultPromise, leaseLost]);
+      if (controller.signal.aborted) throw controller.signal.reason;
+      const completed = await this.queue.complete({ id: job.id, workerId: this.workerId, leaseToken: job.leaseToken, result });
+      if (completed === false) throw new Error('worker completion rejected: lease lost or cancelled');
       this.counters.completed += 1;
     } catch (error) {
       this.counters.failed += 1;
@@ -160,9 +190,11 @@ export class SourceWorker {
         this._reportError(failureError);
       }
     } finally {
+      executionEnded = true;
       this.activeJobs = Math.max(0, this.activeJobs - 1);
       if (heartbeat) clearInterval(heartbeat);
       if (timeout) clearTimeout(timeout);
+      if (leaseDeadline) clearTimeout(leaseDeadline);
     }
   }
 

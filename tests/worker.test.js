@@ -241,3 +241,41 @@ test('shutdown cancels idle polling and outage backoff timers', async () => {
     assert.equal(worker._idleWaiters.size, 0);
   }
 });
+
+test('lost or unreachable lease aborts the handler and cannot count as completion', async () => {
+  for (const unavailable of [false, true]) {
+    let signal;
+    let failed;
+    const queue = {
+      async extend() { if (unavailable) throw new Error('heartbeat database unavailable'); return null; },
+      async complete() { assert.fail('lost lease cannot complete'); },
+      async fail(args) { failed = args; return null; },
+    };
+    const worker = new SourceWorker({ queue, workerId: 'lease-loss', leaseMs: 15, handlers: {
+      waiting: async (_payload, _job, context) => { signal = context.signal; await new Promise(() => {}); },
+    } });
+    await worker._runJob({ id: 'lost', kind: 'waiting', leaseToken: 'old' });
+    assert.equal(signal.aborted, true);
+    assert.match(failed.error, unavailable ? /database unavailable/ : /lease lost/);
+    assert.equal(worker.metrics().completed, 0);
+    assert.equal(worker.metrics().activeJobs, 0);
+  }
+});
+
+test('completion rejection is visible and never counted as successful execution', async () => {
+  const worker = new SourceWorker({ workerId: 'stale', queue: { complete: async () => false, fail: async () => null }, handlers: { done: async () => 'result' } });
+  await worker._runJob({ id: 'stale', kind: 'done', leaseToken: 'expired' });
+  assert.equal(worker.metrics().completed, 0);
+  assert.equal(worker.metrics().failed, 1);
+  assert.match(worker.lastError.message, /completion rejected/);
+});
+
+test('a hanging heartbeat cannot extend execution beyond the local lease deadline', async () => {
+  let signal;
+  const worker = new SourceWorker({ workerId: 'hung-heartbeat', leaseMs: 15, queue: {
+    extend: async () => new Promise(() => {}), complete: async () => { assert.fail('expired execution'); }, fail: async () => null,
+  }, handlers: { waiting: async (_payload, _job, context) => { signal = context.signal; await new Promise(() => {}); } } });
+  await worker._runJob({ id: 'hung', kind: 'waiting', leaseToken: 'old' });
+  assert.equal(signal.aborted, true);
+  assert.match(worker.lastError.message, /deadline exceeded/);
+});

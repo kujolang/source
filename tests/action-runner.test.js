@@ -315,3 +315,53 @@ test('rejected runner environment does not consume execution capacity', async ()
   assert.equal(spawned, false);
   assert.equal(runner.slots.active, 0);
 });
+
+test('cancellation propagates to isolated runtime and rejects before spawning when already aborted', async () => {
+  const child = new EventEmitter(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
+  let killed = false;
+  child.kill = () => { killed = true; child.emit('close', null, 'SIGKILL'); };
+  let spawned = 0;
+  const controller = new AbortController();
+  const runner = new IsolatedActionRunner({ image: 'fixture@sha256:abc', workspaceRoot: '/srv/workspaces', spawnProcess: () => { spawned += 1; return child; } });
+  const pending = runner.run({ steps: [{ run: 'sleep 60' }] }, { workspace: '/srv/workspaces/owned', signal: controller.signal });
+  await new Promise(setImmediate);
+  controller.abort();
+  await assert.rejects(pending, /cancelled/);
+  assert.equal(killed, true);
+  await assert.rejects(runner.run({ steps: [{ run: 'true' }] }, { workspace: '/srv/workspaces/owned', signal: controller.signal }), /abort/i);
+  assert.equal(spawned, 1);
+});
+
+test('workflow handler forwards cancellation through its workspace and secret cleanup boundary', async () => {
+  const controller = new AbortController();
+  let released = false;
+  const handler = createGitHubActionsHandler({
+    workspaceManager: { acquire: async () => '/srv/owned', release: async () => { released = true; } },
+    runner: { run: async (_steps, context) => { assert.equal(context.signal, controller.signal); throw new Error('cancelled'); } },
+  });
+  await assert.rejects(handler({ parameters: { steps: [{ run: 'test' }] } }, { id: 'owned' }, { signal: controller.signal }), /cancelled/);
+  assert.equal(released, true);
+});
+
+test('old attempt cleanup cannot remove a reclaimed job workspace', async (t) => {
+  const { access, rm } = await import('node:fs/promises');
+  const root = await mkdtemp(path.join(tmpdir(), 'source-attempt-workspaces-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const manager = new EphemeralWorkspaceManager({ root, maxActive: 2, queue: 0 });
+  const old = { id: 'same-job', leaseToken: 'old-lease' };
+  const current = { id: 'same-job', leaseToken: 'new-lease' };
+  const oldPath = await manager.acquire(old);
+  const pending = manager.acquire(current);
+  await assert.rejects(manager.acquire(current), /already owns/);
+  const currentPath = await pending;
+  assert.notEqual(oldPath, currentPath);
+  await writeFile(path.join(currentPath, 'result'), 'new attempt');
+  assert.equal(await manager.release(old), true);
+  await assert.rejects(access(oldPath));
+  await access(path.join(currentPath, 'result'));
+  assert.equal(await manager.release(old), false);
+  await assert.rejects(manager.acquire(current), /already owns/);
+  assert.equal(await manager.release(current), true);
+  assert.equal(manager.active.size, 0);
+  assert.equal(manager.slots.active, 0);
+});

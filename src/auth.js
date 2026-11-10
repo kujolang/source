@@ -26,6 +26,7 @@ export const ACTIONS = {
   manage_work: 'manage_work',
   enqueue_job: 'enqueue_job',
   read_jobs: 'read_jobs',
+  cancel_job: 'cancel_job',
   manage_workflows: 'manage_workflows',
   read_workflows: 'read_workflows',
   dispatch_workflow: 'dispatch_workflow',

@@ -111,3 +111,48 @@ requires the provider to return an expiry no later than the requested lease.
 The timeout covers the response body as well as headers; the body limit is 1 MiB.
 Redirects are rejected. Injected fetch implementations must return a standard
 Response with a readable body. Workspace cleanup still runs if lease revocation fails.
+
+## Queue priority, cancellation and lease fencing
+
+Operator-side `JobQueue.enqueue` and `enqueueBatch` accept integer `priority`
+from -100 to 100 (default 0). Higher numbers are claimed first among ready jobs;
+dependency completion and the existing per-project burst allowance still apply.
+This is strict priority without aging, so operators must avoid permanently
+starving low-priority work. Public enqueue routes do not accept caller-selected
+priority; the verification dispatcher must choose it from trusted policy.
+
+`POST /api/v1/orgs/{org}/projects/{project}/jobs/{id}/cancel` requires the explicit,
+project-wide `cancel_job` capability. Enqueue permission and work-scoped tokens
+do not confer cancellation authority. The optional JSON `reason` is bounded to
+1000 characters. Cancellation persists terminal `cancelled` state, reason and
+timestamp, revokes the lease token and records a scoped audit event. Repeats
+return the original cancellation; completed/failed jobs cannot be cancelled.
+Dependent jobs fail rather than running without their prerequisite. Job listings
+include priority and cancellation metadata; cancelled jobs leave active depth.
+
+Complete, fail and heartbeat operations require the current, unexpired lease.
+Workers abort on lease loss, heartbeat errors, or the local heartbeat deadline;
+rejected completion is not counted as success. The isolated action handler passes
+the abort signal to its container runner, which kills the runtime process and
+attempts removal of its uniquely named container before releasing its slot.
+Ephemeral workspaces are owned by job ID plus lease token. Cleanup from an old
+attempt cannot delete a reclaimed attempt's workspace; duplicate acquisition of
+one attempt is rejected, including while acquisition is pending.
+Cancellation is cooperative for custom handlers: they must observe the signal
+and fence persistent writes. It cannot undo side effects already performed or
+prove provider teardown succeeded. Candidate evidence writes will also require
+job-lease fencing in the verification dispatcher; queue cancellation alone does
+not provide that integration.
+
+The store adds priority/cancellation columns and upgrades the previous jobs
+status constraint under existing schema initialization locking. Existing jobs
+retain priority zero. Upgrade workers before enabling these operations. Rollback
+requires draining workers and handling cancelled rows before restoring an old
+status constraint; do not simply drop the new columns from a live queue.
+
+Validation: `tests/verification-queue-live.test.js` uses real PostgreSQL stores for
+priority, dependencies, cross-scope cancellation denial, stale leases and old
+schema upgrade and racing cancellation/completion. Its HTTP test checks authorization and audit. Worker and runner
+tests check cancellation propagation with controlled processes; they do not
+establish live Docker/Podman cleanup. Durable candidate-aware scheduling, safe
+reuse/coalescing, supersession and execution-cost accounting remain separate work.

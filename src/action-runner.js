@@ -408,25 +408,38 @@ export class EphemeralWorkspaceManager {
     this.root = path.resolve(root);
     this.slots = new Semaphore({ capacity: boundedInteger(maxActive, 256, 1, 10_000), queue: boundedInteger(queue, 512, 0, 100_000) });
     this.active = new Map();
+    this.pending = new Set();
+  }
+
+  attemptKey(job) {
+    if (typeof job?.id !== 'string' || !job.id) throw new Error('workspace requires a job identity');
+    if (job.leaseToken != null && typeof job.leaseToken !== 'string') throw new Error('invalid workspace lease identity');
+    return JSON.stringify([job.id, job.leaseToken ?? null]);
   }
 
   async acquire(job) {
-    let releaseSlot = await this.slots.acquire();
-    if (!releaseSlot) throw new Error('workflow workspace capacity exhausted');
+    const key = this.attemptKey(job);
+    if (this.active.has(key) || this.pending.has(key)) throw new Error('workflow attempt already owns a workspace');
+    this.pending.add(key);
+    let releaseSlot;
     try {
+      releaseSlot = await this.slots.acquire();
+      if (!releaseSlot) throw new Error('workflow workspace capacity exhausted');
       await mkdir(this.root, { recursive: true });
       const prefix = `source-${String(job?.id || 'job').replace(/[^A-Za-z0-9_-]/g, '_')}-`;
       const workspace = await mkdtemp(path.join(this.root, prefix));
-      this.active.set(job?.id || workspace, { workspace, releaseSlot });
+      this.active.set(key, { workspace, releaseSlot });
       return workspace;
     } catch (error) {
-      releaseSlot();
+      releaseSlot?.();
       throw error;
+    } finally {
+      this.pending.delete(key);
     }
   }
 
   async release(job) {
-    const key = job?.id;
+    const key = this.attemptKey(job);
     const entry = this.active.get(key);
     if (!entry) return false;
     this.active.delete(key);
@@ -491,11 +504,13 @@ export class IsolatedActionRunner {
     return args;
   }
 
-  async run({ steps }, { workspace, env = {} } = {}) {
+  async run({ steps }, { workspace, env = {}, signal } = {}) {
+    signal?.throwIfAborted();
     const resolvedSteps = await this.resolveSteps(steps);
     const safeEnv = safeEnvironment(env);
     let releaseSlot = await this.slots.acquire();
     if (!releaseSlot) throw new Error('isolated runner capacity exhausted');
+    if (signal?.aborted) { releaseSlot(); signal.throwIfAborted(); }
     const containerName = `source-action-${process.pid}-${Date.now()}-${randomBytes(6).toString('hex')}`;
     let child;
     try {
@@ -518,6 +533,7 @@ export class IsolatedActionRunner {
       const stderr = [];
       let settled = false;
       const release = () => {
+        signal?.removeEventListener('abort', onAbort);
         if (releaseSlot) {
           releaseSlot();
           releaseSlot = null;
@@ -525,14 +541,26 @@ export class IsolatedActionRunner {
       };
       const timer = setTimeout(() => {
         if (settled) return;
-        killRuntimeProcess(child);
         settled = true;
+        killRuntimeProcess(child);
         void removeRuntimeContainer(this.runtime, containerName).finally(() => {
           release();
           reject(new Error('isolated workflow timed out'));
         });
       }, this.timeoutMs);
       timer.unref?.();
+      const onAbort = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        killRuntimeProcess(child);
+        void removeRuntimeContainer(this.runtime, containerName).finally(() => {
+          release();
+          reject(new Error('isolated workflow cancelled'));
+        });
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+      if (signal?.aborted) onAbort();
       const collect = (target, chunk) => {
         if (settled) return;
         outputBytes += chunk.length;
@@ -572,7 +600,8 @@ export function createGitHubActionsHandler({ runner, workspaceForJob, workspaceM
   if (!runner || typeof runner.run !== 'function') throw new Error('runner is required');
   if (!workspaceManager && typeof workspaceForJob !== 'function') throw new Error('workspaceForJob is required');
   if (secretBroker && typeof secretBroker.get !== 'function') throw new Error('secret broker must expose get(payload, job)');
-  return async (payload, job) => {
+  return async (payload, job, { signal } = {}) => {
+    signal?.throwIfAborted();
     const parameters = payload?.parameters;
     if (!parameters) throw new Error('workflow job parameters are missing');
     const workspace = workspaceManager
@@ -583,7 +612,7 @@ export function createGitHubActionsHandler({ runner, workspaceForJob, workspaceM
       const leased = secretBroker?.issue ? await secretBroker.issue(payload, job) : null;
       leaseId = leased?.leaseId || null;
       const env = safeEnvironment(leased ? leased.env : await (secretBroker ? secretBroker.get(payload, job) : secretProvider(payload, job)));
-      const result = await runner.run({ steps: parameters.steps }, { workspace, env });
+      const result = await runner.run({ steps: parameters.steps }, { workspace, env, ...(signal ? { signal } : {}) });
       return redactSecretOutput(result, env);
     } finally {
       try {
