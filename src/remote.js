@@ -7,6 +7,10 @@ export function git(args, cwd, { timeoutMs = 120000 } = {}) {
     execFile('git', args, { cwd, encoding: 'utf8', timeout: timeoutMs, env: { ...process.env, LC_ALL: 'C' } }, (err, stdout, stderr) => {
       if (err) {
         err.httpStatus = Number(stderr.match(/The requested URL returned error: (\d{3})/i)?.[1]) || null;
+        // Classify known local/transport failures without retaining remote text.
+        err.failureKind = /cannot fork|unable to fork|resource temporarily unavailable|cannot create thread/i.test(stderr) ? 'resource_exhausted'
+          : /timed out|timeout/i.test(stderr) ? 'timeout'
+            : /RPC failed|connection reset|failed to connect|empty reply|early EOF/i.test(stderr) ? 'transport' : 'git_exit';
         reject(err);
       }
       else resolve(stdout.trim());
@@ -56,7 +60,17 @@ export function authenticatedGit(credential, url, cwd, { retry = new ClientRetry
           continue;
         }
         // Do not leak command argv, credentials, or remote-controlled stderr.
-        throw new Error(`Source Git ${args[0]} failed; check credentials, connectivity, and fast-forward history (no force or deletion is performed)`);
+        const failure = new Error(`Source Git ${args[0]} failed; check credentials, connectivity, and fast-forward history (no force or deletion is performed)`);
+        failure.diagnostic = {
+          operation: ['clone', 'ls-remote', 'fetch', 'push'].includes(args[0]) ? args[0] : 'git',
+          kind: ['resource_exhausted', 'timeout', 'transport', 'git_exit'].includes(error.failureKind) ? error.failureKind : 'process',
+          exitCode: Number.isInteger(error.code) ? error.code : null,
+          code: ['EAGAIN', 'ENOENT', 'ENOMEM', 'ENOBUFS', 'ETIMEDOUT', 'ECONNRESET', 'EPIPE'].includes(error.code) ? error.code : null,
+          signal: ['SIGTERM', 'SIGKILL', 'SIGABRT', 'SIGSEGV'].includes(error.signal) ? error.signal : null,
+          killed: error.killed === true,
+          httpStatus: Number.isInteger(error.httpStatus) && error.httpStatus >= 100 && error.httpStatus <= 599 ? error.httpStatus : null,
+        };
+        throw failure;
       }
     }
   };

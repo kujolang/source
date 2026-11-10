@@ -107,7 +107,7 @@ async function main() {
     const entry = { child, messages: [], error: null, closed: null };
     entry.closed = new Promise((resolve) => child.once('close', (code, signal) => { if (code !== 0) entry.error ||= new Error(`${role} exited ${code ?? signal}`); resolve(); }));
     child.on('error', (error) => { entry.error = error; });
-    child.on('message', (message) => { entry.messages.push(message); if (message.type === 'execution') executions.push(message.value); if (message.type === 'workerError') workerErrors.push(message.error); if (message.type === 'error') entry.error = new Error(message.error); });
+    child.on('message', (message) => { entry.messages.push(message); if (message.type === 'execution') executions.push(message.value); if (message.type === 'workerError') workerErrors.push(message.error); if (message.type === 'error') entry.error = Object.assign(new Error(message.error), { diagnostic: message.diagnostic }); });
     children.push(entry); child.send({ type: 'config', config });
     entry.wait = async (type, timeout = 180000) => {
       const deadline = Date.now() + timeout;
@@ -255,7 +255,7 @@ async function main() {
     report.storage = { filesystemAllocatedBytes: Number((await exec('du', ['-sk', root])).stdout.split(/\s/)[0]) * 1024, postgresRelationBytes: Number((await store.pool.query('SELECT COALESCE(SUM(pg_total_relation_size(c.oid)),0) AS bytes FROM pg_class c JOIN pg_namespace n ON c.relnamespace=n.oid WHERE n.nspname=$1 AND c.relkind=\'r\'', [schema])).rows[0].bytes) };
     report.network = { serverReceivedBytes: sockets.reduce((sum, s) => sum + s.bytesRead, 0), serverSentBytes: sockets.reduce((sum, s) => sum + s.bytesWritten, 0), scope: 'all loopback HTTP/Git during run' };
     report.status = 'passed'; report.phase = 'complete'; report.correctness = { allProposalsRetained: true, exactVerifiedPromotion: true, unverifiedAcceptanceRejected: true, duplicatePromotionIdempotent: true, baselineTreeEquality: true, conflicts: 0, humanInterventions: 0, acceptance: 'automated harness acting as configured human maintainer' };
-  } catch (error) { report.status = 'failed'; report.error = error.message; report.raw.completedClients = children.flatMap((entry) => entry.messages.filter((message) => message.type === 'result').map((message) => message.result)); process.exitCode = 1; }
+  } catch (error) { report.status = 'failed'; report.error = error.message; report.failureDiagnostic = error.diagnostic ?? null; report.raw.completedClients = children.flatMap((entry) => entry.messages.filter((message) => message.type === 'result').map((message) => message.result)); process.exitCode = 1; }
   finally {
     for (const entry of children) if (entry.child.exitCode == null && entry.child.signalCode == null) entry.child.kill('SIGKILL');
     await Promise.all(children.map((entry) => entry.closed));
@@ -280,8 +280,8 @@ if (process.argv[2] === '--verify') {
       process.send({ type: 'ready' });
       process.once('message', async () => {
         try { process.send({ type: 'result', result: await agent(config) }, () => process.disconnect()); }
-        catch (error) { process.send({ type: 'error', error: error.message }, () => process.disconnect()); process.exitCode = 1; }
+        catch (error) { process.send({ type: 'error', error: error.message, diagnostic: error.diagnostic }, () => process.disconnect()); process.exitCode = 1; }
       });
-    } catch (error) { process.send({ type: 'error', error: error.message }, () => process.disconnect()); process.exitCode = 1; }
+    } catch (error) { process.send({ type: 'error', error: error.message, diagnostic: error.diagnostic }, () => process.disconnect()); process.exitCode = 1; }
   });
 } else await main();

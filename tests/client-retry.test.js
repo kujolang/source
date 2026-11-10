@@ -79,3 +79,22 @@ test('server marks throttled submit before mutation and client waits for admissi
   assert.equal(result.change.id, 'C2'); assert.equal(mutations, 2); assert.equal(events.length, 1);
   assert.equal(events[0].delayMs, 1000);
 });
+
+test('Git failure diagnostics retain safe process facts without stderr, argv or arbitrary fields', async () => {
+  const secret = 'secret-fixture-token';
+  for (const input of [
+    { code: 'EAGAIN', failureKind: 'resource_exhausted', signal: null, httpStatus: null },
+    { code: 128, failureKind: 'transport', signal: 'SIGTERM', killed: true, httpStatus: 503 },
+    { code: secret, failureKind: secret, signal: secret, httpStatus: secret },
+  ]) {
+    const run = authenticatedGit(secret, 'https://source.invalid/git/O/P/R.git', '.', { runGit: async () => { throw Object.assign(new Error(secret), input, { stderr: secret, cmd: secret }); } });
+    await assert.rejects(() => run(['fetch']), (error) => {
+      assert.ok(!JSON.stringify(error).includes(secret));
+      assert.equal(error.diagnostic.operation, 'fetch');
+      assert.equal(error.diagnostic.code, input.code === 'EAGAIN' ? 'EAGAIN' : null);
+      assert.equal(error.diagnostic.exitCode, input.code === 128 ? 128 : null);
+      assert.equal(error.diagnostic.httpStatus, input.httpStatus === 503 ? 503 : null);
+      return true;
+    });
+  }
+});
