@@ -8,8 +8,8 @@ run contributed commands on the host. Contract inspected at Workcell revision
 `src/receipts/v2.kujo`, `src/cli/cli.kujo` and `docs/runtime-lifecycle.md`.
 
 This bridge is opt-in. It has real-Git contract tests and actual Workcell
-validation/inspection evidence; live container and provider execution remain
-unverified in the current environment. It is not a production isolation claim.
+validation/inspection evidence. A live Docker attempt now records an integrity-verified
+failure receipt, but workload execution is blocked by the daemon lacking AppArmor. It is not a production isolation claim.
 
 ## Configure
 
@@ -55,7 +55,9 @@ signature checks. Deploy the declared code and image immutably.
 
 The bridge deliberately requires network `none`, no ambient environment allowlist,
 no secret references, and empty check `inputs`/`externalState`. It passes only PATH,
-Git isolation settings and the explicit KUJO binary to Workcell. Provider profiles
+Git isolation settings, the explicit KUJO binary and an attempt-owned TMPDIR to
+Workcell. TMPDIR confines Workcell output and scratch paths to that private attempt;
+it does not inherit the worker's ambient temporary-directory value. Provider profiles
 that require credentials cannot currently use this bridge. External adapters can
 be supplied explicitly through `manifest`, but need separate compatibility and
 live-provider validation. There is no provider fallback.
@@ -130,3 +132,29 @@ Rollback: stop the affected verification workers, remove this executor from the
 operator module, and retain attempt/evidence/dispatch records. No database schema
 migration is required. Existing evidence remains subject to policy identity,
 expiry and generation checks.
+
+
+## Reproduce live validation
+
+```bash
+SOURCE_TEST_CONTAINER_IMAGE='node@sha256:<tested-digest>' \
+SOURCE_TEST_CONTAINER_NODE_VERSION='<exact-version>' \
+SOURCE_TEST_WORKCELL_EXECUTABLE='/opt/workcell/bin/workcell' \
+SOURCE_TEST_KUJO='/opt/kujo/bin/kujo' \
+SOURCE_TEST_WORKCELL_REVISION='<40-hex-revision>' \
+node scripts/workcell-candidate-smoke.js
+```
+
+The command emits the original receipt/captured logs and execution identity,
+retains the test-owned root for inspection/recovery, and exits nonzero unless the
+workload passes with verified integrity and cleanup. It never substitutes a host
+command. Remove the printed owned root only after checking the retained cleanup
+and recovery state. The checked-in Docker profile requires Workcell's existing
+host security controls; no flag disables them.
+
+On 2026-11-10 Docker Desktop 29.6.2 reached Workcell but failed before execution:
+`Docker daemon does not report AppArmor; rootful Docker requires both seccomp and
+AppArmor profiles`. The receipt is verified and cannot authorize promotion.
+See [raw failed report](../validation/container/workcell-smoke-blocked.json).
+Use a compatible approved runtime host to complete this gate. The separate OCI
+executor's passing smoke does not establish Workcell compatibility.

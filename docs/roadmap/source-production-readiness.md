@@ -222,3 +222,10 @@ candidate-smoke.json and scripts/candidate-container-smoke.js. This supersedes
 the unavailable-Docker limitation for this local executor, not other deployment
 profiles. Worker-death orphan recovery, browser/multi-service staging, Workcell
 live validation, real-project lifecycle and larger load stages remain open.
+
+Workcell follow-up: the bridge now supplies an attempt-owned TMPDIR so absolute
+output is accepted and original failure evidence is retained. The live run reaches
+the Docker policy gate but refuses execution because this daemon lacks AppArmor.
+A compatible approved runtime remains necessary; the requirement was not relaxed.
+See validation/container/workcell-smoke-blocked.json and the reproducible
+scripts/workcell-candidate-smoke.js command.

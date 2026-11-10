@@ -416,3 +416,25 @@ escape assessment. Those remain separate gates.
 
 Focused candidate-export and action-runner regression: 27/27 pass, zero skips,
 1.57 s (`/tmp/source-container-focused.log`). Lint106 and diff checks pass.
+
+
+## Workcell temporary boundary and live failure evidence — 2026-11-10
+
+The first Docker-enabled Workcell attempt failed without a receipt because Source
+supplied an absolute output path outside Workcell's allowed TMPDIR boundary.
+The sanitized environment omitted TMPDIR. Source now explicitly sets it to the
+private realpath-resolved attempt directory for inspect/run/verify. No ambient
+value or broader filesystem access is inherited. The regression assertion failed
+before the fix (`/tmp/source-workcell-tmp-before.log`).
+
+The repeated live smoke now records an exact-candidate, integrity-verified failed
+receipt with cleanup confirmed, preserving original diagnostics. Workcell refuses
+rootful Docker without AppArmor on this daemon; no workload ran and no passing
+evidence was issued. The new reproducible smoke exits nonzero for this outcome.
+[Raw failed receipt](container/workcell-smoke-blocked.json) records the runtime
+error and test-owned evidence path. Keep this distinct from the passing lower-level
+OCI executor smoke. A compatible runtime is still required for the Workcell gate.
+
+Workcell/export/control-adapter focused regression: 20/20 pass, no skips, 6.99 s
+(`/tmp/source-workcell-tmp-tests.log`); syntax lint107 and diff checks pass.
+No new full-suite or successful Workcell execution claim is made.

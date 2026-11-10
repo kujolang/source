@@ -26,6 +26,7 @@ async function fixture(t, mode = 'pass') {
     if (args[0] === 'inspect') return { code: 0, stdout: JSON.stringify({ schema_version: 'workcell-inspect-summary/v1', ok: true, profile: { id: 'local', fingerprint: 'a'.repeat(64) }, controls: { rejected: 0 }, backend: { adapter_id: 'docker', provider_id: 'docker-engine' } }) };
     if (args[0] === 'verify') return { code: 0, stdout: JSON.stringify({ ok: mode !== 'integrity' }) };
     const workspace = flag('--repo'); retained = path.dirname(workspace);
+    assert.equal(options.env.TMPDIR, retained, 'Workcell output must stay in its attempt-owned temporary boundary');
     assert.equal(await readFile(path.join(workspace, 'app.js'), 'utf8'), 'committed candidate');
     assert.equal((await exec('git', ['status', '--porcelain'], { cwd: workspace })).stdout, '');
     assert.equal((await exec('git', ['rev-parse', 'HEAD'], { cwd: workspace })).stdout.trim(), candidate.headCommit);
@@ -62,7 +63,7 @@ test('Workcell bridge materializes exact clean Git, verifies evidence and retain
   assert.equal(result.execution.status, 'pass'); assert.equal(result.execution.workcell.cleanupConfirmed, true);
   assert.deepEqual(JSON.parse(result.output).source_capture, { stdout: 'original stdout', stderr: 'original stderr' });
   assert.deepEqual(f.calls.map((call) => call.args[0]), ['inspect', 'run', 'verify']);
-  assert.deepEqual(Object.keys(f.calls[0].options.env).sort(), ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'GIT_NO_REPLACE_OBJECTS', 'KUJO', 'PATH']);
+  assert.deepEqual(Object.keys(f.calls[0].options.env).sort(), ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'GIT_NO_REPLACE_OBJECTS', 'KUJO', 'PATH', 'TMPDIR']);
   await assert.rejects(() => stat(path.join(f.retained(), 'source')), { code: 'ENOENT' });
   assert.ok((await readdir(f.retained())).includes('runs'));
   assert.equal(f.executor.slots.active, 0);

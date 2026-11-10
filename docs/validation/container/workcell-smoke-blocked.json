@@ -1,0 +1,695 @@
+{
+  "version": 1,
+  "ok": false,
+  "root": "/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-workcell-live-JqrgiR",
+  "execution": {
+    "identity": "885d57786396d70b97f41132064cf6f9d2f29d6038374d53cfd53c1de7f150fd",
+    "commit": "b863635de171686447e3ab6b202a7e8f54c43c17",
+    "tree": "dff8b26727c4d963eb5c3c542dd043cf069feff7",
+    "command": [
+      "node",
+      "-e",
+      "const fs=require('node:fs'),assert=require('node:assert/strict');assert.equal(process.version,\"v26.13.0\");assert.equal(fs.readFileSync('expected','utf8'),'exact-candidate');console.log('live Workcell exact candidate passed')"
+    ],
+    "environment": "source-workcell-v1:7b9ce14d15d409553b6cb7c907010d825cd0576c29e0433364cc60a2bf697b27",
+    "inputs": {},
+    "externalState": {},
+    "toolVersions": {
+      "workcell": "1.3.0",
+      "node": "v26.13.0"
+    },
+    "status": "fail",
+    "startedAt": 1794346174234,
+    "finishedAt": 1794346178031,
+    "durationMs": 3797,
+    "workcell": {
+      "runId": "wc-3ab7b32234164f95911331cff1dab9cf",
+      "runDirectory": "/private/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-workcell-live-JqrgiR/attempts/source-workcell-rgXyZw/runs/wc-3ab7b32234164f95911331cff1dab9cf",
+      "cleanupConfirmed": true,
+      "integrityVerified": true
+    }
+  },
+  "receipt": {
+    "artifacts": {
+      "archive": null,
+      "declared": [],
+      "results": [],
+      "status": "not-requested"
+    },
+    "backend": {
+      "adapter_id": "docker",
+      "adapter_version": "builtin",
+      "contract": "workcell-backend/v1alpha1",
+      "profile_fingerprint": "3366343b9d32f41fc8ecd7e1a77647157b9e4b64c96dd633682194f3d7e0bb86",
+      "profile_id": "docker",
+      "provider_api": "docker-cli",
+      "provider_id": "docker-engine",
+      "resource_ids": [],
+      "substrate": "oci/runc"
+    },
+    "caller": {
+      "attempt_id": "9827bf0369c5f573134290ceeb24473bfe0bab91e4e834abfd588ea595b32a6b",
+      "caller": "source",
+      "correlation_id": "eb7c4aa4bc214cbbcd7fb0a51892fb65f3385a7def1d0c447c5f41bafdbfb088",
+      "schema": "workcell-caller-context/v1",
+      "step_id": "46ddf4ac0068e527b8500636817f95b62f5f43fafaf6e80190c5d344a779a327"
+    },
+    "changes": {
+      "files": [],
+      "patch_path": null,
+      "status": "collected"
+    },
+    "cleanup": {
+      "items": [],
+      "journal_path": "",
+      "remaining": [],
+      "status": "complete"
+    },
+    "controls": [
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker CLI flags and Workcell watchdog",
+          "status": "workcell-enforced"
+        },
+        "id": "lifecycle.provision",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": true,
+        "required": true,
+        "resolved": true
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker CLI flags and Workcell watchdog",
+          "status": "workcell-enforced"
+        },
+        "id": "lifecycle.terminate",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": true,
+        "required": true,
+        "resolved": true
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker CLI flags and Workcell watchdog",
+          "status": "workcell-enforced"
+        },
+        "id": "lifecycle.destroy",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": true,
+        "required": true,
+        "resolved": true
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker CLI flags and Workcell watchdog",
+          "status": "workcell-enforced"
+        },
+        "id": "lifecycle.inventory",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": true,
+        "required": true,
+        "resolved": true
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker CLI flags and Workcell watchdog",
+          "status": "workcell-enforced"
+        },
+        "id": "workspace.stage",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": true,
+        "required": true,
+        "resolved": true
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker CLI flags and Workcell watchdog",
+          "status": "workcell-enforced"
+        },
+        "id": "workspace.collect_delta",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": true,
+        "required": true,
+        "resolved": true
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker engine configuration",
+          "status": "provider-claimed"
+        },
+        "id": "process.argv",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": true,
+        "required": true,
+        "resolved": true
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker engine configuration",
+          "status": "provider-claimed"
+        },
+        "id": "process.exit_status",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": true,
+        "required": true,
+        "resolved": true
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker CLI flags and Workcell watchdog",
+          "status": "workcell-enforced"
+        },
+        "id": "artifact.selective_export",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": true,
+        "required": true,
+        "resolved": true
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker CLI flags and Workcell watchdog",
+          "status": "workcell-enforced"
+        },
+        "id": "environment.explicit",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": true,
+        "required": true,
+        "resolved": true
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker CLI flags and Workcell watchdog",
+          "status": "workcell-enforced"
+        },
+        "id": "credentials.redacted_transport",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": true,
+        "required": true,
+        "resolved": true
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker CLI flags and Workcell watchdog",
+          "status": "workcell-enforced"
+        },
+        "id": "evidence.provider_identity",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": true,
+        "required": true,
+        "resolved": true
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker CLI flags and Workcell watchdog",
+          "status": "workcell-enforced"
+        },
+        "id": "ownership.markers",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": true,
+        "required": true,
+        "resolved": true
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker engine configuration",
+          "status": "provider-claimed"
+        },
+        "id": "compute.cpu_limit",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": 1,
+        "required": true,
+        "resolved": 1
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker engine configuration",
+          "status": "provider-claimed"
+        },
+        "id": "compute.memory_limit",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": "256m",
+        "required": true,
+        "resolved": "256m"
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker engine configuration",
+          "status": "provider-claimed"
+        },
+        "id": "compute.pid_limit",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": 64,
+        "required": true,
+        "resolved": 64
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker CLI flags and Workcell watchdog",
+          "status": "workcell-enforced"
+        },
+        "id": "execution.timeout",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": 120000,
+        "required": true,
+        "resolved": 120000
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker CLI flags and Workcell watchdog",
+          "status": "workcell-enforced"
+        },
+        "id": "logs.bounded",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": 65536,
+        "required": true,
+        "resolved": 65536
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker engine configuration",
+          "status": "provider-claimed"
+        },
+        "id": "network.none",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": {
+          "mode": "deny-all"
+        },
+        "required": true,
+        "resolved": {
+          "mode": "deny-all"
+        }
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker engine configuration",
+          "status": "provider-claimed"
+        },
+        "id": "filesystem.read_only_root",
+        "limitations": [],
+        "observation": {
+          "method": "docker-info",
+          "result": "unavailable",
+          "status": "not-observed"
+        },
+        "requested": true,
+        "required": true,
+        "resolved": true
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker engine configuration",
+          "status": "provider-claimed"
+        },
+        "id": "filesystem.tmpfs",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": [
+          "/tmp"
+        ],
+        "required": true,
+        "resolved": [
+          "/tmp"
+        ]
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker engine configuration",
+          "status": "provider-claimed"
+        },
+        "id": "filesystem.writable_paths",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": [
+          "/workspace"
+        ],
+        "required": true,
+        "resolved": [
+          "/workspace"
+        ]
+      },
+      {
+        "acceptance": "accepted",
+        "enforcement": {
+          "authority": "docker-engine",
+          "evidence": "Docker engine configuration",
+          "status": "provider-claimed"
+        },
+        "id": "image.oci",
+        "limitations": [],
+        "observation": {
+          "method": "v1-conformance",
+          "result": "covered",
+          "status": "observed"
+        },
+        "requested": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216",
+        "required": true,
+        "resolved": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216"
+      }
+    ],
+    "cost": {
+      "amount": null,
+      "class": "local-operator-compute",
+      "source": "not-reported",
+      "status": "unknown",
+      "usage": []
+    },
+    "definition": {
+      "name": "source-candidate",
+      "schema": "workcell-definition/v2alpha1"
+    },
+    "errors": [
+      {
+        "code": "OCI_BACKEND_FAILURE",
+        "message": "Docker daemon does not report AppArmor; rootful Docker requires both seccomp and AppArmor profiles",
+        "phase": "preparing",
+        "time": "2026-11-10T21:29:37Z"
+      }
+    ],
+    "execution": {
+      "argv": [
+        "node",
+        "-e",
+        "const fs=require('node:fs'),assert=require('node:assert/strict');assert.equal(process.version,\"v26.13.0\");assert.equal(fs.readFileSync('expected','utf8'),'exact-candidate');console.log('live Workcell exact candidate passed')"
+      ],
+      "environment_names": [],
+      "secret_names": [],
+      "terminal": {
+        "cancelled": false,
+        "certainty": "unknown",
+        "exit_code": null,
+        "reason": "execution-not-started",
+        "signal": null,
+        "status": "unknown",
+        "timed_out": false
+      },
+      "timings": {
+        "total": {
+          "authority": "workcell-monotonic",
+          "duration_ms": 515
+        }
+      },
+      "workdir": "/workspace"
+    },
+    "execution_result": {
+      "attempt": 1,
+      "classification": "execution_failure",
+      "effects": [
+        {
+          "class": "external_non_idempotent",
+          "effect_id": "effect_f5b918eec13330bd39b5116b",
+          "enforced_by": null,
+          "idempotency_key": null,
+          "state": "unknown"
+        }
+      ],
+      "evidence": [
+        {
+          "$ref": "receipt.json"
+        },
+        {
+          "$ref": "stdout.log"
+        },
+        {
+          "$ref": "stderr.log"
+        },
+        {
+          "$ref": "preservation.json"
+        }
+      ],
+      "finished_at": "2026-11-10T21:29:37Z",
+      "producer": {
+        "name": "workcell",
+        "version": "1.3.0"
+      },
+      "reexecution_descriptor_ref": "reexecution.json",
+      "result_id": "xr_bbf1518735c4be5c6bbf1fba",
+      "retry": {
+        "disposition": "operator_required",
+        "reason": "Network access means external effects cannot be inferred or rolled back from the Workcell receipt."
+      },
+      "schema": "kujo.execution-result/v1",
+      "started_at": "2026-11-10T21:29:37Z",
+      "status": "failure",
+      "subject": {
+        "attempt_id": "attempt-1",
+        "run_id": "wc-3ab7b32234164f95911331cff1dab9cf",
+        "step_id": "workflow"
+      },
+      "warnings": [
+        "Workcell controls execution admission and evidence; it does not roll back external effects."
+      ]
+    },
+    "execution_result_path": "execution-result.json",
+    "lifecycle": [
+      {
+        "phase": "record",
+        "status": "created",
+        "time": "2026-11-10T21:29:37Z"
+      },
+      {
+        "phase": "record",
+        "status": "preparing",
+        "time": "2026-11-10T21:29:37Z"
+      }
+    ],
+    "logs": {
+      "bytes": {
+        "stderr": 0,
+        "stdout": 0
+      },
+      "capture": "streamed-local",
+      "completeness": true,
+      "discontinuities": [],
+      "ordering": "per-stream",
+      "paths": {
+        "stderr": "stderr.log",
+        "stdout": "stdout.log"
+      },
+      "stdout_stderr": "separate",
+      "timestamps": "not-recorded",
+      "truncated": false
+    },
+    "preservation": {
+      "actual_mode": "none",
+      "cleanup": {
+        "handle": "/private/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-workcell-live-JqrgiR/attempts/source-workcell-rgXyZw/kujo-workcell-wc-3ab7b32234164f95911331cff1dab9cf",
+        "owner": "workcell-clean",
+        "source_root": "/private/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-workcell-live-JqrgiR/attempts/source-workcell-rgXyZw/source",
+        "strategy": "git-worktree"
+      },
+      "created_at": "2026-11-10T21:29:37Z",
+      "evidence": [
+        {
+          "$ref": "receipt.json"
+        },
+        {
+          "$ref": "stdout.log"
+        },
+        {
+          "$ref": "stderr.log"
+        }
+      ],
+      "limitations": [],
+      "provider": {
+        "name": "docker",
+        "workspace_id": "/private/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-workcell-live-JqrgiR/attempts/source-workcell-rgXyZw/kujo-workcell-wc-3ab7b32234164f95911331cff1dab9cf"
+      },
+      "reconstructability": "none",
+      "requested_mode": "none",
+      "result_id": "po_b7c886dc8b03c10c3bebe3d2",
+      "schema": "kujo.preservation-outcome/v1",
+      "status": "satisfied",
+      "subject": {
+        "attempt_id": "attempt-1",
+        "run_id": "wc-3ab7b32234164f95911331cff1dab9cf",
+        "step_id": "workflow"
+      }
+    },
+    "preservation_path": "preservation.json",
+    "reexecution_descriptor_path": "reexecution.json",
+    "resources": {
+      "inventory": [],
+      "metrics": [],
+      "provider_reported": false
+    },
+    "run": {
+      "attempt_id": "attempt-1",
+      "end_time": "2026-11-10T21:29:37Z",
+      "failure_category": "preparing",
+      "id": "wc-3ab7b32234164f95911331cff1dab9cf",
+      "start_time": "2026-11-10T21:29:37Z",
+      "status": "preparing"
+    },
+    "schema_version": "workcell-receipt/v2alpha1",
+    "source": {
+      "clean": true,
+      "commit": "b863635de171686447e3ab6b202a7e8f54c43c17"
+    },
+    "verification": {
+      "checks": [],
+      "offline": true,
+      "status": "failed"
+    },
+    "warnings": [],
+    "workspace": {
+      "materialization": "git-worktree",
+      "source": "clean-git-commit"
+    },
+    "source_capture": {
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  "sourceRevision": "d13f6470875f5a1e194a2645d0769c91b01ec82e",
+  "uncommittedChange": "Workcell attempt-owned TMPDIR boundary fix",
+  "harnessSha256": "cc96199f88f8d9fb7067a7fdd35f247013a268206eb4196bbef2ea8e8e6eaa67",
+  "workcellRevision": "189d7ab6e975301a0e5100b65e8ad3fe4a584573",
+  "classification": "failed closed before workload execution; cleanup/integrity verified, not successful isolation validation"
+}

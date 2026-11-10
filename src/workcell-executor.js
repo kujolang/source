@@ -88,7 +88,9 @@ export class WorkcellExecutor {
       if (this.config.manifest) args.push('--manifest', path.join(attempt, 'manifest.json'));
       signal?.addEventListener('abort', onAbort, { once: true });
       if (signal?.aborted) onAbort();
-      const options = { cwd: attempt, env: { ...cleanEnv(), KUJO: this.kujo }, timeout: this.timeoutMs, maxBuffer: 2 * 1024 * 1024, killSignal: 'SIGKILL' };
+      // Workcell restricts absolute output paths to TMPDIR or repository .workcell.
+      // Give it this private attempt, never the worker's ambient temporary root.
+      const options = { cwd: attempt, env: { ...cleanEnv(), KUJO: this.kujo, TMPDIR: attempt }, timeout: this.timeoutMs, maxBuffer: 2 * 1024 * 1024, killSignal: 'SIGKILL' };
       const inspectArgs = ['inspect', '--file', path.join(attempt, 'definition.json'), '--repo', workspace, '--profiles', path.join(attempt, 'profiles.json'), '--profile', this.config.profile, '--summary'];
       if (this.config.manifest) inspectArgs.push('--manifest', path.join(attempt, 'manifest.json'));
       const inspection = await this.invokeProcess(this.executable, inspectArgs, { ...options, timeout: 30000 });
