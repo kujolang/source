@@ -1008,6 +1008,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           return gitAuthError(res, 415, 'unsupported Git request encoding');
         }
 
+        if (req.aborted || res.destroyed) return;
         const tenantRelease = await gitTenantSlots.acquire(`${orgId}:${projectId}`);
         if (!tenantRelease) return gitAuthError(res, 503, 'Git tenant service busy; retry later');
         const release = await gitSlots.acquire();
@@ -1018,6 +1019,9 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
         let body = null;
         let releaseChunked = null;
         try {
+          // A close can occur while awaiting tenant/global admission, before
+          // abort listeners exist. Never start Git for that disconnected client.
+          if (req.aborted || res.destroyed) return;
           const abortController = new AbortController();
           req.once('aborted', () => abortController.abort());
           res.once('close', () => {
@@ -1051,6 +1055,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
             }
           }
 
+          if (abortController.signal.aborted || req.aborted || res.destroyed) return;
           let streamed = false;
           const result = await gitHttpBackend({
           projectRoot: src.reposRoot(orgId, projectId),

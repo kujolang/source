@@ -326,3 +326,40 @@ test('standard Git fetch negotiates many new heads using gzip', async () => {
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test('disconnected Git requests waiting for admission do not start a backend after the slot releases', { timeout: 15000 }, async (t) => {
+  const { request } = await import('node:http');
+  const { src, org, project, human } = freshSource();
+  const { repo } = seedRepo(src, org.id, project.id);
+  const cap = src.capabilities.issue({ principalId: human.id, scope: { org: org.id, project: project.id }, allowed: ['read_source', 'read_context'] });
+  src.getChangeAsync = async () => ({ workId: 'W1' });
+  const childProcess = (await import('node:child_process')).default;
+  const { syncBuiltinESMExports } = await import('node:module');
+  const spawn = childProcess.spawn; let backendStarts = 0;
+  t.mock.method(childProcess, 'spawn', (...args) => { if (args[1]?.includes('http-backend')) backendStarts++; return spawn(...args); });
+  syncBuiltinESMExports();
+  t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports(); });
+  const scanReady = Promise.withResolvers(), releaseScan = Promise.withResolvers();
+  src.scanChangeSecretsAsync = async () => { scanReady.resolve(); await releaseScan.promise; return []; };
+  const server = await startServer(src, { port: 0, gitConcurrency: 1, gitTimeoutMs: 3000 });
+  t.after(() => { releaseScan.resolve(); server.closeAllConnections(); server.close(); });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const scan = fetch(`${base}/api/v1/orgs/${org.id}/projects/${project.id}/changes/C1/scan`, { headers: { Authorization: `Bearer ${cap.credential}` } });
+  await scanReady.promise;
+  const pending = request(`${base}/git/${org.id}/${project.id}/${repo.id}.git/info/refs?service=git-upload-pack`, { headers: { Authorization: basicAuthHeader(cap.credential) } });
+  pending.on('error', () => {}); pending.end();
+  const until = async (predicate, ms = 1000) => {
+    const deadline = Date.now() + ms;
+    while (!predicate() && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.ok(predicate(), 'request state reached before backend timeout');
+  };
+  await until(() => server.metrics.activeRequests === 2);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  pending.destroy();
+  await until(() => server.metrics.abortedRequests === 1);
+  releaseScan.resolve();
+  assert.equal((await scan).status, 200);
+  const live = await fetch(`${base}/git/${org.id}/${project.id}/${repo.id}.git/info/refs?service=git-upload-pack`, { headers: { Authorization: basicAuthHeader(cap.credential) } });
+  assert.equal(live.status, 200); await live.arrayBuffer();
+  assert.equal(backendStarts, 1, 'only the live request may start a Git backend');
+});
