@@ -257,3 +257,37 @@ schema/transaction paths remain; their absence is not claimed.
 These results supersede the earlier observed overlapping-query warning. They do
 not establish live OCI isolation, database-primary failover, deployed staging,
 real-project migration or the required staged concurrency benchmarks.
+
+## Workcell execution bridge — 2026-11-10
+
+An optional `WorkcellExecutor` connects Source's existing verification handler to
+Workcell portable inspect/run/verify. Real-Git materialization tests prove exact
+committed bytes, clean HEAD/index and absence of canonical remote configuration.
+Controlled CLI fixtures verify candidate/command/attempt binding, resolved
+provider/profile fingerprint matching, manifest verification, original log capture,
+failed/truncated results, incomplete cleanup, cancellation-file delivery, preserved
+worktree backing repositories and executor slot release. They do not run an
+untrusted workload or prove container/provider isolation.
+
+Focused executor, candidate exporter, control-adapter, action-runner and worker
+regression: 56 tests pass, zero failures/skips/cancellations, 6.66 seconds
+(`/tmp/source-workcell-focused.log`). Lint syntax-checks 102 JavaScript files;
+diff checks pass. The last full 327-test regression predates this additive bridge.
+
+Actual sibling Workcell 1.3.0 at
+`189d7ab6e975301a0e5100b65e8ad3fe4a584573` accepted the example definition with
+`bin/workcell validate --file <source>/examples/verification/workcell-definition.json`
+and resolved the Docker profile with `inspect --file <definition> --profiles
+<source>/examples/verification/workcell-profiles.json --profile docker --summary`.
+Inspect returned `ok: true`, 23 accepted controls, zero rejected, and one unobserved
+control. Inspection is not evidence that those controls operated in a live run.
+The example's all-zero image digest is intentionally a placeholder and must be
+replaced before execution. An actual CLI invocation against a temporary real Git
+candidate failed closed without an inspectable receipt; no passing evidence was
+returned. The owned temporary fixture was removed after invocation finished.
+Docker info independently confirmed its daemon socket was absent.
+
+The bridge retains Workcell run evidence and unconfirmed-cleanup source/control
+material for Workcell-owned recovery. It does not implement a Source reaper,
+certify worker-death resource cleanup, deliver remote provider credentials or
+prove endpoint/browser staging. Those remain explicit mission requirements.

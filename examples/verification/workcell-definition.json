@@ -1,0 +1,63 @@
+{
+  "schema": "workcell-definition/v2alpha1",
+  "name": "source-candidate",
+  "workload": {
+    "kind": "linux-process",
+    "image": {
+      "reference": "node@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "digest": "",
+      "signature_key": ""
+    },
+    "command": [
+      "node",
+      "test/integration.js"
+    ],
+    "working_directory": "/workspace"
+  },
+  "workspace": {
+    "source": "clean-git-commit",
+    "materialization": "portable-clone",
+    "mount_path": "/workspace"
+  },
+  "environment": {
+    "allow": [],
+    "set": {}
+  },
+  "secrets": [],
+  "requirements": {
+    "compute": {
+      "cpus": 1,
+      "memory": "256m",
+      "pids": 64
+    },
+    "execution": {
+      "timeout_ms": 120000,
+      "max_output_bytes": 65536
+    },
+    "network": {
+      "mode": "none"
+    },
+    "filesystem": {
+      "read_only_root": true,
+      "writable": [
+        "/workspace"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ]
+    }
+  },
+  "artifacts": {
+    "export": []
+  },
+  "verification": {
+    "version": 1,
+    "commands": []
+  },
+  "cleanup": {
+    "keep_failed": false
+  },
+  "receipt": {
+    "path": ".workcell/runs"
+  }
+}

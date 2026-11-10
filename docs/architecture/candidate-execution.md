@@ -101,3 +101,10 @@ lifecycle validation are additional gates, not claims made by this smoke test.
 Rollback consists of stopping verification workers and removing this executor
 from the operator handler module. Retain existing candidate/receipt/dispatch
 records and the generation-aware broker. No storage schema change is required.
+
+## Workcell alternative
+
+The optional [Workcell bridge](workcell-execution.md) reuses Workcell portable
+lifecycle, evidence verification, cancellation and recovery contracts. It retains
+recovery material when cleanup is unconfirmed; live execution and orphan recovery
+remain validation gates. This does not change the OCI executor above.

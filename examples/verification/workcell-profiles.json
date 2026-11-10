@@ -1,0 +1,25 @@
+{
+  "schema": "workcell-host-profiles/v1alpha1",
+  "profiles": {
+    "docker": {
+      "backend": "docker",
+      "credential_ref": "",
+      "adapter_options": {
+        "docker": {
+          "workspace_run_as": "host"
+        }
+      },
+      "policy": {}
+    },
+    "podman": {
+      "backend": "podman",
+      "credential_ref": "",
+      "adapter_options": {
+        "podman": {
+          "workspace_run_as": "rootless"
+        }
+      },
+      "policy": {}
+    }
+  }
+}

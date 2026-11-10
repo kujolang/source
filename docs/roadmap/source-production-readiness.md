@@ -177,3 +177,18 @@ explicit replaced-candidate cancellation portion of the earlier work list;
 automatic replacement inference is not enabled. Live PostgreSQL contract/race
 results are recorded in failure-recovery. Runtime teardown, staging and the
 remaining full-mission gates are still open.
+
+## Workcell bridge increment — 2026-11-10
+
+An optional Workcell executor now connects exact candidate export and the durable
+verification handler to Workcell's portable CLI. It binds command/commit/attempt,
+verifies the evidence manifest, captures receipt/logs, rejects incomplete cleanup
+as passing evidence, and retains recovery/preservation material. Operator examples
+and limitations are in `../architecture/workcell-execution.md`. Actual Workcell
+1.3.0 validates the definition and resolves the built-in Docker profile; a runtime
+invocation failed closed without an inspectable receipt. Docker remains unavailable.
+
+This is a working orchestration bridge, not live isolated staging certification.
+Single-environment endpoint/browser fixtures, provider credential delivery,
+orphan recovery drills, external-service inputs, real-project lifecycle and all
+staged benchmarks remain open mission requirements. The full goal stays active.
