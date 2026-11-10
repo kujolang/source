@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { authenticatedGit } from '../../src/remote.js';
+import { StageTelemetry, processResources } from './telemetry.js';
 const exec = promisify(execFile);
 const script = fileURLToPath(import.meta.url);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -75,7 +76,7 @@ async function worker(config) {
     if (message.type === 'go') runtime.start();
     if (message.type === 'stop') {
       await runtime.stop(); await store.closeAsync();
-      process.send({ type: 'stopped', metrics: runtime.metrics() }, () => process.disconnect());
+      process.send({ type: 'stopped', metrics: runtime.metrics(), resources: processResources() }, () => process.disconnect());
     }
   });
 }
@@ -100,11 +101,14 @@ async function main() {
   const schema = `source_bench_${process.pid}_${Date.now()}`;
   let store, server; const children = [], sockets = []; const executions = [], workerErrors = [];
   const cpuBefore = process.cpuUsage(); const began = Date.now();
-  const report = { version: 1, status: 'running', phase: 'setup', httpStatuses: {}, date: new Date().toISOString(), agents, repositories: repos, concurrency: { agentProcesses: agents, workerProcesses: 2, workerConcurrency: 2 }, host: { platform: process.platform, arch: process.arch, node: process.version, cpuCount: cpus().length, memoryBytes: totalmem() }, fixture: 'compatible independent files; fixed host Git-content checker; no repository code execution', profile, rateLimits: privateProfile ? 'explicit private-load operator profile; not default capacity' : 'unchanged server defaults', admissionConfiguration: rateLimit, maxIntegrationProposals, stages: {}, raw: {}, limitations: ['loopback single host; no deployed TLS latency', 'fixed Git-content verification, not application CI or isolated staging', 'no induced worker crash in this measurement', 'maximum 1000 agents per harness run; operator batch bound recorded explicitly', privateProfile ? 'private repositories; explicit 1000/min push and submit limits per shared address; server queue/concurrency defaults unchanged' : 'default same-address submit/read/push rate limits apply'] };
+  const report = { version: 2, status: 'running', phase: 'setup', httpStatuses: {}, date: new Date().toISOString(), agents, repositories: repos, concurrency: { agentProcesses: agents, workerProcesses: 2, workerConcurrency: 2 }, host: { platform: process.platform, arch: process.arch, node: process.version, cpuCount: cpus().length, memoryBytes: totalmem() }, fixture: 'compatible independent files; fixed host Git-content checker; no repository code execution', profile, rateLimits: privateProfile ? 'explicit private-load operator profile; not default capacity' : 'unchanged server defaults', admissionConfiguration: rateLimit, maxIntegrationProposals, stages: {}, raw: {}, limitations: ['loopback single host; no deployed TLS latency', 'fixed Git-content verification, not application CI or isolated staging', 'no induced worker crash in this measurement', 'maximum 1000 agents per harness run; operator batch bound recorded explicitly', privateProfile ? 'private repositories; explicit 1000/min push and submit limits per shared address; server queue/concurrency defaults unchanged' : 'default same-address submit/read/push rate limits apply'] };
+  const telemetry = new StageTelemetry();
+  const phase = (name) => { telemetry.begin(name); report.phase = name; };
+  phase('setup');
   const spawnRole = (role, config) => {
     const child = fork(script, [`--${role}`], { stdio: ['ignore', 'pipe', 'pipe', 'ipc'], env: { ...env(), ...(role === 'worker' ? { PGUSER: config.databaseUser } : {}) } });
     let stderr = ''; child.stderr.on('data', (chunk) => { if (stderr.length < 16384) stderr += chunk; }); child.stdout.resume();
-    const entry = { child, messages: [], error: null, closed: null };
+    const entry = { role, child, messages: [], error: null, closed: null };
     entry.closed = new Promise((resolve) => child.once('close', (code, signal) => { if (code !== 0) entry.error ||= new Error(`${role} exited ${code ?? signal}`); resolve(); }));
     child.on('error', (error) => { entry.error = error; });
     child.on('message', (message) => { entry.messages.push(message); if (message.type === 'execution') executions.push(message.value); if (message.type === 'workerError') workerErrors.push(message.error); if (message.type === 'error') entry.error = Object.assign(new Error(message.error), { diagnostic: message.diagnostic }); });
@@ -126,6 +130,7 @@ async function main() {
     const databaseUser = (await store.pool.query('SELECT current_user AS name')).rows[0].name;
     report.sourceRevision = await git(path.resolve(path.dirname(script), '../..'), 'rev-parse', 'HEAD');
     report.harnessSha256 = createHash('sha256').update(await readFile(script)).digest('hex');
+    report.telemetrySha256 = createHash('sha256').update(await readFile(new URL('./telemetry.js', import.meta.url))).digest('hex');
     report.host.git = await git(root, '--version');
     const org = await source.createOrgAsync({ name: 'benchmark', slug: 'benchmark' });
     const human = await source.createPrincipalAsync({ type: 'human', name: 'benchmark maintainer', password: 'fixture-password-only-123' });
@@ -146,6 +151,7 @@ async function main() {
       records.push({ scope, repo, base, policy });
     }
     server = await startServer(source, { port: 0, host: '127.0.0.1', rateLimit });
+    report.httpTimeouts = { headersMs: server.headersTimeout, requestMs: server.requestTimeout, keepAliveMs: server.keepAliveTimeout };
     server.on('connection', (socket) => sockets.push(socket));
     server.prependListener('request', (_req, res) => res.once('finish', () => { report.httpStatuses[res.statusCode] = (report.httpStatuses[res.statusCode] || 0) + 1; }));
     const baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -167,7 +173,7 @@ async function main() {
       clientConfigs.push(config); clients.push(spawnRole('agent', config));
     }
     await Promise.all(clients.map((entry) => entry.wait('ready')));
-    report.phase = 'submission';
+    phase('submission');
     const submittedAt = performance.now(); clients.forEach((entry) => entry.child.send({ type: 'go' }));
     const proposals = (await Promise.all(clients.map((entry) => entry.wait('result', 660000)))).map((message) => message.result);
     const submissionWallMs = performance.now() - submittedAt;
@@ -175,7 +181,7 @@ async function main() {
     assert.equal(new Set(proposals.map((item) => item.changeId)).size, agents);
     report.raw.proposals = proposals;
     report.stages.submission = { wallMs: submissionWallMs, proposalsPerSecond: agents * 1000 / submissionWallMs, cloneMs: stats(proposals.map((p) => p.cloneMs)), submitMs: stats(proposals.map((p) => p.submitMs)) };
-    report.phase = 'assembly';
+    phase('assembly');
     const candidates = [], assembly = [];
     for (let i = 0; i < records.length; i++) {
       const record = records[i], selected = proposals.filter((p) => p.repoIndex === i);
@@ -190,7 +196,7 @@ async function main() {
       candidates.push({ record, plan, input, selected });
     }
     report.raw.assemblyMs = assembly; report.stages.assemblyMs = stats(assembly);
-    report.phase = 'verification';
+    phase('verification');
     const verificationStart = performance.now();
     for (const item of candidates) {
       const first = await source.verification.dispatch(item.input), second = await source.verification.dispatch(item.input);
@@ -212,7 +218,7 @@ async function main() {
     assert.equal(jobs.length, repos); assert.ok(jobs.every((job) => job.status === 'completed' && job.attempts === 1));
     report.raw.executions = executions;
     report.stages.verification = { wallMs: performance.now() - verificationStart, queueMs: stats(executions.map((e) => e.queueMs)), executionMs: stats(executions.map((e) => e.executionMs)), completed: jobs.length, failed: 0, abandoned: 0, recoveryMs: null };
-    report.phase = 'promotion';
+    phase('promotion');
     const promotion = [], fetch = [];
     for (const { record, plan, input, selected } of candidates) {
       assert.equal((await source.integration.evaluate(input)).ok, true);
@@ -234,7 +240,7 @@ async function main() {
     report.stages.reuse = { requests: repos, hits: repos, coalescedRequests: repos, assertions: 'same job ID while active; same exact candidate receipts reused after completion' };
     // Conservative conventional baseline: verify each cumulative merge once,
     // without assuming speculative per-PR checks or stale-result retries.
-    report.phase = 'baseline';
+    phase('baseline');
     const baselineChecks = [], baselineAssembly = [];
     for (const { record, selected, plan } of candidates) {
       const cwd = path.join(root, `baseline-${record.repo.id}`);
@@ -257,11 +263,14 @@ async function main() {
     report.status = 'passed'; report.phase = 'complete'; report.correctness = { allProposalsRetained: true, exactVerifiedPromotion: true, unverifiedAcceptanceRejected: true, duplicatePromotionIdempotent: true, baselineTreeEquality: true, conflicts: 0, humanInterventions: 0, acceptance: 'automated harness acting as configured human maintainer' };
   } catch (error) { report.status = 'failed'; report.error = error.message; report.failureDiagnostic = error.diagnostic ?? null; report.raw.completedClients = children.flatMap((entry) => entry.messages.filter((message) => message.type === 'result').map((message) => message.result)); process.exitCode = 1; }
   finally {
+    telemetry.begin('cleanup');
     for (const entry of children) if (entry.child.exitCode == null && entry.child.signalCode == null) entry.child.kill('SIGKILL');
     await Promise.all(children.map((entry) => entry.closed));
     if (server) { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
     if (store) { await store.pool.query(`DROP SCHEMA "${schema}" CASCADE`); await store.closeAsync(); }
     await rm(root, { recursive: true, force: true });
+    report.telemetry = telemetry.stop();
+    report.childResources = children.map((entry) => ({ role: entry.role, completed: entry.messages.some((m) => m.type === 'result' || m.type === 'stopped'), resource: entry.messages.find((m) => m.resources)?.resources || null }));
     report.gitBackendOutcomes = Object.fromEntries(server?.metrics.gitBackendOutcomes || []);
     report.elapsedMs = Date.now() - began; report.parentCpuMicros = process.cpuUsage(cpuBefore); report.parentPeakRssBytes = process.resourceUsage().maxRSS * 1024;
     await writeFile(output, JSON.stringify(report, null, 2) + '\n', { flag: 'wx' });
@@ -280,9 +289,9 @@ if (process.argv[2] === '--verify') {
       if (process.argv[2] === '--worker') { await worker(config); return; }
       process.send({ type: 'ready' });
       process.once('message', async () => {
-        try { process.send({ type: 'result', result: await agent(config) }, () => process.disconnect()); }
-        catch (error) { process.send({ type: 'error', error: error.message, diagnostic: error.diagnostic }, () => process.disconnect()); process.exitCode = 1; }
+        try { process.send({ type: 'result', result: await agent(config), resources: processResources() }, () => process.disconnect()); }
+        catch (error) { process.send({ type: 'error', error: error.message, diagnostic: error.diagnostic, resources: processResources() }, () => process.disconnect()); process.exitCode = 1; }
       });
-    } catch (error) { process.send({ type: 'error', error: error.message, diagnostic: error.diagnostic }, () => process.disconnect()); process.exitCode = 1; }
+    } catch (error) { process.send({ type: 'error', error: error.message, diagnostic: error.diagnostic, resources: processResources() }, () => process.disconnect()); process.exitCode = 1; }
   });
 } else await main();

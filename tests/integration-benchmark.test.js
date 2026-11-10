@@ -36,6 +36,13 @@ for (const profile of ['default', 'private-load']) test(`benchmark completes rea
   await exec(process.execPath, [script, '--profile', profile, '--agents', '2', '--repos', '2', '--output', output], { env: process.env, timeout: 80000, maxBuffer: 4 * 1024 * 1024 });
   const report = JSON.parse(await readFile(output, 'utf8'));
   assert.equal(report.profile, profile);
+  assert.equal(report.version, 2);
+  assert.deepEqual(report.httpTimeouts, { headersMs: 15000, requestMs: 120000, keepAliveMs: 5000 });
+  assert.deepEqual(report.telemetry.stages.map((s) => s.phase), ['setup', 'submission', 'assembly', 'verification', 'promotion', 'baseline', 'cleanup']);
+  assert.ok(report.telemetry.stages.every((s) => s.wallMs >= 0 && s.samples >= 2 && s.parentSampledPeakRssBytes > 0));
+  assert.equal(report.childResources.length, 4);
+  assert.ok(report.childResources.every((c) => c.completed && c.resource.peakRssBytes > 0));
+  assert.match(report.telemetrySha256, /^[a-f0-9]{64}$/);
   if (profile === 'private-load') {
     assert.equal(report.anonymousGitRejected, true);
     assert.deepEqual(report.admissionConfiguration, { gitPush: { limit: 1000, windowMs: 60000 }, submit: { limit: 1000, windowMs: 60000 } });
