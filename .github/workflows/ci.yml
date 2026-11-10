@@ -27,7 +27,9 @@ jobs:
       - run: npm test
       - run: npm run demo:contest
       - run: npm run demo:hybrid
+      - run: npm ci --prefix cloudflare/artifacts-bootstrap --ignore-scripts
       - run: npm run test:cloudflare
+      - run: npm audit --prefix cloudflare/artifacts-bootstrap --audit-level=high
       - run: npm audit --omit=dev --audit-level=high
 
   kujo-release-gate:
