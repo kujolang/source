@@ -352,3 +352,33 @@ speedup. Dependent ancestry chains may still require quadratic comparisons.
 Repeated sustained runs, 250/1000-agent stages, recovery under load, and complete
 host resource accounting remain unproven. The harness elapsed time includes both
 workflows and cleanup and must not be presented as Source application latency.
+
+### First 250-agent attempts: submission failures
+
+Revision `72bf924` adds a validated operator batch ceiling while retaining the
+100-proposal default (hard maximum 1000). The harness now supports up to 1000
+real client processes and records the selected ceiling. Focused API/planner/broker
+validation passed 23/23 tests in 103.80 s, including 101 independent real Git
+proposals. Default/private PostgreSQL lifecycle fixtures passed 3/3 in 30.42 s.
+
+The first private-load 250-agent reports both failed:
+[ten repositories](benchmarks/agents-250-repos-10-private.json) and
+[one repository](benchmarks/agents-250-repos-1-private.json). Distributed failed
+in `ls-remote` after 72.078 s; hot failed in clone after 36.164 s. The reports
+contain 1040 / 374 HTTP 200 responses, respectively, plus the expected anonymous
+401 probe. Neither recorded a 429 or a completed client result before the first
+failure aborted the run. This does not prove that no server mutations occurred.
+Assembly, verification, promotion and baseline assertions were not reached.
+The sanitized client error did not preserve enough information to attribute
+these failures to a particular host or transport constraint.
+
+After each failure report was written, queued requests for disconnected clients
+started Git backends and kept the harness process alive until the backend timeout
+(up to about two additional minutes). Consequently the failed reports' elapsedMs
+exclude that final process drain and are not total lifecycle durations. A focused
+HTTP regression reproduces this admission bug: it observes two backend starts
+instead of one when a queued client disconnects while a scan holds the shared
+Git slot. The API now checks disconnection after admission and before starting
+Git. A separate client diagnostic change retains only allowlisted process facts
+and a fixed error category, never raw stderr, command arguments or credentials.
+These fixes require reruns; the 250-agent milestone is not yet satisfied.
