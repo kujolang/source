@@ -70,3 +70,14 @@ fixture passed. Logs: `/tmp/source-impact-regression.log` and
 before claiming complete regression verification. The implementation commit is
 `ecc5aa0`; neither this increment nor its focused tests establish production or
 performance readiness.
+
+After disk capacity was restored, an unchanged-source rerun of all 43 test files
+passed: 293 tests, 286 pass, seven PostgreSQL skips, zero failures (124.16 seconds).
+The separate live PostgreSQL baseline ran in a disposable local database and
+passed all 22 tests with zero skips (60.25 seconds), including concurrent claims,
+worker recovery, evidence relationships and storage parity. Temporary fixtures
+and the disposable database were removed after completion. Evidence logs:
+`/tmp/source-impact-recovered-regression.log` and
+`/tmp/source-postgres-baseline.log`. These successful runs supersede the disk-
+limited attempts for regression acceptance. They do not establish the new broker's
+PostgreSQL crash/failover behavior or production capacity; those gates remain open.
