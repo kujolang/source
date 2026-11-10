@@ -384,3 +384,10 @@ unsupported encodings, normal subsequent requests, and an ordinary Git fetch of
 30 new heads that asserts Git actually sent gzip. Transport/API/submit/sync/retry
 suites pass 44/44 with no skips in 10.65 seconds
 (`/tmp/source-gzip-final-tests.log`). This is not a new full-suite result.
+
+
+The post-fix hot25 real-process/PG lifecycle also passes all assertions, including
+final HTTP fetch and exact baseline-tree comparison. See
+[raw report](benchmarks/agents-25-repos-1-gzip.json) and concurrency-results for
+measurements and scope. This resolves the observed fetch failure; it does not
+certify production capacity.

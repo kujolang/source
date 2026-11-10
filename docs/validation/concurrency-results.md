@@ -129,7 +129,7 @@ candidates: their 100% hit result proves correctness, not an expected cache rate
 | Stage | Hot repository | Distributed repositories |
 |---|---|---|
 | 10 | Passed this compatible-file lifecycle | Passed, five repos |
-| 25 | Backoff submits/verifies; final fetch fails (gzip), rerun pending | Passed with bounded backoff, five repos |
+| 25 | Passed after bounded backoff and gzip fix | Passed with bounded backoff, five repos |
 | 100 | Not measured | Not measured |
 | 250 | Not measured; beyond harness bound | Not measured |
 | 1,000+ | Not measured; multi-batch orchestration required | Not measured |
@@ -169,7 +169,7 @@ The ten-agent reports retain the harness digest from commit `4887aa5`.
 The pilot adds response-status counts, phase and completed-client diagnostics;
 its separate digest records that instrumentation change. Default-rate shared-IP
 agent bursts need bounded retry/backoff or a reviewed authenticated admission
-policy before repeating the pilot. Completion at 25 and higher is unproven.
+policy before repeating the pilot. At that point completion at 25 and higher was unproven; subsequent pilot results follow.
 
 
 ## 25-agent pilot with bounded client backoff
@@ -195,3 +195,21 @@ preserving server limits and permissions. Raw results:
 These single runs still use a fixed checker, synthetic compatible changes and
 one shared-IP host. They do not establish application CI savings or sustained
 production capacity. Earlier failed reports remain immutable.
+
+
+### Hot-repository rerun after gzip fix
+
+[25-agent hot rerun](benchmarks/agents-25-repos-1-gzip.json), application revision
+`7ab7acb`, passed all lifecycle assertions in 182.802 s including setup/baseline/
+cleanup. All 25 proposals submitted in 148.163 s (0.169/s), assembly took
+15.527 s, the single job completed once in 680 ms with no failed/abandoned jobs,
+and exact-candidate coalescing/reuse probes passed. Promotion took 275 ms and
+post-promotion HTTP fetch 325 ms. The equivalent baseline ran 25 checks in
+9,973.649 ms: 24 fixed-checker runs avoided. HTTP statuses were 235 success-200,
+25 success-201 and 26 throttled-429. Submit p50/p95/p99 was
+66,022/146,062/146,069 ms; queue latency 357 ms. Limits were unchanged.
+
+The earlier failure remains in the record. Both pilot layouts now have passing
+runs, but the distributed run predates the gzip fix and neither run demonstrates
+sustained load or application CI. Different throttle timing and jitter prevent
+attributing the elapsed-time difference between hot runs solely to the fix.
