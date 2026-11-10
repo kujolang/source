@@ -162,3 +162,17 @@ a lost connection, timeout, malformed response or 5xx may follow a committed
 change. Those remain errors requiring inspection rather than duplicate creation.
 Oversized Retry-After values fail against the deadline instead of retrying early.
 Retry notices go to stderr; successful JSON output stays on stdout.
+
+Submission uses a single Node HTTP/HTTPS JSON exchange with the same bounded
+client deadline across connection setup, response headers and response body.
+It does not follow redirects or automatically replay a transport failure.
+Responses are limited to 1 MiB and headers to 16 KiB. An uncertain result must
+be inspected before resubmission; only an explicit pre-admission retryable 429
+uses the existing bounded retry loop. This avoids a separate runtime HTTP
+connection timer expiring earlier than Source's advertised request budget.
+
+Git errors retain only bounded diagnostic fields (operation, fixed category,
+exit/code/signal, numeric curl and HTTP codes). HTTP submission errors retain
+allowlisted cause codes and mark the outcome unknown. Neither includes raw
+stderr, command arguments, response text or credentials. Server metrics expose
+`source_git_backend_outcomes_total` with bounded exit/outcome labels.

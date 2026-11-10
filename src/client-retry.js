@@ -1,6 +1,7 @@
 // Bounded client backoff for explicit admission rejection. Transport errors and
 // ambiguous mutation outcomes must not be retried as if they were rejections.
 import { setTimeout as delay } from 'node:timers/promises';
+import { submitHttpRequest } from './client-http.js';
 
 export class ClientRetry {
   constructor({ maxRetries = 8, maxElapsedMs = 600000, fallbackMs = 60000, now = Date.now, sleep = delay, random = Math.random, onRetry = ({ operation, delayMs, attempt }) => process.stderr.write(`Source ${operation} throttled; retry ${attempt}/${maxRetries} in ${Math.ceil(delayMs / 1000)}s\n`) } = {}) {
@@ -33,7 +34,7 @@ export class ClientRetry {
   }
 }
 
-export async function submitRequest(url, options, { retry = new ClientRetry(), fetchImpl = fetch } = {}) {
+export async function submitRequest(url, options, { retry = new ClientRetry(), fetchImpl = submitHttpRequest } = {}) {
   while (true) {
     // An uncertain response or timeout could follow a committed mutation. Only
     // Source's explicit pre-admission 429 is safe to replay without idempotency.
@@ -46,7 +47,7 @@ export async function submitRequest(url, options, { retry = new ClientRetry(), f
       const codes = ['UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT', 'UND_ERR_SOCKET', 'ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ENOTFOUND'];
       const code = error?.cause?.code ?? error?.code;
       const failure = new Error('Source submit transport failed; outcome unknown; inspect before retrying');
-      failure.diagnostic = { operation: 'submit', kind: 'transport', code: codes.includes(code) ? code : null, timedOut: error?.name === 'TimeoutError', responseReceived: Boolean(response), outcomeUnknown: true };
+      failure.diagnostic = { operation: 'submit', kind: 'transport', code: codes.includes(code) ? code : null, timedOut: signal.aborted && signal.reason?.name === 'TimeoutError', responseReceived: Boolean(response), outcomeUnknown: true };
       throw failure;
     }
     if (response.status === 429 && body?.retryable === true) {
