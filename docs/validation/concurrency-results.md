@@ -129,7 +129,7 @@ candidates: their 100% hit result proves correctness, not an expected cache rate
 | Stage | Hot repository | Distributed repositories |
 |---|---|---|
 | 10 | Passed this compatible-file lifecycle | Passed, five repos |
-| 25 | Failed during submission: HTTP 429 | Failed during submission: HTTP 429 |
+| 25 | Backoff submits/verifies; final fetch fails (gzip), rerun pending | Passed with bounded backoff, five repos |
 | 100 | Not measured | Not measured |
 | 250 | Not measured; beyond harness bound | Not measured |
 | 1,000+ | Not measured; multi-batch orchestration required | Not measured |
@@ -156,8 +156,8 @@ run. Source's public Git-read limiter is keyed by client address, with a default
 120 requests per minute. All benchmark clients share one loopback address.
 Repeated Git discovery/fetch requests reach that bounded admission policy before
 proposal verification. The explicit 429 counts establish throttling; this is not
-a database/merge-capacity result. No rate limits were raised and no retry behavior
-was added to make the runs pass. The harness stops after the first client failure,
+a database/merge-capacity result. In those initial runs, no rate limits were raised and no retry behavior
+was added. The harness stops after the first client failure,
 so counts describe an aborted burst, not every attempted operation's final outcome.
 
 - [Instrumented 25-agent hot failure](benchmarks/agents-25-repos-1.json).
@@ -170,3 +170,28 @@ The pilot adds response-status counts, phase and completed-client diagnostics;
 its separate digest records that instrumentation change. Default-rate shared-IP
 agent bursts need bounded retry/backoff or a reviewed authenticated admission
 policy before repeating the pilot. Completion at 25 and higher is unproven.
+
+
+## 25-agent pilot with bounded client backoff
+
+Commit `71dfa00` adds bounded retries for explicit admission throttling while
+preserving server limits and permissions. Raw results:
+
+- [Hot repository](benchmarks/agents-25-repos-1-backoff.json): all 25 submitted in
+  224.015 s, assembled in 15.533 s, one verification completed in 614 ms.
+  Final post-promotion fetch failed with `expected 'acknowledgments'`. This is
+  a failed lifecycle, not a passing capacity result. The compressed Git request
+  regression and fix are recorded in failure-recovery.md.
+- [Five repositories](benchmarks/agents-25-repos-5-backoff.json): passed all
+  assertions in 244.118 s including setup/cleanup. Submission 219.559 s
+  (0.114 proposals/s); assembly 5.617 s total; five checks completed in 1.179 s
+  versus 25 equivalent baseline checks in 4.509 s, avoiding 20 checks.
+  Promotion 1.148 s total; final fetch 1.264 s. Queue p50/p95/p99
+  692/1,079/1,079 ms; submit 67,684/147,278/217,621 ms. All five jobs completed
+  once with no failed/abandoned jobs; five active dispatches coalesced and five
+  exact-candidate reuse probes passed. HTTP statuses: 245 success-200,
+  25 success-201, 33 throttled-429. Backoff dominates elapsed time.
+
+These single runs still use a fixed checker, synthetic compatible changes and
+one shared-IP host. They do not establish application CI savings or sustained
+production capacity. Earlier failed reports remain immutable.

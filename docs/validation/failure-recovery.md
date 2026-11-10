@@ -364,3 +364,23 @@ submit/sync/API/Git transport suites: 42 tests pass, zero failures/skips, 24.40
 seconds (`/tmp/source-client-backoff-tests.log`). Lint checks 106 JS files; diff
 checks pass. The benchmark client timeout now permits the documented ten-minute
 retry budget rather than aborting a still-bounded client at three minutes.
+
+## Compressed Git negotiation — 2026-11-10
+
+The bounded-backoff hot 25-agent run submitted and verified all proposals, then
+failed its post-promotion fetch with `expected 'acknowledgments'`. A real Git
+backend reproduction showed compressed protocol-v2 input being interpreted as
+packet lines because Source omitted Content-Encoding handling. Git's own
+[v2.42 backend](https://github.com/git/git/blob/v2.42.0/http-backend.c) supports
+encoded requests; Source now decodes gzip/x-gzip before delegation so it can also
+enforce an explicit expanded-body limit. Both compressed and decoded input are
+limited to the smaller Git body/chunked body bound, using the existing bounded
+buffered-upload slots. Unsupported encodings return 415, malformed gzip 400,
+and oversized compressed/decoded requests 413. Authentication remains first.
+
+The regression fails before the fix (`/tmp/source-gzip-before.log`). Tests cover
+valid compressed protocol-v2 requests, expansion limits, malformed input,
+unsupported encodings, normal subsequent requests, and an ordinary Git fetch of
+30 new heads that asserts Git actually sent gzip. Transport/API/submit/sync/retry
+suites pass 44/44 with no skips in 10.65 seconds
+(`/tmp/source-gzip-final-tests.log`). This is not a new full-suite result.

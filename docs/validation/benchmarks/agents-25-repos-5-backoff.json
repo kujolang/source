@@ -1,0 +1,615 @@
+{
+  "version": 1,
+  "status": "passed",
+  "phase": "complete",
+  "httpStatuses": {
+    "200": 245,
+    "201": 25,
+    "429": 33
+  },
+  "date": "2026-11-10T21:11:51.649Z",
+  "agents": 25,
+  "repositories": 5,
+  "concurrency": {
+    "agentProcesses": 25,
+    "workerProcesses": 2,
+    "workerConcurrency": 2
+  },
+  "host": {
+    "platform": "darwin",
+    "arch": "x64",
+    "node": "v26.12.1",
+    "cpuCount": 12,
+    "memoryBytes": 17179869184,
+    "git": "git version 2.42.0"
+  },
+  "fixture": "compatible independent files; fixed host Git-content checker; no repository code execution",
+  "rateLimits": "unchanged server defaults",
+  "stages": {
+    "submission": {
+      "wallMs": 219559.185489,
+      "proposalsPerSecond": 0.1138645142279985,
+      "cloneMs": {
+        "samples": 25,
+        "total": 28268.264379999997,
+        "p50": 1185.2994099999999,
+        "p95": 1933.19067,
+        "p99": 1959.267602
+      },
+      "submitMs": {
+        "samples": 25,
+        "total": 2263616.700337,
+        "p50": 67683.692708,
+        "p95": 147278.049441,
+        "p99": 217621.138349
+      }
+    },
+    "assemblyMs": {
+      "samples": 5,
+      "total": 5617.1309020000335,
+      "p50": 1116.717880000011,
+      "p95": 1141.0959750000038,
+      "p99": 1141.0959750000038
+    },
+    "verification": {
+      "wallMs": 1756.7212360000121,
+      "queueMs": {
+        "samples": 5,
+        "total": 3843,
+        "p50": 692,
+        "p95": 1079,
+        "p99": 1079
+      },
+      "executionMs": {
+        "samples": 5,
+        "total": 1179,
+        "p50": 239,
+        "p95": 240,
+        "p99": 240
+      },
+      "completed": 5,
+      "failed": 0,
+      "abandoned": 0,
+      "recoveryMs": null
+    },
+    "promotionMs": {
+      "samples": 5,
+      "total": 1148.3771889999625,
+      "p50": 228.95193400001153,
+      "p95": 232.8364120000042,
+      "p99": 232.8364120000042
+    },
+    "fetchMs": {
+      "samples": 5,
+      "total": 1264.311469999957,
+      "p50": 253.47684099999606,
+      "p95": 255.78486399998656,
+      "p99": 255.78486399998656
+    },
+    "reuse": {
+      "requests": 5,
+      "hits": 5,
+      "coalescedRequests": 5,
+      "assertions": "same job ID while active; same exact candidate receipts reused after completion"
+    }
+  },
+  "raw": {
+    "proposals": [
+      {
+        "index": 0,
+        "repoIndex": 0,
+        "changeId": "C2",
+        "workId": "W2",
+        "sessionId": "S2",
+        "evidenceId": "E2",
+        "baseCommit": "6abd0d584330e94a70297bc3686eb0fbec1552b1",
+        "headCommit": "61552eea0eb555f66c23d7f13161f3250b3f9b4b",
+        "cloneMs": 517.840162,
+        "submitMs": 2121.906676,
+        "totalMs": 2958.472769
+      },
+      {
+        "index": 1,
+        "repoIndex": 1,
+        "changeId": "C1",
+        "workId": "W1",
+        "sessionId": "S1",
+        "evidenceId": "E1",
+        "baseCommit": "6abd0d584330e94a70297bc3686eb0fbec1552b1",
+        "headCommit": "4698bb26812017f5db031c560ec5ec37a53bc2f9",
+        "cloneMs": 509.787425,
+        "submitMs": 2098.010047,
+        "totalMs": 2899.8901699999997
+      },
+      {
+        "index": 2,
+        "repoIndex": 2,
+        "changeId": "C18",
+        "workId": "W18",
+        "sessionId": "S18",
+        "evidenceId": "E18",
+        "baseCommit": "6abd0d584330e94a70297bc3686eb0fbec1552b1",
+        "headCommit": "b0fc6e4848eae74db2b3a0c8929cf7f18df2177b",
+        "cloneMs": 1959.267602,
+        "submitMs": 134961.844957,
+        "totalMs": 137185.13462
+      },
+      {
+        "index": 3,
+        "repoIndex": 3,
+        "changeId": "C17",
+        "workId": "W17",
+        "sessionId": "S17",
+        "evidenceId": "E17",
+        "baseCommit": "7273a9232dbca4abc719da7ee05b868e63a13ef0",
+        "headCommit": "be02748d4070b40eedcf0e40394513673f9bfb26",
+        "cloneMs": 940.0254890000001,
+        "submitMs": 134715.824441,
+        "totalMs": 135927.018717
+      },
+      {
+        "index": 4,
+        "repoIndex": 4,
+        "changeId": "C3",
+        "workId": "W3",
+        "sessionId": "S3",
+        "evidenceId": "E3",
+        "baseCommit": "7273a9232dbca4abc719da7ee05b868e63a13ef0",
+        "headCommit": "06f3de4ccf0cc861d9b985273f86924eb5ed89c9",
+        "cloneMs": 491.15283100000005,
+        "submitMs": 2162.667241,
+        "totalMs": 2959.4158039999998
+      },
+      {
+        "index": 5,
+        "repoIndex": 0,
+        "changeId": "C4",
+        "workId": "W4",
+        "sessionId": "S4",
+        "evidenceId": "E4",
+        "baseCommit": "6abd0d584330e94a70297bc3686eb0fbec1552b1",
+        "headCommit": "3aa67aa30e5ecde7e4b98e6ef5e6d860e35252a0",
+        "cloneMs": 567.855863,
+        "submitMs": 2100.367832,
+        "totalMs": 2969.095978
+      },
+      {
+        "index": 6,
+        "repoIndex": 1,
+        "changeId": "C7",
+        "workId": "W7",
+        "sessionId": "S7",
+        "evidenceId": "E7",
+        "baseCommit": "6abd0d584330e94a70297bc3686eb0fbec1552b1",
+        "headCommit": "971e9b9f192d0bc8dc620277938a267ba38b0690",
+        "cloneMs": 762.3356640000001,
+        "submitMs": 63776.842566,
+        "totalMs": 64830.621198
+      },
+      {
+        "index": 7,
+        "repoIndex": 2,
+        "changeId": "C9",
+        "workId": "W9",
+        "sessionId": "S9",
+        "evidenceId": "E9",
+        "baseCommit": "6abd0d584330e94a70297bc3686eb0fbec1552b1",
+        "headCommit": "c8306105756a27d01a02851bba698e5abb031b2f",
+        "cloneMs": 752.943151,
+        "submitMs": 65766.538157,
+        "totalMs": 66807.551413
+      },
+      {
+        "index": 8,
+        "repoIndex": 3,
+        "changeId": "C20",
+        "workId": "W20",
+        "sessionId": "S20",
+        "evidenceId": "E20",
+        "baseCommit": "7273a9232dbca4abc719da7ee05b868e63a13ef0",
+        "headCommit": "ebf53456c1fb2b5107d3c41e164f9a99d90065bf",
+        "cloneMs": 584.492101,
+        "submitMs": 138911.900555,
+        "totalMs": 139821.788564
+      },
+      {
+        "index": 9,
+        "repoIndex": 4,
+        "changeId": "C10",
+        "workId": "W10",
+        "sessionId": "S10",
+        "evidenceId": "E10",
+        "baseCommit": "7273a9232dbca4abc719da7ee05b868e63a13ef0",
+        "headCommit": "ee46cd75f388c731981518668cbaa6064261ccd5",
+        "cloneMs": 662.4701640000001,
+        "submitMs": 66935.821153,
+        "totalMs": 67894.214463
+      },
+      {
+        "index": 10,
+        "repoIndex": 0,
+        "changeId": "C6",
+        "workId": "W6",
+        "sessionId": "S6",
+        "evidenceId": "E6",
+        "baseCommit": "6abd0d584330e94a70297bc3686eb0fbec1552b1",
+        "headCommit": "115b6df5509e3345a3127ef045032712e43f92a3",
+        "cloneMs": 562.19029,
+        "submitMs": 63684.498237,
+        "totalMs": 64558.968146
+      },
+      {
+        "index": 11,
+        "repoIndex": 1,
+        "changeId": "C23",
+        "workId": "W23",
+        "sessionId": "S23",
+        "evidenceId": "E23",
+        "baseCommit": "6abd0d584330e94a70297bc3686eb0fbec1552b1",
+        "headCommit": "0ca10a61899597ca639f52d97940540f882aa9c4",
+        "cloneMs": 1863.254832,
+        "submitMs": 142160.136561,
+        "totalMs": 144299.23605099999
+      },
+      {
+        "index": 12,
+        "repoIndex": 2,
+        "changeId": "C25",
+        "workId": "W25",
+        "sessionId": "S25",
+        "evidenceId": "E25",
+        "baseCommit": "6abd0d584330e94a70297bc3686eb0fbec1552b1",
+        "headCommit": "386cff208a9c27c6920314d2621f8508e1af454a",
+        "cloneMs": 1620.994583,
+        "submitMs": 217621.138349,
+        "totalMs": 219537.142792
+      },
+      {
+        "index": 13,
+        "repoIndex": 3,
+        "changeId": "C8",
+        "workId": "W8",
+        "sessionId": "S8",
+        "evidenceId": "E8",
+        "baseCommit": "7273a9232dbca4abc719da7ee05b868e63a13ef0",
+        "headCommit": "662fefd8e38e567d8df9bafe48e8548f99fa1cde",
+        "cloneMs": 1193.407866,
+        "submitMs": 65170.758743000006,
+        "totalMs": 66671.156784
+      },
+      {
+        "index": 14,
+        "repoIndex": 4,
+        "changeId": "C14",
+        "workId": "W14",
+        "sessionId": "S14",
+        "evidenceId": "E14",
+        "baseCommit": "7273a9232dbca4abc719da7ee05b868e63a13ef0",
+        "headCommit": "965d5fce6a4c79c873e3748e16af27091c4d94bf",
+        "cloneMs": 1195.469382,
+        "submitMs": 68188.78383500001,
+        "totalMs": 69681.494124
+      },
+      {
+        "index": 15,
+        "repoIndex": 0,
+        "changeId": "C22",
+        "workId": "W22",
+        "sessionId": "S22",
+        "evidenceId": "E22",
+        "baseCommit": "6abd0d584330e94a70297bc3686eb0fbec1552b1",
+        "headCommit": "ed0e649f9cd958ff5acbfaad9132c1e4ba69f60e",
+        "cloneMs": 939.4970410000001,
+        "submitMs": 143068.687776,
+        "totalMs": 144284.51279200002
+      },
+      {
+        "index": 16,
+        "repoIndex": 1,
+        "changeId": "C24",
+        "workId": "W24",
+        "sessionId": "S24",
+        "evidenceId": "E24",
+        "baseCommit": "6abd0d584330e94a70297bc3686eb0fbec1552b1",
+        "headCommit": "0a01d50195aa8d71cc00581f341167d472de5390",
+        "cloneMs": 1562.7349450000002,
+        "submitMs": 147278.049441,
+        "totalMs": 149139.359658
+      },
+      {
+        "index": 17,
+        "repoIndex": 2,
+        "changeId": "C15",
+        "workId": "W15",
+        "sessionId": "S15",
+        "evidenceId": "E15",
+        "baseCommit": "6abd0d584330e94a70297bc3686eb0fbec1552b1",
+        "headCommit": "1ddb786ae2f37225b2252c20b0ad7d2a3795e01f",
+        "cloneMs": 1370.8291020000001,
+        "submitMs": 129416.49443600001,
+        "totalMs": 131108.378363
+      },
+      {
+        "index": 18,
+        "repoIndex": 3,
+        "changeId": "C19",
+        "workId": "W19",
+        "sessionId": "S19",
+        "evidenceId": "E19",
+        "baseCommit": "7273a9232dbca4abc719da7ee05b868e63a13ef0",
+        "headCommit": "6ef3e80e214ce14f5203898b5c81509ae1155914",
+        "cloneMs": 1158.993103,
+        "submitMs": 136945.407587,
+        "totalMs": 138374.504343
+      },
+      {
+        "index": 19,
+        "repoIndex": 4,
+        "changeId": "C5",
+        "workId": "W5",
+        "sessionId": "S5",
+        "evidenceId": "E5",
+        "baseCommit": "7273a9232dbca4abc719da7ee05b868e63a13ef0",
+        "headCommit": "fdb7217c700e7abfbdb93c3bd2eddf689cb6d5a6",
+        "cloneMs": 1559.441272,
+        "submitMs": 61833.801391,
+        "totalMs": 63685.217605
+      },
+      {
+        "index": 20,
+        "repoIndex": 0,
+        "changeId": "C12",
+        "workId": "W12",
+        "sessionId": "S12",
+        "evidenceId": "E12",
+        "baseCommit": "6abd0d584330e94a70297bc3686eb0fbec1552b1",
+        "headCommit": "ef2c4b92153a1b5e5b0780081a190b33740bdc6f",
+        "cloneMs": 1185.2994099999999,
+        "submitMs": 66837.331453,
+        "totalMs": 68295.949997
+      },
+      {
+        "index": 21,
+        "repoIndex": 1,
+        "changeId": "C11",
+        "workId": "W11",
+        "sessionId": "S11",
+        "evidenceId": "E11",
+        "baseCommit": "6abd0d584330e94a70297bc3686eb0fbec1552b1",
+        "headCommit": "92e687f68988ee8edec15a06bc466bd8a33ec074",
+        "cloneMs": 1613.142238,
+        "submitMs": 66127.873647,
+        "totalMs": 68036.13213499999
+      },
+      {
+        "index": 22,
+        "repoIndex": 2,
+        "changeId": "C21",
+        "workId": "W21",
+        "sessionId": "S21",
+        "evidenceId": "E21",
+        "baseCommit": "6abd0d584330e94a70297bc3686eb0fbec1552b1",
+        "headCommit": "ebc3e1d7f624f7959414506048eac1217650dfa6",
+        "cloneMs": 1933.19067,
+        "submitMs": 141941.26055200002,
+        "totalMs": 144145.339397
+      },
+      {
+        "index": 23,
+        "repoIndex": 3,
+        "changeId": "C16",
+        "workId": "W16",
+        "sessionId": "S16",
+        "evidenceId": "E16",
+        "baseCommit": "7273a9232dbca4abc719da7ee05b868e63a13ef0",
+        "headCommit": "87a6aa937259028fc577c242ab455f5b9bb3935b",
+        "cloneMs": 1569.6436740000001,
+        "submitMs": 132107.06199599997,
+        "totalMs": 133981.697876
+      },
+      {
+        "index": 24,
+        "repoIndex": 4,
+        "changeId": "C13",
+        "workId": "W13",
+        "sessionId": "S13",
+        "evidenceId": "E13",
+        "baseCommit": "7273a9232dbca4abc719da7ee05b868e63a13ef0",
+        "headCommit": "c73cd7266b446b972c34877a1ab80d510148b9d8",
+        "cloneMs": 1192.00552,
+        "submitMs": 67683.692708,
+        "totalMs": 69182.054607
+      }
+    ],
+    "assemblyMs": [
+      1141.0959750000038,
+      1130.2200180000218,
+      1112.6020089999947,
+      1116.4950200000021,
+      1116.717880000011
+    ],
+    "executions": [
+      {
+        "jobId": "J2",
+        "candidateId": "63fb83945e6c9299da82b75a3ece7389a0111f4973ca2ff92a1a904742265d39",
+        "workerId": "benchmark-1",
+        "queueMs": 882,
+        "executionMs": 238
+      },
+      {
+        "jobId": "J4",
+        "candidateId": "541fcb42f8129dcd274201d87312413271452a8d3f9de20576772d242a1b85ce",
+        "workerId": "benchmark-0",
+        "queueMs": 501,
+        "executionMs": 239
+      },
+      {
+        "jobId": "J3",
+        "candidateId": "7f972694fc256858043ad3aa0b6c5276953f2bd3c0bf1603cf19ee1eae3b16b6",
+        "workerId": "benchmark-1",
+        "queueMs": 689,
+        "executionMs": 240
+      },
+      {
+        "jobId": "J1",
+        "candidateId": "31fb8c9e812d178fe8ad0dd88ec2c7c272c3285a64788e56e4e926eab69cde08",
+        "workerId": "benchmark-0",
+        "queueMs": 1079,
+        "executionMs": 239
+      },
+      {
+        "jobId": "J5",
+        "candidateId": "4426ca688395beec54a29c330bdaed09ec9598637069727a0e96c3ee68b12769",
+        "workerId": "benchmark-1",
+        "queueMs": 692,
+        "executionMs": 223
+      }
+    ],
+    "promotionMs": [
+      228.07423099997686,
+      231.05798899999354,
+      228.95193400001153,
+      227.4566229999764,
+      232.8364120000042
+    ],
+    "fetchMs": [
+      255.7659649999987,
+      250.5148760000011,
+      248.7689239999745,
+      253.47684099999606,
+      255.78486399998656
+    ],
+    "baselineChecksMs": [
+      138.02308799998718,
+      162.56107900000643,
+      179.10013400000753,
+      196.1906490000256,
+      216.79580600000918,
+      139.42319199998747,
+      159.18699799999013,
+      183.08511600000202,
+      200.82756700000027,
+      220.15317100001266,
+      141.200353000022,
+      157.93146799999522,
+      181.46916300000157,
+      205.6613490000018,
+      225.39049300001352,
+      145.91338499999256,
+      156.97684099999606,
+      177.76758499999414,
+      197.0907470000093,
+      224.51942399999825,
+      143.47887999998056,
+      159.72546899999725,
+      178.66116899999906,
+      202.85092399999849,
+      215.43507000000682
+    ],
+    "baselineAssemblyMs": [
+      60.113517999998294,
+      62.03580199999851,
+      62.14868100002059,
+      61.819422000000486,
+      60.95367299998179,
+      60.11768600001233,
+      62.72126700001536,
+      61.745644000009634,
+      62.978736999997636,
+      61.35326199998963,
+      61.38268900002004,
+      62.05746199999703,
+      62.31335599999875,
+      68.20190300000831,
+      61.129936000012094,
+      60.228779999975814,
+      61.95239000002039,
+      62.15395000000717,
+      62.274399999994785,
+      61.517482000024756,
+      60.09588999999687,
+      61.72314099999494,
+      62.09450800000923,
+      62.39646899999934,
+      61.13953099999344
+    ]
+  },
+  "limitations": [
+    "loopback single host; no deployed TLS latency",
+    "fixed Git-content verification, not application CI or isolated staging",
+    "no induced worker crash in this measurement",
+    "maximum 100 agents per harness run",
+    "default same-address submit/read/push rate limits apply"
+  ],
+  "sourceRevision": "71dfa00ea80e3f69e51250268545d07adb5a96a9",
+  "harnessSha256": "bf20650897bd2c6a91f4b1e83d06c112607eee3782a31d0b62cc99bdb180b1d2",
+  "workerMetrics": [
+    {
+      "claimed": 2,
+      "completed": 2,
+      "failed": 0,
+      "errors": 0,
+      "activeJobs": 0,
+      "stopping": true
+    },
+    {
+      "claimed": 3,
+      "completed": 3,
+      "failed": 0,
+      "errors": 0,
+      "activeJobs": 0,
+      "stopping": true
+    }
+  ],
+  "baseline": {
+    "method": "sequential cumulative merge plus identical checker once per proposal; no speculative rerun penalty",
+    "checks": 25,
+    "executionMs": {
+      "samples": 25,
+      "total": 4509.419120000035,
+      "p50": 179.10013400000753,
+      "p95": 224.51942399999825,
+      "p99": 225.39049300001352
+    },
+    "assemblyMs": {
+      "samples": 25,
+      "total": 1546.6495790000772,
+      "p50": 61.819422000000486,
+      "p95": 62.978736999997636,
+      "p99": 68.20190300000831
+    },
+    "finalTreesEqual": true
+  },
+  "comparison": {
+    "checksAvoided": 20,
+    "sourceChecks": 5,
+    "baselineChecks": 25,
+    "sourceVerificationMs": 1179,
+    "baselineVerificationMs": 4509.419120000035
+  },
+  "storage": {
+    "filesystemAllocatedBytes": 7720960,
+    "postgresRelationBytes": 1826816
+  },
+  "network": {
+    "serverReceivedBytes": 144286,
+    "serverSentBytes": 192437,
+    "scope": "all loopback HTTP/Git during run"
+  },
+  "correctness": {
+    "allProposalsRetained": true,
+    "exactVerifiedPromotion": true,
+    "unverifiedAcceptanceRejected": true,
+    "duplicatePromotionIdempotent": true,
+    "baselineTreeEquality": true,
+    "conflicts": 0,
+    "humanInterventions": 0,
+    "acceptance": "automated harness acting as configured human maintainer"
+  },
+  "elapsedMs": 244118,
+  "parentCpuMicros": {
+    "user": 2807882,
+    "system": 1647294
+  },
+  "parentPeakRssBytes": 114003968
+}

@@ -15,6 +15,7 @@
 // the event loop that serves the HTTP requests.
 
 import { test } from 'node:test';
+import { gzipSync } from 'node:zlib';
 import assert from 'node:assert';
 import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -260,4 +261,68 @@ test('internal candidate refs cannot be modified by a Git push capability', asyn
     await assert.rejects(() => run(['push', 'origin', `${head}:refs/source/candidates/forged`], cwd), /hidden ref/);
     assert.equal(src.gitRepo(org.id, project.id, repo.id).revParse('refs/source/candidates/forged'), '');
   });
+});
+
+
+test('compressed Git negotiation is decoded with bounded output', async () => {
+  const { src, org, project, human } = freshSource();
+  const { repo, head } = seedRepo(src, org.id, project.id);
+  const cap = gitCap(src, org.id, project.id, human.id);
+  const server = await startServer(src, { port: 0, maxGitBodyBytes: 1024 });
+  const url = `http://127.0.0.1:${server.address().port}/git/${org.id}/${project.id}/${repo.id}.git/git-upload-pack`;
+  const pkt = (value) => (Buffer.byteLength(value) + 4).toString(16).padStart(4, '0') + value;
+  const request = Buffer.from(pkt('command=ls-refs\n') + '0001' + pkt('peel\n') + pkt('symrefs\n') + '0000');
+  const post = (body, encoding) => fetch(url, { method: 'POST', headers: {
+    authorization: basicAuthHeader(cap.credential),
+    'content-type': 'application/x-git-upload-pack-request',
+    'git-protocol': 'version=2',
+    ...(encoding ? { 'content-encoding': encoding } : {}),
+  }, body });
+  try {
+    for (const encoding of ['gzip', 'x-gzip']) {
+      const response = await post(gzipSync(request), encoding);
+      assert.equal(response.status, 200);
+      assert.ok((await response.text()).includes(`${head} refs/heads/main`));
+    }
+    assert.equal((await post(gzipSync(Buffer.alloc(2048, 'a')), 'gzip')).status, 413);
+    assert.equal((await post(Buffer.from('invalid gzip'), 'gzip')).status, 400);
+    assert.equal((await post(request, 'br')).status, 415);
+    const response = await post(request);
+    assert.equal(response.status, 200);
+    assert.ok((await response.text()).includes(`${head} refs/heads/main`));
+  } finally {
+    server.closeAllConnections?.();
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('standard Git fetch negotiates many new heads using gzip', async () => {
+  const { src, org, project, human } = freshSource();
+  const { repo, head, work } = seedRepo(src, org.id, project.id);
+  const cap = gitCap(src, org.id, project.id, human.id);
+  const server = await startServer(src, { port: 0 });
+  const encodings = [];
+  server.prependListener('request', (req) => {
+    if (req.method === 'POST') encodings.push(req.headers['content-encoding'] || 'identity');
+  });
+  try {
+    const cloneDir = mkdtempSync(path.join(tmpdir(), 'source-http-many-heads-'));
+    const url = authedUrl(`http://127.0.0.1:${server.address().port}`, `/git/${org.id}/${project.id}/${repo.id}.git`, cap.credential);
+    await run(['clone', url, cloneDir]);
+    const tree = await run(['rev-parse', 'HEAD^{tree}'], work);
+    const refs = [];
+    for (let i = 0; i < 30; i++) {
+      const commit = await run(['commit-tree', tree, '-p', head, '-m', `proposal ${i}`], work);
+      await run(['update-ref', `refs/heads/proposal-${i}`, commit], work);
+      refs.push(`refs/heads/proposal-${i}`);
+    }
+    await run(['push', 'origin', ...refs], work);
+    await run(['fetch', 'origin'], cloneDir);
+    assert.ok(encodings.includes('gzip'), 'real Git must exercise compressed negotiation');
+    const received = await run(['for-each-ref', '--format=%(refname)', 'refs/remotes/origin/proposal-*'], cloneDir);
+    assert.equal(received.split('\n').filter(Boolean).length, 30);
+  } finally {
+    server.closeAllConnections?.();
+    await new Promise((resolve) => server.close(resolve));
+  }
 });

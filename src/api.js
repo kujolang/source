@@ -24,6 +24,8 @@
 import http from 'node:http';
 import path from 'node:path';
 import https from 'node:https';
+import { gunzip } from 'node:zlib';
+import { promisify } from 'node:util';
 import { readFileSync } from 'node:fs';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { Source } from './source.js';
@@ -33,6 +35,8 @@ import { gitHttpBackend } from './git-http.js';
 import { ACTIONS, authorizeRequest, authorizeRequestAsync, authorizeGit, authorizeGitAsync, bearerCredential } from './auth.js';
 import { RateLimiter } from './ratelimit.js';
 import { KeyedSemaphore, Semaphore } from './concurrency.js';
+
+const decodeGzip = promisify(gunzip);
 
 function json(res, status, obj) {
   const body = JSON.stringify(obj);
@@ -999,6 +1003,10 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
         if (Number.isFinite(declaredLength) && declaredLength > maxGitBodyBytes) {
           return gitAuthError(res, 413, 'request body too large');
         }
+        const contentEncoding = (req.headers['content-encoding'] || 'identity').trim().toLowerCase();
+        if (!['identity', 'gzip', 'x-gzip'].includes(contentEncoding)) {
+          return gitAuthError(res, 415, 'unsupported Git request encoding');
+        }
 
         const tenantRelease = await gitTenantSlots.acquire(`${orgId}:${projectId}`);
         if (!tenantRelease) return gitAuthError(res, 503, 'Git tenant service busy; retry later');
@@ -1019,7 +1027,21 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           let contentLength = null;
           if (req.method === 'POST') {
             const length = Number(req.headers['content-length']);
-            if (Number.isFinite(length)) {
+            if (contentEncoding !== 'identity') {
+              // Git compresses larger negotiation requests. Bound both wire and
+              // decoded bytes before handing the request to the Git subprocess.
+              releaseChunked = await chunkedGitSlots.acquire();
+              if (!releaseChunked) return gitAuthError(res, 503, 'buffered Git uploads busy; retry later');
+              const limit = Math.min(maxGitBodyBytes, maxChunkedGitBodyBytes);
+              try {
+                const compressed = await readRawBody(req, limit);
+                body = await decodeGzip(compressed, { maxOutputLength: limit });
+              } catch (error) {
+                const tooLarge = error.code === 'ERR_BUFFER_TOO_LARGE' || error.message === 'body too large';
+                return gitAuthError(res, tooLarge ? 413 : 400, tooLarge ? 'request body too large' : 'invalid compressed Git request');
+              }
+              contentLength = body.length;
+            } else if (Number.isFinite(length)) {
               input = req;
               contentLength = length;
             } else {
