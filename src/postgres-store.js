@@ -1534,6 +1534,23 @@ class PostgresStore {
     `);
   }
 
+  // Hold this row lock until the caller's evidence transaction commits. Checking
+  // a lease outside that transaction leaves a cancellation/write race.
+  async lockJobLeaseAsync({ id, orgId, projectId, workerId, leaseToken }) {
+    if (!this._asyncTransaction.getStore()) throw new Error('job lease fencing requires a transaction');
+    if (![id, orgId, projectId, workerId, leaseToken].every((value) => typeof value === 'string' && value.length > 0)) throw new Error('job lease fencing requires scoped ownership');
+    const rows = await this._fetchJsonRowsAsync(`SELECT id, kind, payload FROM ${this._qualified('jobs')}
+      WHERE id = ${escapeSqlLiteral(id)} AND org_id = ${escapeSqlLiteral(orgId)}
+        AND project_id = ${escapeSqlLiteral(projectId)} AND status = 'leased'
+        AND worker_id = ${escapeSqlLiteral(workerId)} AND lease_token = ${escapeSqlLiteral(leaseToken)}
+      FOR UPDATE`);
+    // Evaluate wall time after acquiring the lock, including any lock wait.
+    const valid = rows.length && await this._runAsync(`SELECT 1 FROM ${this._qualified('jobs')}
+      WHERE id = ${escapeSqlLiteral(id)} AND leased_until > clock_timestamp()`);
+    if (!valid) throw new Error('job lease expired, cancelled, or superseded');
+    return rows[0];
+  }
+
   async cancelJobAsync({ id, orgId, projectId, reason = 'cancelled by operator' }) {
     if (![id, orgId, projectId].every((value) => typeof value === 'string' && value.length > 0)) throw new Error('job cancellation requires ID and project scope');
     if (typeof reason !== 'string' || !reason || reason.length > 1000) throw new Error('invalid cancellation reason');

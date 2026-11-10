@@ -102,3 +102,27 @@ not live container teardown. The Docker daemon remains unavailable locally.
 Custom handlers must observe abort signals and fence writes; candidate-aware
 dispatcher receipt fencing, durable reuse/supersession, staging and cost accounting
 remain required. No claim of production capacity follows from these tests.
+
+## Evidence lease fencing — 2026-11-10
+
+Queued broker recordings can now supply an internal `jobLease`. The broker locks
+the scoped PostgreSQL job row inside the project mutation transaction, checks the
+worker/token and wall-clock expiry, and matches the job kind, repository,
+candidate, check and verification identity. It checks the lease again after
+writing the receipt and audit, before transaction completion. Cancellation and
+reclaim cannot interleave with that locked write. Lease expiry detected after the
+write rolls back the evidence transaction. HTTP verification does not accept or
+forward client-provided lease ownership; ordinary authorized service attestations
+retain their existing behavior.
+
+Focused validation: 13 tests passed, zero failures/skips, in 17.84 seconds using
+a disposable live PostgreSQL database (`/tmp/source-evidence-fence.log`). Coverage
+includes missing transaction rejection, wrong scope, cancelled/expired/reclaimed
+leases, cancellation lock contention across independent connections, rollback on
+expiry during a write, and current-lease persistence. The broker suite also checks
+that queued recording fails closed on stores without transactional fencing.
+Syntax lint checked 94 JavaScript files; diff whitespace validation passed.
+
+This is the fencing seam for the forthcoming candidate dispatcher, not a claim
+that dispatch, isolated execution, or end-to-end queued receipt production is
+implemented. A live PostgreSQL broker/dispatcher lifecycle test remains required.

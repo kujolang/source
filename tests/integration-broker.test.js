@@ -45,6 +45,7 @@ async function setup(t) {
 test('broker requires exact evidence and maintainer acceptance; atomic landed receipt makes repeats idempotent', async (t) => {
   const f = await setup(t); const item = await f.propose('feature');
   await assert.rejects(() => f.src.integration.accept(item.input), /verification/);
+  await assert.rejects(() => f.src.integration.record({ ...item.input, principalId: f.service.id, checkId: 'integration', execution: f.execution(item.report), output: 'queued output', jobLease: { id: 'job', workerId: 'worker', leaseToken: 'lease' } }), /transactional lease fencing/);
   await assert.rejects(() => f.src.integration.record({ ...item.input, principalId: f.agent.id, checkId: 'integration', execution: f.execution(item.report), output: 'forged' }), /untrusted/);
   const saved = await f.verify(item);
   const repeated = await f.src.integration.record({ ...item.input, principalId: f.service.id, checkId: 'integration', execution: saved.execution, output: 'original fixture output' });

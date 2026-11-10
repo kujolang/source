@@ -5,6 +5,54 @@ import { JobQueue } from '../src/job-queue.js';
 
 const dsn = process.env.SOURCE_TEST_DATABASE_URL;
 
+test('evidence transactions fence cancelled, expired and reclaimed job leases', { skip: !dsn }, async (t) => {
+  const schema = `source_evidence_lease_${process.pid}_${Date.now()}`;
+  const store = new PostgresStore({ dsn, schema });
+  const peer = new PostgresStore({ dsn, schema });
+  t.after(async () => { await peer.closeAsync(); await store.pool.query(`DROP SCHEMA "${schema}" CASCADE`); await store.closeAsync(); });
+  const scope = { orgId: 'org', projectId: 'project' };
+  const queue = new JobQueue(store);
+  await queue.enqueue({ ...scope, kind: 'integration.verify', payload: { identity: 'exact' } });
+  const [lease] = await queue.claim({ workerId: 'owner' });
+  const owner = { ...scope, id: lease.id, workerId: lease.workerId, leaseToken: lease.leaseToken };
+  await assert.rejects(() => store.lockJobLeaseAsync(owner), /requires a transaction/);
+  await store.transactionAsync(async () => {
+    assert.equal((await store.lockJobLeaseAsync(owner)).payload.identity, 'exact');
+    await assert.rejects(() => store.lockJobLeaseAsync({ ...owner, projectId: 'other' }), /expired, cancelled, or superseded/);
+    await assert.rejects(() => peer.transactionAsync(async () => {
+      await peer._runAsync("SET LOCAL lock_timeout = '100ms'");
+      await peer.cancelJobAsync({ ...scope, id: lease.id });
+    }), (error) => error.code === '55P03', 'cancellation cannot interleave with a fenced evidence write');
+  });
+  await peer.cancelJobAsync({ ...scope, id: lease.id });
+  await assert.rejects(() => store.transactionAsync(async () => {
+    await store.writeJsonAsync('evidence/cancelled.json', { invalid: true });
+    await store.lockJobLeaseAsync(owner);
+  }), /expired, cancelled, or superseded/);
+  assert.equal(await store.readJsonAsync('evidence/cancelled.json'), null);
+
+  await queue.enqueue({ ...scope, kind: 'integration.verify' });
+  const [expired] = await queue.claim({ workerId: 'old' });
+  const stale = { ...scope, id: expired.id, workerId: expired.workerId, leaseToken: expired.leaseToken };
+  await store.pool.query(`UPDATE "${schema}".jobs SET leased_until = NOW() - INTERVAL '1 second' WHERE id = $1`, [expired.id]);
+  await assert.rejects(() => store.transactionAsync(() => store.lockJobLeaseAsync(stale)), /expired/);
+  const [renewed] = await peer.claimJobsAsync({ workerId: 'new' });
+  await assert.rejects(() => store.transactionAsync(() => store.lockJobLeaseAsync(stale)), /superseded/);
+  const current = { ...scope, id: renewed.id, workerId: renewed.workerId, leaseToken: renewed.leaseToken };
+  await assert.rejects(() => store.transactionAsync(async () => {
+    await store.lockJobLeaseAsync(current);
+    await store.writeJsonAsync('evidence/expired-during-write.json', { invalid: true });
+    await store._runAsync(`UPDATE "${schema}".jobs SET leased_until = clock_timestamp() - INTERVAL '1 second' WHERE id = '${renewed.id}'`);
+    await store.lockJobLeaseAsync(current);
+  }), /expired/);
+  assert.equal(await peer.readJsonAsync('evidence/expired-during-write.json'), null);
+  await store.transactionAsync(async () => {
+    await store.lockJobLeaseAsync(current);
+    await store.writeJsonAsync('evidence/current.json', { valid: true });
+  });
+  assert.deepEqual(await peer.readJsonAsync('evidence/current.json'), { valid: true });
+});
+
 test('Postgres priority, dependency, cancellation and expired leases remain fenced across stores', { skip: !dsn }, async (t) => {
   const schema = `source_verify_queue_${process.pid}_${Date.now()}`;
   const store = new PostgresStore({ dsn, schema });

@@ -68,6 +68,13 @@ export class IntegrationBroker {
   async record(input) {
     const { orgId, projectId, principalId, checkId, execution, output } = input;
     return this.source._projectMutationAsync(orgId, projectId, async () => {
+      const fence = async () => {
+        if (!input.jobLease) return;
+        if (!this.source.store.lockJobLeaseAsync) throw new Error('queued verification requires transactional lease fencing');
+        const job = await this.source.store.lockJobLeaseAsync({ ...input.jobLease, orgId, projectId });
+        if (job.kind !== 'integration.verify' || job.payload.repoId !== input.repoId || job.payload.candidateId !== input.candidateId || job.payload.checkId !== checkId || job.payload.identity !== execution.identity) throw new Error('verification job does not match exact candidate and check');
+      };
+      await fence();
       const { root, report, repo } = await this.load(input);
       const producer = await this.source.getPrincipalAsync(principalId);
       // Validate producer and metadata before storing an untrusted artifact.
@@ -96,6 +103,7 @@ export class IntegrationBroker {
       if (store.putArtifactAsync) await store.putArtifactAsync(bytes); else store.putArtifact(bytes);
       await this.source._asyncWrite(receiptRel, receipt);
       await this.source._asyncAudit({ event: 'integration.verification', orgId, projectId, repoId: input.repoId, candidateId: input.candidateId, receiptId: receipt.id, status: execution.status, principalId });
+      await fence();
       return receipt;
     });
   }
