@@ -6,9 +6,46 @@ import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { freshSource, seedRepo } from './helpers.js';
-import { verificationIdentity } from '../src/verification.js';
+import { verificationIdentity, createVerificationReceipt } from '../src/verification.js';
+import { digest } from '../src/integration-planner.js';
 import { startServer } from '../src/api.js';
 const exec = promisify(execFile);
+
+test('legacy assembly candidates remain inspectable but cannot reuse evidence or authorize promotion', async (t) => {
+  const f = await setup(t); const item = await f.propose('legacy');
+  const report = structuredClone(item.report);
+  delete report.candidate.assemblyContract;
+  delete report.candidate.id;
+  report.candidate.id = digest(report.candidate);
+  const input = { ...item.input, candidateId: report.candidate.id };
+  const root = f.src.integration.scope(input);
+  execFileSync('git', ['update-ref', `refs/source/candidates/${input.candidateId}`, report.candidate.headCommit], { cwd: f.repo.barePath });
+  await f.src._asyncWrite(`${root}/${input.candidateId}.json`, report);
+  // Model a persisted pre-upgrade passing receipt and human acceptance, not just
+  // an unverified historical snapshot. These must not restore authorization.
+  const artifactRef = f.src.store.putArtifact(Buffer.from('legacy passing output'));
+  const receipt = createVerificationReceipt({ candidate: report.candidate, policy: f.policy, checkId: 'integration',
+    producer: f.service, execution: f.execution(report), artifactRef });
+  await f.src._asyncWrite(`${root}/${input.candidateId}/receipts/${receipt.id}.json`, receipt);
+  await f.src._asyncWrite(`${root}/${input.candidateId}/acceptance.json`, { candidateId: input.candidateId,
+    policyHash: report.policyHash, principalId: f.human.id, receipts: [receipt.id] });
+  await assert.rejects(() => f.src.integration.evaluate(input), /assembly contract changed/);
+  await assert.rejects(() => f.src.integration.accept(input), /assembly contract changed/);
+  await assert.rejects(() => f.src.integration.promote(input), /assembly contract changed/);
+  await assert.rejects(() => f.verify({ input, report }), /assembly contract changed/);
+  const status = await f.src.integration.status(input);
+  assert.equal(status.evaluation.ok, false);
+  assert.match(status.evaluation.reason, /assembly contract changed/);
+  assert.ok(status.acceptance, 'historical acceptance is retained for inspection');
+  assert.equal(f.src.gitRepo(f.org.id, f.project.id, f.repo.id).revParse('main'), f.baseCommit);
+  const fresh = await f.src.planIntegrationAsync({ ...f.scope, changeIds: [item.change.id] });
+  assert.notEqual(fresh.candidate.id, input.candidateId);
+  const next = { ...input, candidateId: fresh.candidate.id };
+  assert.equal((await f.src.integration.evaluate(next)).ok, false, 'fresh assembly requires fresh evidence');
+  await f.verify({ input: next, report: fresh });
+  await f.src.integration.accept(next);
+  assert.equal((await f.src.integration.promote(next)).state, 'landed');
+});
 
 async function setup(t) {
   const state = freshSource();

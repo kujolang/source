@@ -549,3 +549,36 @@ are ignored rather than deleted. `/tmp/source-replace-after.log` records all
 three regressions passing in 4.74 s. The scan fixture uses a generated synthetic
 pattern, never a real credential. This verifies the concrete substitution path,
 not a claim that pattern-based scanning detects all possible credentials.
+
+### Original-object boundary and retained-candidate upgrade
+
+The full main test suite at `5b4c3bf` passed **367/367 tests, zero skips**, in
+449.095 seconds with live PostgreSQL and the pinned OCI image enabled. See
+[the per-file results](main-suite-object-identity.json). This run covers the shared
+Git object-identity changes; it predates the assembly-contract migration guard
+and excludes the separate Cloudflare package.
+
+A subsequent regression models a retained legacy candidate with a genuine
+content-addressed passing receipt and human acceptance. Before the guard, current
+evaluation accepted it (the expected rejection failed). The guard adds an
+assembly-contract field to the candidate hash and requires the current contract
+for authorization. The regression now rejects reuse, receipt writes, acceptance
+and promotion while preserving historical status. Replanning yields a different
+identity; only fresh evidence and acceptance permit its promotion. A live
+PostgreSQL regression also restores a queued legacy job, checks rejection before
+execution, and verifies durable, idempotent cancellation. Upgrade ordering is
+documented in the architecture guide.
+
+Post-guard regression: **38/38 passed, zero skips**, 208.842 seconds, using
+a disposable live PostgreSQL database and sequential test-file execution:
+
+```sh
+SOURCE_TEST_DATABASE_URL=<disposable-database> node --test --test-concurrency=1 --test-reporter=tap \
+  tests/integration-planner.test.js tests/integration-broker.test.js \
+  tests/integration-api.test.js tests/verification.test.js \
+  tests/verification-dispatch-live.test.js
+```
+
+Log: `/tmp/source-assembly-regressions.log` (local, ephemeral). Syntax validation
+checked 112 JavaScript files and `git diff --check` passed. The disposable database
+was dropped after completion. No test or benchmark remained running at commit.

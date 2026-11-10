@@ -1,0 +1,540 @@
+{
+  "version": 1,
+  "date": "2026-11-10T23:14:14.053152+00:00",
+  "sourceRevision": "5b4c3bf16bb393c45eba7ae7d306efdac3b66784",
+  "scope": "main tests/**/*.test.js, sequential files with isolated temporary roots; excludes separate Cloudflare package suite",
+  "postgres": true,
+  "containerImage": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216",
+  "containerNodeVersion": "v26.13.0",
+  "files": [
+    {
+      "file": "tests/action-runner.test.js",
+      "exitCode": 0,
+      "durationSeconds": 1.456,
+      "tests": 23,
+      "pass": 23,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/api.test.js",
+      "exitCode": 0,
+      "durationSeconds": 1.277,
+      "tests": 11,
+      "pass": 11,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/artifacts.test.js",
+      "exitCode": 0,
+      "durationSeconds": 8.996,
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/auth.test.js",
+      "exitCode": 0,
+      "durationSeconds": 2.116,
+      "tests": 17,
+      "pass": 17,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/backup.test.js",
+      "exitCode": 0,
+      "durationSeconds": 0.665,
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/benchmark-telemetry.test.js",
+      "exitCode": 0,
+      "durationSeconds": 0.493,
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/candidate-executor.test.js",
+      "exitCode": 0,
+      "durationSeconds": 1.691,
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/capability.test.js",
+      "exitCode": 0,
+      "durationSeconds": 0.663,
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/cli.test.js",
+      "exitCode": 0,
+      "durationSeconds": 0.869,
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/client-http.test.js",
+      "exitCode": 0,
+      "durationSeconds": 0.909,
+      "tests": 6,
+      "pass": 6,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/client-retry.test.js",
+      "exitCode": 0,
+      "durationSeconds": 1.677,
+      "tests": 8,
+      "pass": 8,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/concurrency.test.js",
+      "exitCode": 0,
+      "durationSeconds": 3.331,
+      "tests": 42,
+      "pass": 42,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/container-layout.test.js",
+      "exitCode": 0,
+      "durationSeconds": 0.652,
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/contest-client.test.js",
+      "exitCode": 0,
+      "durationSeconds": 0.681,
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/control-tools.test.js",
+      "exitCode": 0,
+      "durationSeconds": 0.277,
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/decision.test.js",
+      "exitCode": 0,
+      "durationSeconds": 2.009,
+      "tests": 7,
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/dogfood.test.js",
+      "exitCode": 0,
+      "durationSeconds": 1.267,
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/domain.test.js",
+      "exitCode": 0,
+      "durationSeconds": 1.017,
+      "tests": 10,
+      "pass": 10,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/e2e.test.js",
+      "exitCode": 0,
+      "durationSeconds": 1.395,
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/git-http.test.js",
+      "exitCode": 0,
+      "durationSeconds": 17.084,
+      "tests": 19,
+      "pass": 19,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/git.test.js",
+      "exitCode": 0,
+      "durationSeconds": 4.676,
+      "tests": 7,
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/github-actions.test.js",
+      "exitCode": 0,
+      "durationSeconds": 0.416,
+      "tests": 3,
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/hardening.test.js",
+      "exitCode": 0,
+      "durationSeconds": 1.61,
+      "tests": 12,
+      "pass": 12,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/http-load.test.js",
+      "exitCode": 0,
+      "durationSeconds": 0.74,
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/impact-planner.test.js",
+      "exitCode": 0,
+      "durationSeconds": 0.285,
+      "tests": 5,
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/integration-api.test.js",
+      "exitCode": 0,
+      "durationSeconds": 2.939,
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/integration-benchmark.test.js",
+      "exitCode": 0,
+      "durationSeconds": 31.251,
+      "tests": 3,
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/integration-broker.test.js",
+      "exitCode": 0,
+      "durationSeconds": 21.082,
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/integration-planner.test.js",
+      "exitCode": 0,
+      "durationSeconds": 93.676,
+      "tests": 13,
+      "pass": 13,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/integration-semantic-live.test.js",
+      "exitCode": 0,
+      "durationSeconds": 26.598,
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/kujo-integration.test.js",
+      "exitCode": 0,
+      "durationSeconds": 0.662,
+      "tests": 13,
+      "pass": 13,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/multi-repo.test.js",
+      "exitCode": 0,
+      "durationSeconds": 2.752,
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/org.test.js",
+      "exitCode": 0,
+      "durationSeconds": 1.159,
+      "tests": 7,
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/policy.test.js",
+      "exitCode": 0,
+      "durationSeconds": 0.854,
+      "tests": 5,
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/postgres-claims-live.test.js",
+      "exitCode": 0,
+      "durationSeconds": 5.656,
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/postgres-live.test.js",
+      "exitCode": 0,
+      "durationSeconds": 13.775,
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/postgres-regressions.test.js",
+      "exitCode": 0,
+      "durationSeconds": 21.229,
+      "tests": 6,
+      "pass": 6,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/postgres-transactions.test.js",
+      "exitCode": 0,
+      "durationSeconds": 0.391,
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/ratelimit.test.js",
+      "exitCode": 0,
+      "durationSeconds": 1.779,
+      "tests": 7,
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/replication.test.js",
+      "exitCode": 0,
+      "durationSeconds": 1.778,
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/scan.test.js",
+      "exitCode": 0,
+      "durationSeconds": 1.661,
+      "tests": 5,
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/smoke.test.js",
+      "exitCode": 0,
+      "durationSeconds": 0.33,
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/store.test.js",
+      "exitCode": 0,
+      "durationSeconds": 22.882,
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/submit.test.js",
+      "exitCode": 0,
+      "durationSeconds": 16.64,
+      "tests": 8,
+      "pass": 8,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/sync.test.js",
+      "exitCode": 0,
+      "durationSeconds": 4.804,
+      "tests": 3,
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/tls.test.js",
+      "exitCode": 0,
+      "durationSeconds": 2.201,
+      "tests": 3,
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/verification-dispatch-live.test.js",
+      "exitCode": 0,
+      "durationSeconds": 87.255,
+      "tests": 8,
+      "pass": 8,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/verification-queue-live.test.js",
+      "exitCode": 0,
+      "durationSeconds": 20.807,
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/verification.test.js",
+      "exitCode": 0,
+      "durationSeconds": 0.359,
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/web-ui.test.js",
+      "exitCode": 0,
+      "durationSeconds": 1.25,
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/workcell-executor.test.js",
+      "exitCode": 0,
+      "durationSeconds": 8.114,
+      "tests": 12,
+      "pass": 12,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    {
+      "file": "tests/worker.test.js",
+      "exitCode": 0,
+      "durationSeconds": 0.435,
+      "tests": 13,
+      "pass": 13,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0
+    }
+  ],
+  "durationSeconds": 449.095,
+  "status": "passed",
+  "totals": {
+    "tests": 367,
+    "pass": 367,
+    "fail": 0,
+    "skipped": 0,
+    "cancelled": 0
+  }
+}

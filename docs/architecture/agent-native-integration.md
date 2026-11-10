@@ -186,3 +186,23 @@ and synchronous/asynchronous scan findings despite an existing replacement ref,
 plus rejection of replacement-ref pushes. Git documents the relevant
 [replacement-object switch](https://git-scm.com/docs/git-replace.html) and
 [hidden receive refs](https://git-scm.com/docs/git-config#Documentation/git-config.txt-receivehideRefs).
+
+### Upgrading retained integration candidates
+
+New candidate snapshots include the hashed assembly contract
+`original-git-objects-v1`. Candidates missing that contract, or carrying an
+unsupported contract, cannot receive new evidence, reuse old evidence, dispatch
+checks, execute queued checks, obtain acceptance or start promotion. Replanning
+creates a new candidate identity and requires fresh verification and acceptance,
+even if the resulting Git tree is unchanged.
+
+For an upgrade from replacement-aware Git behavior, drain ingress and stop all
+old API and worker processes, deploy the fixed code everywhere, then restart.
+Mixed old/new binaries do not enforce this boundary consistently. Inspect and
+cancel or supersede old queued candidates through the existing retirement API;
+replan their proposals under the new contract. Historical snapshots, artifacts,
+acceptances and refs remain available. Already-landed outcomes and lost-ack
+reconciliation remain inspectable and do not move Git again; this upgrade does
+not undo past promotions. Review previously landed content separately if
+replacement refs were used. Do not manually add the contract to old snapshots
+or copy their receipts into new candidates.

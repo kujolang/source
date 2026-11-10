@@ -10,8 +10,41 @@ import { Source } from '../src/source.js';
 import { PostgresStore } from '../src/postgres-store.js';
 import { createVerificationHandler } from '../src/verification-dispatcher.js';
 import { startServer } from '../src/api.js';
+import { digest } from '../src/integration-planner.js';
+import { verificationIdentity } from '../src/verification.js';
 const exec = promisify(execFile);
 const dsn = process.env.SOURCE_TEST_DATABASE_URL;
+
+test('legacy assembly jobs cannot dispatch or execute but remain cancellable after upgrade', { skip: !dsn }, async (t) => {
+  const f = await fixture(t);
+  const report = structuredClone(f.report);
+  delete report.candidate.assemblyContract;
+  delete report.candidate.id;
+  report.candidate.id = digest(report.candidate);
+  const input = { ...f.input, candidateId: report.candidate.id };
+  const root = f.src.integration.scope(input);
+  const repo = await f.src.getRepositoryAsync(input.orgId, input.projectId, input.repoId);
+  await exec('git', ['update-ref', `refs/source/candidates/${input.candidateId}`, report.candidate.headCommit], { cwd: repo.barePath });
+  await f.src._asyncWrite(`${root}/${input.candidateId}.json`, report);
+  await assert.rejects(() => f.src.verification.dispatch(input), /assembly contract changed/);
+  assert.equal(await f.src.jobs.count(f.scope), 0);
+  // Restore the shape of one queued pre-upgrade job and its durable dispatch.
+  const payload = { repoId: input.repoId, candidateId: input.candidateId, checkId: 'preflight', epoch: 1,
+    identity: verificationIdentity(report.candidate, f.policy, 'preflight') };
+  const queued = await f.src.jobs.enqueue({ ...f.scope, kind: 'integration.verify', payload });
+  await f.src._asyncWrite(`${root}/${input.candidateId}/dispatch.json`, { checks: [{ ...payload, jobId: queued.id }] });
+  const [job] = await f.src.jobs.claim({ workerId: 'upgrade-fixture', limit: 1 });
+  let executions = 0;
+  const handler = createVerificationHandler({ source: f.peer, principalId: f.service.id,
+    executor: { async execute() { executions++; throw new Error('must not execute'); } } });
+  await assert.rejects(() => handler(job.payload, job), /assembly contract changed/);
+  assert.equal(executions, 0);
+  const result = await f.src.verification.retire(input);
+  assert.deepEqual(result.cancelledJobs, [job.id]);
+  assert.equal((await f.store.getJobAsync({ ...f.scope, id: job.id })).status, 'cancelled');
+  assert.equal((await f.src.integration.status(input)).state, 'cancelled');
+  assert.deepEqual(await f.src.verification.retire(input), result);
+});
 
 async function fixture(t) {
   const root = await mkdtemp(path.join(tmpdir(), 'source-dispatch-'));

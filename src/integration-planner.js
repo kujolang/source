@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto';
 const exec = promisify(execFile);
 const oid = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/;
 const idPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/;
+export const ASSEMBLY_CONTRACT = 'original-git-objects-v1';
 
 export function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
@@ -194,7 +195,7 @@ export class IntegrationPlanner {
     }
     if (!accepted.length) return { candidate: null, rejected, conflicts, risks };
     const candidate = {
-      version: 1, context, baseCommit, headCommit: current,
+      version: 1, assemblyContract: ASSEMBLY_CONTRACT, context, baseCommit, headCommit: current,
       tree: await this.git(['rev-parse', `${current}^{tree}`]),
       proposals: accepted.map(({ id, baseCommit, headCommit, dependsOn, files }) => ({ id, baseCommit, headCommit, dependsOn, files })),
       requiredVerification: ['preflight', 'integration'],

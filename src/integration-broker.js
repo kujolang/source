@@ -2,7 +2,7 @@
 // capabilities and supply the authenticated principal, never a body producer ID.
 import { createHash } from 'node:crypto';
 import { normalizeControlArtifact } from './integrations/control-tools.js';
-import { IntegrationPlanner, digest } from './integration-planner.js';
+import { IntegrationPlanner, digest, ASSEMBLY_CONTRACT } from './integration-planner.js';
 import { validateVerificationPolicy, createVerificationReceipt, evaluateVerification } from './verification.js';
 
 export class IntegrationBroker {
@@ -51,6 +51,7 @@ export class IntegrationBroker {
     const { id, ...body } = report.candidate;
     if (id !== input.candidateId || digest(body) !== id) throw new Error('candidate snapshot integrity mismatch');
     if (currentPolicy) {
+      if (report.candidate.assemblyContract !== ASSEMBLY_CONTRACT) throw new Error('candidate assembly contract changed; replan and reverify');
       const retirement = await this.read(`${root}/${id}/retirement.json`);
       if (retirement) throw new Error(`candidate ${retirement.state}; verification and promotion are disabled`);
     }
