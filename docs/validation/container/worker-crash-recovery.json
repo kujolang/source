@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "ok": true,
+  "runtime": "docker",
+  "image": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216",
+  "nodeVersion": "v26.13.0",
+  "candidate": "5f47a27354ac92c8986f02d566b377be2a7f56bab18b5c630198bf80a8b58415",
+  "killedWorkerSignal": "SIGKILL",
+  "concurrentSameJobDifferentLease": true,
+  "leaseFixture": "distinct caller tokens; no PostgreSQL queue in this drill",
+  "recoveryThroughOperatorCli": true,
+  "liveAttemptPreserved": true,
+  "orphanWasRunning": true,
+  "active": {
+    "version": 1,
+    "results": [
+      {
+        "containerName": "source-action-22537-1794355014574-b6d36cc46db2",
+        "jobId": "same-job",
+        "ownerPid": 22537,
+        "state": "active"
+      },
+      {
+        "containerName": "source-action-22546-1794355015181-4629f1f13913",
+        "jobId": "same-job",
+        "ownerPid": 22546,
+        "state": "active"
+      }
+    ],
+    "durationMs": 3
+  },
+  "recovered": {
+    "version": 1,
+    "results": [
+      {
+        "containerName": "source-action-22537-1794355014574-b6d36cc46db2",
+        "jobId": "same-job",
+        "ownerPid": 22537,
+        "state": "recovered"
+      },
+      {
+        "containerName": "source-action-22546-1794355015181-4629f1f13913",
+        "jobId": "same-job",
+        "ownerPid": 22546,
+        "state": "active"
+      }
+    ],
+    "durationMs": 236
+  },
+  "repeated": {
+    "version": 1,
+    "results": [
+      {
+        "containerName": "source-action-22546-1794355015181-4629f1f13913",
+        "jobId": "same-job",
+        "ownerPid": 22546,
+        "state": "active"
+      }
+    ],
+    "durationMs": 1
+  },
+  "workspaceRootEmpty": true,
+  "date": "2026-11-10T23:58:41.475741+00:00",
+  "sourceRevision": "e6a31e2c7c5cf0f5d6e65c89b79a9e29a51b0766",
+  "dockerServer": "29.6.2",
+  "implementationSha256": {
+    "src/action-runner.js": "b0352d5a63696b04e9770e20b21a12e47e58998f3ffe32cabb4d5bcea4a7f490",
+    "src/candidate-executor.js": "f628d3de340fd03f4f1d2863d9926869ce02ca23e0bbe87bec08fb1fe00136cd",
+    "src/execution-attempts.js": "2cbd6dd5f6f756226a5e2602d89b0bfe8accd2cde1c4fddc6cd9dc531e9b9040",
+    "scripts/candidate-crash-smoke.js": "25d1022496a46e7c804e3ffd669217a6f7286cc68d8639847b8a9150a4e16b53",
+    "scripts/recover-executions.js": "99cbbc558405beb01cc223b128dccca85795ab3171dc00d00ea54391175d08ef",
+    "scripts/candidate-container-smoke.js": "b573063204af29296009bc4cfafa8cb1ed8e79aa2f5989bce0a7bc4f310855c9"
+  },
+  "limitations": [
+    "Local Docker Desktop only; not a container escape audit or a production capacity claim.",
+    "Worker crash drill uses real Node workers and OCI containers with distinct caller lease tokens, not a PostgreSQL queue restart.",
+    "Absent prepared resources, crashes before journaling/export completion, reaper death, daemon/host loss and power-loss durability require further work or operator review.",
+    "Foreign hosts/namespaces, live or reused PIDs and ambiguous ownership/runtime state are retained, never automatically deleted."
+  ]
+}

@@ -607,3 +607,47 @@ Syntax lint checked 112 JS files; diff checks passed. No shared daemon was stopp
 This is not worker-SIGKILL orphan reconciliation or an actual daemon restart drill;
 those remain open. Operator recovery and storage-failure limits are documented in
 [the execution guide](../architecture/candidate-execution.md).
+
+### Managed OCI worker SIGKILL and ownership recovery
+
+At `e6a31e2`, managed executions publish complete, synced ownership journals before
+launch. The real-process crash drill was red before implementation: two running
+containers had zero journals. The completed drill starts two workers with the
+same job ID and different caller lease tokens, verifies both live ownership
+records, then SIGKILLs one worker. The orphan is still running when recovery starts.
+The operator CLI recovers only that orphan, preserves the other live container
+and its exact candidate bytes, and makes no further changes on a repeated call.
+Normal cancellation of the surviving worker leaves the workspace root empty.
+The final local recovery call took 236 ms, including inspecting the live attempt;
+this is a fixture measurement, not recovery under load or an SLO.
+
+Recovery requires a dead local PID in the recorded host/PID namespace, matching
+image/labels/bind, and confirmed immutable-container-ID removal. Live/reused PIDs,
+foreign hosts/namespaces, malformed records, resource substitution, symlink
+substitution, unavailable runtimes and ambiguous absent resources are retained.
+A filesystem lock excludes competing reapers and new admissions; interrupted
+reapers leave their lock for operator review. Legacy cleanup records without an
+ownership journal are surfaced without invented deletion authority.
+
+A separate regression reproduced workload PATH overriding the host runtime's
+PATH. Random inert aliases now carry workload environment values, restoring their
+original names only inside the container before workflow steps. Unit and real
+Docker tests preserve multiline values, keep values out of argv, remove aliases
+inside the container, and prevent workload HOME/DOCKER_HOST/PATH from configuring
+the host client or cleanup context. No external endpoint was contacted.
+
+Validation: **45/45 focused tests passed, zero skips**, 28.584 seconds, including
+both real OCI semantic integration/split cases and live environment isolation.
+All six journaled lifecycle smoke cases and the actual SIGKILL/operator-CLI drill
+passed. Syntax lint checked 116 JS files and diff checks passed. Raw results,
+implementation hashes and exact scope:
+
+- [Crash recovery](container/worker-crash-recovery.json)
+- [Journaled lifecycle](container/journaled-cleanup.json)
+- [Focused regression record](container/worker-crash-regressions.json)
+
+The crash drill has no PostgreSQL queue; prior queue fencing/recovery evidence
+remains separate. This does not prove host/daemon loss, reaper crash recovery,
+power-loss durability, orphan workspace cleanup before journaling, or resolution
+of an in-flight create request whose prepared resource is absent. Operator steps
+and remaining windows are documented in the execution guide.

@@ -235,3 +235,20 @@ Runtime cancellation still depends on worker heartbeat/abort handling; late
 evidence is rejected at the broker even if physical teardown is delayed. Never
 delete retirement records during rollback or run an older broker that ignores
 them against affected candidates. This change adds no database schema migration.
+
+### Managed execution recovery
+
+Managed action workspaces and candidate verification now publish host-owned
+attempt journals before OCI launch. Operators can recover a dead local worker's
+container with `node scripts/recover-executions.js /absolute/workspace-root`.
+Recovery verifies host/PID namespace, dead owner, resource labels, image and
+workspace binding; it never uses job ID or age alone to authorize deletion.
+Live owners and uncertain state remain untouched. See
+[the execution recovery contract](../architecture/candidate-execution.md) for
+upgrade, environment identity, recovery states and remaining failure windows.
+
+Container environment values are passed to the runtime client under inert random
+aliases, then restored only inside the container shell. Workload `PATH`, `HOME`,
+`DOCKER_HOST` and similar names cannot alter host runtime configuration. Values
+remain out of argv, multiline values survive, and aliases are removed before
+workflow commands. This is separate from output redaction and lease revocation.

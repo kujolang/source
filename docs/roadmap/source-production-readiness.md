@@ -311,3 +311,15 @@ fault injection proves retention and explicit recovery while the container is
 still running. This advances runtime-unreachable handling; it does not complete
 worker-SIGKILL orphan reconciliation, actual daemon restart, multi-service staging,
 Workcell compatibility, or the other load/real-project/production gates.
+
+## Managed worker crash recovery — 2026-11-10
+
+Candidate and managed workflow execution now journal ownership before OCI launch.
+The operator reaper admits only dead local owners in the recorded PID namespace,
+verifies labels/image/bind, removes by immutable container ID, and retains every
+ambiguous case. Root locks serialize reapers; live attempts are protected even
+with identical job IDs. Actual SIGKILL and concurrent live-attempt preservation
+are demonstrated through the recovery CLI. This advances the worker-death gate
+for running managed containers; export/pre-launch ambiguity, reaper death, actual
+daemon/host loss, queue-integrated restart and production deployment drills remain
+open alongside the real-project, staging and load requirements.

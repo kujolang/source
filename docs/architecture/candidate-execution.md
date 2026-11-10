@@ -70,7 +70,7 @@ exited successfully. A failed removal is followed by a bounded successful runtim
 inventory check; an unreachable daemon is never treated as proof of absence.
 The workspace is removed only after confirmed teardown (or a pre-launch/export
 failure). Returned candidate execution metadata records `cleanupConfirmed: true`.
-The profile now includes `cleanup: confirmed-removal-v1`, changing the environment
+The profile now includes `cleanup: journaled-removal-v2`, changing the environment
 hash: update operator policy from the executor's new environment, then replan and
 reverify. Do not edit old receipts to match the new environment.
 
@@ -95,9 +95,9 @@ records until every affected container is accounted for; never sweep containers 
 prefix or delete a workspace while its container might still run. Rollback also
 requires resolving retained cleanup records before restarting an older binary.
 
-This is confirmed cleanup with durable recovery on observed runtime failures.
-Worker SIGKILL before cleanup can still leave an unrecorded container/workspace;
-that separate crash-orphan reaper and deployment recovery proof remain required.
+Managed executions now publish an ownership journal before runtime launch and
+support explicit recovery after worker SIGKILL. See the recovery section below
+for its authority checks and the remaining pre-launch/export and host-loss gaps.
 
 ## Validation
 
@@ -154,3 +154,89 @@ and only then removes the workspace and marker. See
 [cleanup confirmation results](../validation/container/cleanup-confirmation.json).
 This injects the cleanup failure without stopping the shared Docker daemon; it is
 not a daemon restart or worker-SIGKILL recovery test.
+
+## Recovering a killed worker's managed execution
+
+Every candidate execution, and GitHub workflow execution using a workspace manager,
+publishes a mode-0600 `.source-action-<attempt>.attempt.json` before spawning the
+runtime. The file is synced and atomically linked into place; concurrent readers
+never see a partially written journal. It records the local owner PID, hostname,
+PID namespace, exact workspace, image, runtime and job ID. The job ID is diagnostic;
+it is never cleanup authority. A fresh random container name and ownership labels
+bind the resource to this journal. The journal is outside the sole workspace mount.
+Once removal is confirmed, Source atomically records `container-removed`; it deletes
+the journal only after the managed workspace has been removed.
+
+Use a worker-local, operator-controlled workspace root in one host/PID namespace.
+Do not share a root across hosts, PID namespaces or untrusted users. Linux records
+its `/proc/self/ns/pid` identity; macOS uses its host PID namespace. Unsupported or
+unreadable namespace identity is retained for review. PID reuse is conservative:
+if the recorded PID is alive, recovery will not touch the attempt. Draining affected
+workers is recommended, but a live attempt is protected even when another attempt
+is recovered concurrently.
+
+Run the operator command from the Source checkout:
+
+```sh
+node scripts/recover-executions.js /absolute/worker/workspace-root
+```
+
+The command takes a filesystem lock to exclude another reaper. New admissions are
+blocked while that lock exists; a dead/unknown owner journal also blocks admission
+until recovery. A reaper killed while holding the lock leaves it for operator
+review—never remove a lock merely because it is old. Confirm the reaper stopped
+before removing `.source-recovery.lock` and retrying. Recovery does not execute
+repository commands, update Git, create passing evidence, complete jobs or grant
+promotion. Retry/re-dispatch work through the existing lease-fenced queue afterward.
+
+Only a dead local owner in the matching PID namespace is eligible. Recovery
+inspects the exact named resource and requires matching Source labels, configured
+image and sole workspace bind. It removes the inspected immutable
+container ID, confirms removal, records that phase, then removes only the recorded
+workspace after checking it is still a real directory at the canonical path.
+Another live attempt—even with the same job ID—is not eligible. A successful
+runtime inventory is required when reconciling an already-removed resource.
+
+The JSON report distinguishes `active`, `recovered`, ownership mismatch, foreign
+host/namespace, invalid record and uncertain runtime/cleanup states. Exit status
+2 means at least one record needs review; 0 means records were recovered or belong
+to live owners (or there were none). Legacy `.cleanup.json` files without ownership
+journals are reported for manual review and are never silently deleted. Repeating
+recovery after successful removal makes no further changes.
+
+If a prepared attempt has no observable container, recovery retains it. The dead
+worker's creation request might still be in flight; absence alone cannot settle
+that race. A crash after container removal but before recording that phase also
+requires review. A crash during export, before the pre-launch journal exists, can
+leave a workspace requiring manual inspection. This implementation does not yet
+prove power-loss durability, host-loss/failover recovery, cross-host cleanup,
+automatic queue restart integration or cleanup after the reaper itself crashes.
+It must not be described as complete production orphan reconciliation.
+
+The real-process drill starts two candidate containers for the same job with
+different caller lease tokens, verifies both ownership journals, SIGKILLs one
+worker, invokes the operator CLI, and confirms that only the orphan is removed.
+It verifies surviving candidate bytes, repeatability and an empty root after the
+surviving worker cancels normally. It uses actual OCI execution and Node worker
+processes, but no PostgreSQL queue in this drill. Run with the same pinned image
+variables as the regular smoke check:
+
+```sh
+node scripts/candidate-crash-smoke.js
+```
+
+See [worker crash evidence](../validation/container/worker-crash-recovery.json)
+and [journaled lifecycle evidence](../validation/container/journaled-cleanup.json).
+
+Workload environment values are transported to the runtime client under random,
+non-configuring aliases. Original variable names are restored only in the
+container shell before workflow steps and the aliases are then unset. This keeps
+`PATH`, `HOME`, `DOCKER_HOST` and other workload settings from selecting a host
+binary, runtime context or cleanup target. Values—including multiline values—are
+not placed in runtime command arguments. The existing environment name/value
+bounds and forbidden injection-variable filters still apply. A controlled
+regression reproduced host PATH replacement before this fix; unit and real Docker
+checks verify host configuration remains unchanged while container values arrive
+intact. Standalone runners with external `workspaceForJob` ownership still need
+their operator's workspace recovery procedure; automatic attempt journaling is
+for managed workspaces.

@@ -1,0 +1,290 @@
+{
+  "version": 2,
+  "runtime": "docker",
+  "image": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216",
+  "nodeVersion": "v26.13.0",
+  "cases": [
+    {
+      "name": "endpoint-and-isolation",
+      "durationMs": 859,
+      "profile": {
+        "version": 1,
+        "runtime": "docker",
+        "image": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216",
+        "toolVersions": {
+          "node": "v26.13.0"
+        },
+        "timeoutMs": 30000,
+        "maxOutputBytes": 65536,
+        "memory": "1g",
+        "cpus": 2,
+        "pidsLimit": 256,
+        "user": "501:20",
+        "network": "none",
+        "export": "git-blobs-regular-files-v1",
+        "cleanup": "journaled-removal-v2"
+      },
+      "result": {
+        "output": "candidate endpoint and isolation passed\n",
+        "execution": {
+          "identity": "8de20c1ad3c6cf94fc59fcedcb8eee2c216236f90b786f4f0324c875e69b75ba",
+          "commit": "fd809adb6cfa6400457b7b94db920a458484585b",
+          "tree": "bd7242f0a237b081cb80f48263155be1fa9d0078",
+          "command": [
+            "node",
+            "-e",
+            "\n    const fs=require('node:fs'),assert=require('node:assert/strict'),os=require('node:os');\n    (async()=>{\n      assert.equal(process.version,\"v26.13.0\");\n      assert.notEqual(process.getuid(),0);\n      assert.equal(fs.readFileSync('expected','utf8'),'exact-candidate');\n      assert.equal(fs.existsSync('.git'),false);\n      assert.equal(fs.existsSync('host-only'),false);\n      assert.equal(process.env.SOURCE_SMOKE_HOST_ONLY,undefined);\n      assert.equal(fs.existsSync('/var/run/docker.sock'),false);\n      assert.throws(()=>fs.writeFileSync('/source-escape','bad'));\n      assert.ok(Object.values(os.networkInterfaces()).flat().every(x=>x.internal));\n      const status=fs.readFileSync('/proc/self/status','utf8');\n      assert.match(status,/CapEff:\\s+0+\\n/); assert.match(status,/NoNewPrivs:\\s+1\\n/);\n      const server=require('./app.cjs');\n      await new Promise(r=>server.listen(0,'127.0.0.1',r));\n      try { const response=await fetch('http://127.0.0.1:'+server.address().port); assert.equal(response.status,200); assert.deepEqual(await response.json(),{value:'exact-candidate'}); }\n      finally { await new Promise(r=>server.close(r)); }\n      fs.writeFileSync('temporary-result','ok'); console.log('candidate endpoint and isolation passed');\n    })().catch(e=>{console.error(e);process.exitCode=1});\n  "
+          ],
+          "environment": "source-oci-v1:7fe616a5d03116557d23d9998a4fec8e24efb63dacc47ee0d9f680e8c04af6cb",
+          "inputs": {},
+          "externalState": {},
+          "toolVersions": {
+            "node": "v26.13.0"
+          },
+          "status": "pass",
+          "startedAt": 1794355004698,
+          "finishedAt": 1794355005511,
+          "durationMs": 813,
+          "stderr": "",
+          "exitCode": 0,
+          "runtimeSignal": null,
+          "export": {
+            "files": 2,
+            "bytes": 234,
+            "commit": "fd809adb6cfa6400457b7b94db920a458484585b",
+            "tree": "bd7242f0a237b081cb80f48263155be1fa9d0078"
+          },
+          "cleanupConfirmed": true,
+          "workspaceRemoved": true
+        }
+      },
+      "cleanupVerified": true
+    },
+    {
+      "name": "failed-check",
+      "durationMs": 738,
+      "profile": {
+        "version": 1,
+        "runtime": "docker",
+        "image": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216",
+        "toolVersions": {
+          "node": "v26.13.0"
+        },
+        "timeoutMs": 30000,
+        "maxOutputBytes": 65536,
+        "memory": "1g",
+        "cpus": 2,
+        "pidsLimit": 256,
+        "user": "501:20",
+        "network": "none",
+        "export": "git-blobs-regular-files-v1",
+        "cleanup": "journaled-removal-v2"
+      },
+      "result": {
+        "output": "controlled integration failure\n",
+        "execution": {
+          "identity": "550a68d56c3006ce91da4bc5fb24296d2f1e96882dce439860887380294fb773",
+          "commit": "fd809adb6cfa6400457b7b94db920a458484585b",
+          "tree": "bd7242f0a237b081cb80f48263155be1fa9d0078",
+          "command": [
+            "node",
+            "-e",
+            "console.error('controlled integration failure'); process.exitCode=7"
+          ],
+          "environment": "source-oci-v1:7fe616a5d03116557d23d9998a4fec8e24efb63dacc47ee0d9f680e8c04af6cb",
+          "inputs": {},
+          "externalState": {},
+          "toolVersions": {
+            "node": "v26.13.0"
+          },
+          "status": "fail",
+          "startedAt": 1794355005556,
+          "finishedAt": 1794355006245,
+          "durationMs": 689,
+          "stderr": "controlled integration failure\n",
+          "exitCode": 7,
+          "runtimeSignal": null,
+          "export": {
+            "files": 2,
+            "bytes": 234,
+            "commit": "fd809adb6cfa6400457b7b94db920a458484585b",
+            "tree": "bd7242f0a237b081cb80f48263155be1fa9d0078"
+          },
+          "cleanupConfirmed": true,
+          "workspaceRemoved": true
+        }
+      },
+      "cleanupVerified": true
+    },
+    {
+      "name": "cancel",
+      "durationMs": 744,
+      "profile": {
+        "version": 1,
+        "runtime": "docker",
+        "image": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216",
+        "toolVersions": {
+          "node": "v26.13.0"
+        },
+        "timeoutMs": 30000,
+        "maxOutputBytes": 65536,
+        "memory": "1g",
+        "cpus": 2,
+        "pidsLimit": 256,
+        "user": "501:20",
+        "network": "none",
+        "export": "git-blobs-regular-files-v1",
+        "cleanup": "journaled-removal-v2"
+      },
+      "result": {
+        "error": "isolated workflow cancelled",
+        "cleanup": {
+          "confirmed": true,
+          "runtime": "docker",
+          "containerName": "source-action-22370-1794355006379-442759abb38c",
+          "workspace": "/private/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-container-smoke-pfQpGG/workspaces/source-cancel-eYhvHB",
+          "attemptRecord": "/private/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-container-smoke-pfQpGG/workspaces/.source-action-22370-1794355006379-442759abb38c.attempt.json"
+        }
+      },
+      "runtimeInspection": {
+        "network": "none",
+        "readOnlyRoot": true,
+        "memoryBytes": 1073741824,
+        "nanoCpus": 2000000000,
+        "pids": 256,
+        "user": "501:20"
+      },
+      "cleanupVerified": true
+    },
+    {
+      "name": "timeout",
+      "durationMs": 5328,
+      "profile": {
+        "version": 1,
+        "runtime": "docker",
+        "image": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216",
+        "toolVersions": {
+          "node": "v26.13.0"
+        },
+        "timeoutMs": 5000,
+        "maxOutputBytes": 65536,
+        "memory": "1g",
+        "cpus": 2,
+        "pidsLimit": 256,
+        "user": "501:20",
+        "network": "none",
+        "export": "git-blobs-regular-files-v1",
+        "cleanup": "journaled-removal-v2"
+      },
+      "result": {
+        "error": "isolated workflow timed out",
+        "cleanup": {
+          "confirmed": true,
+          "runtime": "docker",
+          "containerName": "source-action-22370-1794355007119-a00b4649f6a5",
+          "workspace": "/private/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-container-smoke-pfQpGG/workspaces/source-timeout-shmcPD",
+          "attemptRecord": "/private/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-container-smoke-pfQpGG/workspaces/.source-action-22370-1794355007119-a00b4649f6a5.attempt.json"
+        }
+      },
+      "cleanupVerified": true
+    },
+    {
+      "name": "output-limit",
+      "durationMs": 694,
+      "profile": {
+        "version": 1,
+        "runtime": "docker",
+        "image": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216",
+        "toolVersions": {
+          "node": "v26.13.0"
+        },
+        "timeoutMs": 30000,
+        "maxOutputBytes": 1024,
+        "memory": "1g",
+        "cpus": 2,
+        "pidsLimit": 256,
+        "user": "501:20",
+        "network": "none",
+        "export": "git-blobs-regular-files-v1",
+        "cleanup": "journaled-removal-v2"
+      },
+      "result": {
+        "error": "isolated workflow output exceeded configured limit",
+        "cleanup": {
+          "confirmed": true,
+          "runtime": "docker",
+          "containerName": "source-action-22370-1794355012447-02d0fe127855",
+          "workspace": "/private/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-container-smoke-pfQpGG/workspaces/source-output-limit-kPFuQI",
+          "attemptRecord": "/private/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-container-smoke-pfQpGG/workspaces/.source-action-22370-1794355012447-02d0fe127855.attempt.json"
+        }
+      },
+      "cleanupVerified": true
+    },
+    {
+      "name": "cleanup-outage",
+      "durationMs": 761,
+      "profile": {
+        "version": 1,
+        "runtime": "docker",
+        "image": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216",
+        "toolVersions": {
+          "node": "v26.13.0"
+        },
+        "timeoutMs": 30000,
+        "maxOutputBytes": 65536,
+        "memory": "1g",
+        "cpus": 2,
+        "pidsLimit": 256,
+        "user": "501:20",
+        "network": "none",
+        "export": "git-blobs-regular-files-v1",
+        "cleanup": "journaled-removal-v2"
+      },
+      "result": {
+        "error": "isolated workflow cancelled; container cleanup unconfirmed: source-action-22370-1794355013148-7e73b0e5fd56; workspace retained at /private/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-container-smoke-pfQpGG/workspaces/source-cleanup-outage-TyNy8I; recovery record /var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-container-smoke-pfQpGG/workspaces/.source-action-22370-1794355013148-7e73b0e5fd56.cleanup.json",
+        "cleanup": {
+          "confirmed": false,
+          "runtime": "docker",
+          "containerName": "source-action-22370-1794355013148-7e73b0e5fd56",
+          "workspace": "/private/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-container-smoke-pfQpGG/workspaces/source-cleanup-outage-TyNy8I",
+          "attemptRecord": "/private/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-container-smoke-pfQpGG/workspaces/.source-action-22370-1794355013148-7e73b0e5fd56.attempt.json",
+          "recordPath": "/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-container-smoke-pfQpGG/workspaces/.source-action-22370-1794355013148-7e73b0e5fd56.cleanup.json",
+          "recorded": true
+        },
+        "recovery": {
+          "fault": "injected unavailable cleanup boundary; real running OCI container",
+          "containerRemovalConfirmed": true,
+          "workspacePreservedUntilRemoval": true,
+          "currentAndRestartedWorkerBlocked": true
+        }
+      },
+      "runtimeInspection": {
+        "network": "none",
+        "readOnlyRoot": true,
+        "memoryBytes": 1073741824,
+        "nanoCpus": 2000000000,
+        "pids": 256,
+        "user": "501:20"
+      },
+      "cleanupVerified": true
+    }
+  ],
+  "ok": true,
+  "date": "2026-11-10T23:58:41.475741+00:00",
+  "sourceRevision": "e6a31e2c7c5cf0f5d6e65c89b79a9e29a51b0766",
+  "dockerServer": "29.6.2",
+  "implementationSha256": {
+    "src/action-runner.js": "b0352d5a63696b04e9770e20b21a12e47e58998f3ffe32cabb4d5bcea4a7f490",
+    "src/candidate-executor.js": "f628d3de340fd03f4f1d2863d9926869ce02ca23e0bbe87bec08fb1fe00136cd",
+    "src/execution-attempts.js": "2cbd6dd5f6f756226a5e2602d89b0bfe8accd2cde1c4fddc6cd9dc531e9b9040",
+    "scripts/candidate-crash-smoke.js": "25d1022496a46e7c804e3ffd669217a6f7286cc68d8639847b8a9150a4e16b53",
+    "scripts/recover-executions.js": "99cbbc558405beb01cc223b128dccca85795ab3171dc00d00ea54391175d08ef",
+    "scripts/candidate-container-smoke.js": "b573063204af29296009bc4cfafa8cb1ed8e79aa2f5989bce0a7bc4f310855c9"
+  },
+  "limitations": [
+    "Local Docker Desktop only; not a container escape audit or a production capacity claim.",
+    "Worker crash drill uses real Node workers and OCI containers with distinct caller lease tokens, not a PostgreSQL queue restart.",
+    "Absent prepared resources, crashes before journaling/export completion, reaper death, daemon/host loss and power-loss durability require further work or operator review.",
+    "Foreign hosts/namespaces, live or reused PIDs and ambiguous ownership/runtime state are retained, never automatically deleted."
+  ]
+}
