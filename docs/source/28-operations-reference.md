@@ -192,3 +192,22 @@ deliveries require a provider signature and delivery ID and are replay-safe.
 Workflow dispatch is bounded to 1,000 jobs per event by default; operators can
 adjust the `maxWorkflowJobs` server option for a different controlled fan-out.
 
+
+
+## Listing and writer lifecycle guarantees
+
+Storage listing cursors are exclusive lexical lower bounds. A cursor whose record
+has been removed still resumes at the next greater ID; it does not restart the
+list. Limits apply after selecting distinct direct children (or logical child
+directories when requested). Storage path prefixes are literal, including `_`
+and `%`; they are not SQL patterns. PostgreSQL listings use `C` collation for
+stable ID ordering across database locales.
+
+Writer controllers renew every one-third of their lease duration, including the
+minimum 1,000 ms lease. Repeated starts reuse the running controller. Shutdown
+invalidates in-flight acquisition/renewal results so they cannot reactivate a
+stopped controller or install a new renewal timer. This does not replace the
+existing deployment requirement for database fencing and Git compare-and-swap.
+
+Repository file responses preserve leading and trailing UTF-8 whitespace from
+Git; callers that need normalized text must explicitly normalize it themselves.

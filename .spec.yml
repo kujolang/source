@@ -64,7 +64,7 @@ risks:
     mitigation: "Use the isolated runner controls and validate runtime/image/secret-provider policy in each deployment."
     severity: "high"
 dependencies:
-  - "Node.js >= 18"
+  - "Node.js >=22.23.4 <23 || >=24.22.1 <25 || >=26.12.1"
   - "Git"
   - "Postgres for multi-process production mode"
   - "Kujo runtime for release gates"
