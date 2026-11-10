@@ -26,14 +26,16 @@ export class IntegrationPlanner {
     this.timeoutMs = timeoutMs;
   }
 
-  async git(args, env = {}) {
+  async git(args, env = {}, input = null) {
     // Do not inherit Git object-directory, config injection or tracing variables.
     const clean = {};
     for (const key of ['PATH', 'HOME', 'TMPDIR', 'SYSTEMROOT']) if (process.env[key]) clean[key] = process.env[key];
-    const result = await exec('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgSign=false', ...args], {
+    const pending = exec('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgSign=false', ...args], {
       cwd: this.barePath, encoding: 'utf8', timeout: this.timeoutMs, maxBuffer: 8 * 1024 * 1024,
       env: { ...clean, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_ATTR_NOSYSTEM: '1', ...env },
     });
+    if (input != null) pending.child.stdin.end(input);
+    const result = await pending;
     return result.stdout.trim();
   }
 
@@ -56,7 +58,7 @@ export class IntegrationPlanner {
     return result;
   }
 
-  async assemble({ baseCommit, proposals, exclusivePaths = ['migrations/', 'generated/'], dependencyGroups = [] }) {
+  async assemble({ baseCommit, proposals, exclusivePaths = ['migrations/', 'generated/'], dependencyGroups = [], context = {} }) {
     if (!oid.test(baseCommit)) throw new Error('baseCommit must be a full Git object ID');
     if (!Array.isArray(proposals) || !proposals.length || proposals.length > this.maxProposals) throw new Error('invalid proposal batch size');
     if (!Array.isArray(exclusivePaths) || !exclusivePaths.every((p) => typeof p === 'string' && p.length)) throw new Error('invalid exclusive paths');
@@ -138,7 +140,7 @@ export class IntegrationPlanner {
     }
     if (!accepted.length) return { candidate: null, rejected, conflicts, risks };
     const candidate = {
-      version: 1, baseCommit, headCommit: current,
+      version: 1, context, baseCommit, headCommit: current,
       tree: await this.git(['rev-parse', `${current}^{tree}`]),
       proposals: accepted.map(({ id, baseCommit, headCommit, dependsOn, files }) => ({ id, baseCommit, headCommit, dependsOn, files })),
       requiredVerification: ['preflight', 'integration'],
