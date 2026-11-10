@@ -129,7 +129,7 @@ candidates: their 100% hit result proves correctness, not an expected cache rate
 | Stage | Hot repository | Distributed repositories |
 |---|---|---|
 | 10 | Passed this compatible-file lifecycle | Passed, five repos |
-| 25 | Not measured | Not measured |
+| 25 | Failed during submission: HTTP 429 | Failed during submission: HTTP 429 |
 | 100 | Not measured | Not measured |
 | 250 | Not measured; beyond harness bound | Not measured |
 | 1,000+ | Not measured; multi-batch orchestration required | Not measured |
@@ -140,3 +140,33 @@ worker crash/recovery timing under load; full host/network utilization;
 real-project lifecycle; larger stages; deployment capacity and security gates.
 Existing crash tests are in [failure recovery](failure-recovery.md), not folded
 into these measurements. Recovery duration is null, not zero, in raw reports.
+
+## 25-agent pilot: default admission limit reached
+
+The 25-agent hot and five-repository attempts failed before any client completed
+the submit lifecycle. Instrumented reports observed HTTP 429 responses:
+
+| Layout | HTTP 200 responses | HTTP 429 responses | Completed clients before abort | Elapsed including cleanup |
+|---|---:|---:|---:|---:|
+| One repo | 119 | 7 | 0 | 11.438 s |
+| Five repos | 119 | 4 | 0 | 13.290 s |
+
+The failed operation was `ls-remote` in the hot run and `fetch` in the distributed
+run. Source's public Git-read limiter is keyed by client address, with a default
+120 requests per minute. All benchmark clients share one loopback address.
+Repeated Git discovery/fetch requests reach that bounded admission policy before
+proposal verification. The explicit 429 counts establish throttling; this is not
+a database/merge-capacity result. No rate limits were raised and no retry behavior
+was added to make the runs pass. The harness stops after the first client failure,
+so counts describe an aborted burst, not every attempted operation's final outcome.
+
+- [Instrumented 25-agent hot failure](benchmarks/agents-25-repos-1.json).
+- [Instrumented 25-agent distributed failure](benchmarks/agents-25-repos-5.json).
+- [Initial hot failure before status instrumentation](benchmarks/agents-25-repos-1-initial.json).
+- [Initial distributed failure before status instrumentation](benchmarks/agents-25-repos-5-initial.json).
+
+The ten-agent reports retain the harness digest from commit `4887aa5`.
+The pilot adds response-status counts, phase and completed-client diagnostics;
+its separate digest records that instrumentation change. Default-rate shared-IP
+agent bursts need bounded retry/backoff or a reviewed authenticated admission
+policy before repeating the pilot. Completion at 25 and higher is unproven.

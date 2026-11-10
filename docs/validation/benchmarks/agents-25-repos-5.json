@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "status": "failed",
+  "phase": "submission",
+  "httpStatuses": {
+    "200": 119,
+    "429": 4
+  },
+  "date": "2026-11-10T20:54:57.095Z",
+  "agents": 25,
+  "repositories": 5,
+  "concurrency": {
+    "agentProcesses": 25,
+    "workerProcesses": 2,
+    "workerConcurrency": 2
+  },
+  "host": {
+    "platform": "darwin",
+    "arch": "x64",
+    "node": "v26.12.1",
+    "cpuCount": 12,
+    "memoryBytes": 17179869184,
+    "git": "git version 2.42.0"
+  },
+  "fixture": "compatible independent files; fixed host Git-content checker; no repository code execution",
+  "rateLimits": "unchanged server defaults",
+  "stages": {},
+  "raw": {
+    "completedClients": []
+  },
+  "limitations": [
+    "loopback single host; no deployed TLS latency",
+    "fixed Git-content verification, not application CI or isolated staging",
+    "no induced worker crash in this measurement",
+    "maximum 100 agents per harness run",
+    "default same-address submit/read/push rate limits apply"
+  ],
+  "sourceRevision": "4887aa51b5bbdde4f6c8f266a094c59da19821d4",
+  "harnessSha256": "4bff2c0db485fc1e695691dd91cd0e9bb893170f15074d9e9422769b10faac52",
+  "error": "Source Git fetch failed; check credentials, connectivity, and fast-forward history (no force or deletion is performed)",
+  "elapsedMs": 13290,
+  "parentCpuMicros": {
+    "user": 1226922,
+    "system": 970099
+  },
+  "parentPeakRssBytes": 100040704
+}

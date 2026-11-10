@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "status": "failed",
+  "date": "2026-11-10T20:53:22.615Z",
+  "agents": 25,
+  "repositories": 5,
+  "concurrency": {
+    "agentProcesses": 25,
+    "workerProcesses": 2,
+    "workerConcurrency": 2
+  },
+  "host": {
+    "platform": "darwin",
+    "arch": "x64",
+    "node": "v26.12.1",
+    "cpuCount": 12,
+    "memoryBytes": 17179869184,
+    "git": "git version 2.42.0"
+  },
+  "fixture": "compatible independent files; fixed host Git-content checker; no repository code execution",
+  "rateLimits": "unchanged server defaults",
+  "stages": {},
+  "raw": {},
+  "limitations": [
+    "loopback single host; no deployed TLS latency",
+    "fixed Git-content verification, not application CI or isolated staging",
+    "no induced worker crash in this measurement",
+    "maximum 100 agents per harness run",
+    "default same-address submit/read/push rate limits apply"
+  ],
+  "sourceRevision": "4887aa51b5bbdde4f6c8f266a094c59da19821d4",
+  "harnessSha256": "08b0a72ba2b4bff78fd5fc33e4d9a0e84644d35c93738a11ec685ccb87c31277",
+  "error": "Source Git ls-remote failed; check credentials, connectivity, and fast-forward history (no force or deletion is performed)",
+  "elapsedMs": 13323,
+  "parentCpuMicros": {
+    "user": 1191151,
+    "system": 871853
+  },
+  "parentPeakRssBytes": 99258368
+}

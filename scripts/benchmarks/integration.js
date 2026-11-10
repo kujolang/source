@@ -92,7 +92,7 @@ async function main() {
   const schema = `source_bench_${process.pid}_${Date.now()}`;
   let store, server; const children = [], sockets = []; const executions = [], workerErrors = [];
   const cpuBefore = process.cpuUsage(); const began = Date.now();
-  const report = { version: 1, status: 'running', date: new Date().toISOString(), agents, repositories: repos, concurrency: { agentProcesses: agents, workerProcesses: 2, workerConcurrency: 2 }, host: { platform: process.platform, arch: process.arch, node: process.version, cpuCount: cpus().length, memoryBytes: totalmem() }, fixture: 'compatible independent files; fixed host Git-content checker; no repository code execution', rateLimits: 'unchanged server defaults', stages: {}, raw: {}, limitations: ['loopback single host; no deployed TLS latency', 'fixed Git-content verification, not application CI or isolated staging', 'no induced worker crash in this measurement', 'maximum 100 agents per harness run', 'default same-address submit/read/push rate limits apply'] };
+  const report = { version: 1, status: 'running', phase: 'setup', httpStatuses: {}, date: new Date().toISOString(), agents, repositories: repos, concurrency: { agentProcesses: agents, workerProcesses: 2, workerConcurrency: 2 }, host: { platform: process.platform, arch: process.arch, node: process.version, cpuCount: cpus().length, memoryBytes: totalmem() }, fixture: 'compatible independent files; fixed host Git-content checker; no repository code execution', rateLimits: 'unchanged server defaults', stages: {}, raw: {}, limitations: ['loopback single host; no deployed TLS latency', 'fixed Git-content verification, not application CI or isolated staging', 'no induced worker crash in this measurement', 'maximum 100 agents per harness run', 'default same-address submit/read/push rate limits apply'] };
   const spawnRole = (role, config) => {
     const child = fork(script, [`--${role}`], { stdio: ['ignore', 'pipe', 'pipe', 'ipc'], env: { ...env(), ...(role === 'worker' ? { PGUSER: config.databaseUser } : {}) } });
     let stderr = ''; child.stderr.on('data', (chunk) => { if (stderr.length < 16384) stderr += chunk; }); child.stdout.resume();
@@ -139,6 +139,7 @@ async function main() {
     }
     server = await startServer(source, { port: 0, host: '127.0.0.1' });
     server.on('connection', (socket) => sockets.push(socket));
+    server.prependListener('request', (_req, res) => res.once('finish', () => { report.httpStatuses[res.statusCode] = (report.httpStatuses[res.statusCode] || 0) + 1; }));
     const baseUrl = `http://127.0.0.1:${server.address().port}`;
     const workers = Array.from({ length: 2 }, (_, i) => spawnRole('worker', { dsn, databaseUser, schema, root, serviceId: service.id, workerId: `benchmark-${i}` }));
     await Promise.all(workers.map((entry) => entry.wait('ready')));
@@ -150,6 +151,7 @@ async function main() {
       clients.push(spawnRole('agent', { root, cwd: path.join(root, `agent${i}`), index: i, repoIndex: i % repos, url: `${baseUrl}/git/${org.id}/${record.scope.projectId}/${record.repo.id}.git`, credential: cap.credential }));
     }
     await Promise.all(clients.map((entry) => entry.wait('ready')));
+    report.phase = 'submission';
     const submittedAt = performance.now(); clients.forEach((entry) => entry.child.send({ type: 'go' }));
     const proposals = (await Promise.all(clients.map((entry) => entry.wait('result')))).map((message) => message.result);
     const submissionWallMs = performance.now() - submittedAt;
@@ -157,6 +159,7 @@ async function main() {
     assert.equal(new Set(proposals.map((item) => item.changeId)).size, agents);
     report.raw.proposals = proposals;
     report.stages.submission = { wallMs: submissionWallMs, proposalsPerSecond: agents * 1000 / submissionWallMs, cloneMs: stats(proposals.map((p) => p.cloneMs)), submitMs: stats(proposals.map((p) => p.submitMs)) };
+    report.phase = 'assembly';
     const candidates = [], assembly = [];
     for (let i = 0; i < records.length; i++) {
       const record = records[i], selected = proposals.filter((p) => p.repoIndex === i);
@@ -171,6 +174,7 @@ async function main() {
       candidates.push({ record, plan, input, selected });
     }
     report.raw.assemblyMs = assembly; report.stages.assemblyMs = stats(assembly);
+    report.phase = 'verification';
     const verificationStart = performance.now();
     for (const item of candidates) {
       const first = await source.verification.dispatch(item.input), second = await source.verification.dispatch(item.input);
@@ -192,6 +196,7 @@ async function main() {
     assert.equal(jobs.length, repos); assert.ok(jobs.every((job) => job.status === 'completed' && job.attempts === 1));
     report.raw.executions = executions;
     report.stages.verification = { wallMs: performance.now() - verificationStart, queueMs: stats(executions.map((e) => e.queueMs)), executionMs: stats(executions.map((e) => e.executionMs)), completed: jobs.length, failed: 0, abandoned: 0, recoveryMs: null };
+    report.phase = 'promotion';
     const promotion = [], fetch = [];
     for (const { record, plan, input, selected } of candidates) {
       assert.equal((await source.integration.evaluate(input)).ok, true);
@@ -209,6 +214,7 @@ async function main() {
     report.stages.reuse = { requests: repos, hits: repos, coalescedRequests: repos, assertions: 'same job ID while active; same exact candidate receipts reused after completion' };
     // Conservative conventional baseline: verify each cumulative merge once,
     // without assuming speculative per-PR checks or stale-result retries.
+    report.phase = 'baseline';
     const baselineChecks = [], baselineAssembly = [];
     for (const { record, selected, plan } of candidates) {
       const cwd = path.join(root, `baseline-${record.repo.id}`);
@@ -228,8 +234,8 @@ async function main() {
     report.comparison = { checksAvoided: baselineChecks.length - executions.length, sourceChecks: executions.length, baselineChecks: baselineChecks.length, sourceVerificationMs: executions.reduce((sum, e) => sum + e.executionMs, 0), baselineVerificationMs: baselineChecks.reduce((sum, n) => sum + n, 0) };
     report.storage = { filesystemAllocatedBytes: Number((await exec('du', ['-sk', root])).stdout.split(/\s/)[0]) * 1024, postgresRelationBytes: Number((await store.pool.query('SELECT COALESCE(SUM(pg_total_relation_size(c.oid)),0) AS bytes FROM pg_class c JOIN pg_namespace n ON c.relnamespace=n.oid WHERE n.nspname=$1 AND c.relkind=\'r\'', [schema])).rows[0].bytes) };
     report.network = { serverReceivedBytes: sockets.reduce((sum, s) => sum + s.bytesRead, 0), serverSentBytes: sockets.reduce((sum, s) => sum + s.bytesWritten, 0), scope: 'all loopback HTTP/Git during run' };
-    report.status = 'passed'; report.correctness = { allProposalsRetained: true, exactVerifiedPromotion: true, unverifiedAcceptanceRejected: true, duplicatePromotionIdempotent: true, baselineTreeEquality: true, conflicts: 0, humanInterventions: 0, acceptance: 'automated harness acting as configured human maintainer' };
-  } catch (error) { report.status = 'failed'; report.error = error.message; process.exitCode = 1; }
+    report.status = 'passed'; report.phase = 'complete'; report.correctness = { allProposalsRetained: true, exactVerifiedPromotion: true, unverifiedAcceptanceRejected: true, duplicatePromotionIdempotent: true, baselineTreeEquality: true, conflicts: 0, humanInterventions: 0, acceptance: 'automated harness acting as configured human maintainer' };
+  } catch (error) { report.status = 'failed'; report.error = error.message; report.raw.completedClients = children.flatMap((entry) => entry.messages.filter((message) => message.type === 'result').map((message) => message.result)); process.exitCode = 1; }
   finally {
     for (const entry of children) if (entry.child.exitCode == null && entry.child.signalCode == null) entry.child.kill('SIGKILL');
     await Promise.all(children.map((entry) => entry.closed));
