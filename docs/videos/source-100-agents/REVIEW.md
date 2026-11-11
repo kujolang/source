@@ -8,7 +8,7 @@ The weakest shot is the wide test console: it is a 960×540/10fps recording upsc
 
 Intentional holds: the scope card remains still while Siren explains compatible versus contradictory edits; the release card stays still long enough to read the URL. Two nested-media warnings are intentional: local start offsets 2s and 4s, not legacy global timestamps. No lint/runtime/layout/contrast errors were present in the reviewed check. Final check and render metadata remain in evidence.
 
-Audio: Siren eleven_v4, unmodified speaking rate, seven independent cues. Original Kujo music is crossfaded beneath it. The measured master is about −17 LUFS, with true peak about −1.15 dBTP and no detected clipping. Audio was measured, not auditioned; a human listening pass remains before posting. No external publication was performed.
+Audio: Siren eleven_v4, unmodified speaking rate, seven independent cues. Original Kujo music is crossfaded beneath it. The measured master is about −17 LUFS, with true peak about −1.15 dBTP and no detected clipping. Audio was measured, not auditioned; a human listening pass remains before posting. Subsequent user-requested phone delivery published the 480p derivative as a v0.2.0 GitHub release asset; the original master remains local.
 
 The failed first capture is preserved. Reduced recorder overhead accompanied a successful repeat, but causality and reliable capacity under cohosted recording load are not proven. SignalBox capture cap_288a07c7-a9e1-453e-a9dd-0c8aa531f3eb and signal sig_6f0e4240-4f49-438b-95dc-1260dd81b58e preserve that open performance question; exact and concept retrieval passed. An older capacity signal was related, not duplicated. Routine successful tests and video work were excluded from SignalBox.
 
