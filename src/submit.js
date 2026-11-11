@@ -37,7 +37,9 @@ async function mergeBase(cwd, remote, run) {
 // Submit a contribution from a working clone. Returns the Source lifecycle
 // objects created server-side: { work, session, change, evidence, evaluation,
 // interpretation }.
-export async function submitFromWorkingDir({ cwd = process.cwd(), intent = '', baseUrl = null, credential = null, remote = null, retry = new ClientRetry() } = {}) {
+export async function submitFromWorkingDir({ cwd = process.cwd(), intent = '', baseUrl = null, credential = null, remote = null, submissionKey = null, recover = false, retry = new ClientRetry() } = {}) {
+  if (submissionKey !== null && (typeof submissionKey !== 'string' || !/^[A-Za-z0-9._:-]{1,200}$/.test(submissionKey))) throw new Error('invalid submission key');
+  if (recover && !submissionKey) throw new Error('--recover requires --submission-key');
   const target = await resolveRemote(cwd, remote);
   const parsed = target;
   const apiBase = baseUrl || target.baseUrl;
@@ -46,6 +48,17 @@ export async function submitFromWorkingDir({ cwd = process.cwd(), intent = '', b
   if (submitCredential && new URL(apiBase).origin !== new URL(target.baseUrl).origin) {
     throw new Error('authenticated submit requires the API and Git remote to have the same origin');
   }
+  if (submissionKey && !submitCredential) throw new Error('recoverable submissions require SOURCE_CREDENTIAL or --credential');
+  const endpoint = `${apiBase}/api/v1/orgs/${parsed.orgId}/projects/${parsed.projectId}`;
+  const checked = (result) => {
+    if (submissionKey && (result?.submission?.version !== 1 || result.submission.committed !== true)) {
+      throw new Error('server did not confirm recoverable submission; outcome unknown; inspect before retrying');
+    }
+    return result;
+  };
+  if (recover) return checked(await submitRequest(`${endpoint}/submissions/${submissionKey}`, {
+    method: 'GET', redirect: 'error', headers: { authorization: `Bearer ${submitCredential}` },
+  }, { retry }));
   const run = authenticatedGit(submitCredential, target.url, cwd, { retry });
   const head = await git(['rev-parse', 'HEAD'], cwd);
   const base = await mergeBase(cwd, target, run);
@@ -69,9 +82,9 @@ export async function submitFromWorkingDir({ cwd = process.cwd(), intent = '', b
   }
 
   // 6. Submit to the Source API (org-scoped).
-  return submitRequest(`${apiBase}/api/v1/orgs/${parsed.orgId}/projects/${parsed.projectId}/submit`, {
+  return checked(await submitRequest(`${endpoint}/submit`, {
     method: 'POST', redirect: 'error',
-    headers: { 'content-type': 'application/json', ...(submitCredential ? { authorization: `Bearer ${submitCredential}` } : {}) },
+    headers: { 'content-type': 'application/json', ...(submissionKey ? { 'idempotency-key': submissionKey } : {}), ...(submitCredential ? { authorization: `Bearer ${submitCredential}` } : {}) },
     body: JSON.stringify({
       repoRef: parsed.repoRef,
       baseCommit: base,
@@ -79,5 +92,5 @@ export async function submitFromWorkingDir({ cwd = process.cwd(), intent = '', b
       intent: resolvedIntent,
       contributorName,
     }),
-  }, { retry });
+  }, { retry }));
 }

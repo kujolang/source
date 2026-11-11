@@ -10,6 +10,7 @@ import { access } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
 import { randomBytes, scrypt, scryptSync, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { Store } from './store.js';
 import { GitRepo } from './git.js';
 import { artifactsBinding, artifactsFromEnv, checkArtifactsProtection } from './integrations/artifacts.js';
@@ -61,6 +62,7 @@ export class Source {
     this.integration = new IntegrationBroker(this);
     this.verification = new VerificationDispatcher(this);
     this.canonicalLocks = new KeyedSemaphore({ capacity: 1, queue: 256, maxKeys: 100_000 });
+    this.projectMutationContext = new AsyncLocalStorage();
     const requestedCanonicalConcurrency = Number(canonicalRepoConcurrency);
     this.canonicalRepoConcurrency = Number.isFinite(requestedCanonicalConcurrency)
       ? Math.min(64, Math.max(1, Math.trunc(requestedCanonicalConcurrency)))
@@ -96,6 +98,15 @@ export class Source {
   }
 
   async _projectMutationAsync(orgId, projectId, mutate) {
+    const parent = this.projectMutationContext.getStore();
+    if (parent) {
+      if (!parent.active) throw new Error('project mutation context is no longer active');
+      if (parent.orgId !== orgId || parent.projectId !== projectId) throw new Error('nested project mutation must remain in the same project');
+      // Composite service operations call their mutation steps sequentially.
+      // Independent requests have independent async contexts and still contend
+      // on the local admission gate and the database's project row lock.
+      return mutate();
+    }
     const release = await this.canonicalLocks.acquire(`${orgId}:${projectId}`);
     if (!release) {
       const error = new Error('project mutation admission exhausted');
@@ -105,7 +116,9 @@ export class Source {
     try {
       return await this._asyncTransaction(async () => {
         if (typeof this.store.lockProjectAsync === 'function') await this.store.lockProjectAsync(orgId, projectId);
-        return mutate();
+        const context = { orgId, projectId, active: true };
+        try { return await this.projectMutationContext.run(context, mutate); }
+        finally { context.active = false; }
       });
     } finally { release(); }
   }
@@ -1556,7 +1569,40 @@ export class Source {
     return findingsByTarget.flat();
   }
 
-  async submitContributionAsync({ orgId, projectId, repoRef, baseCommit, headCommit, intent = '', contributorName = 'contributor', principalId = null }) {
+  _submissionRel({ orgId, projectId, principalId, submissionKey }) {
+    if (typeof this.store.lockProjectAsync !== 'function' || typeof this.store.transactionAsync !== 'function') {
+      throw Object.assign(new Error('recoverable submissions require PostgreSQL'), { code: 'SUBMISSION_STORE_UNSUPPORTED' });
+    }
+    if (!principalId) throw new Error('recoverable submissions require an authenticated principal');
+    if (typeof submissionKey !== 'string' || !/^[A-Za-z0-9._:-]{1,200}$/.test(submissionKey)) throw new Error('invalid submission key');
+    return `${this._projectRel(orgId, projectId)}/submissions/${digest({ principalId, submissionKey })}.json`;
+  }
+
+  async getSubmissionAsync(input) {
+    const rel = this._submissionRel(input);
+    const receipt = await this.store.readJsonAsync(rel);
+    return receipt?.result || null;
+  }
+
+  async submitContributionAsync({ orgId, projectId, repoRef, baseCommit, headCommit, intent = '', contributorName = 'contributor', principalId = null, submissionKey = null }) {
+    if (submissionKey !== null) {
+      const rel = this._submissionRel({ orgId, projectId, principalId, submissionKey });
+      return this._projectMutationAsync(orgId, projectId, async () => {
+        const repo = await this.resolveRepositoryAsync(orgId, projectId, repoRef);
+        if (!repo) throw new Error(`repository not found: ${repoRef}`);
+        const requestHash = digest({ version: 1, repoId: repo.id, baseCommit, headCommit, intent, contributorName, principalId });
+        const prior = await this.store.readJsonAsync(rel);
+        if (prior) {
+          if (prior.requestHash !== requestHash) throw Object.assign(new Error('submission key already identifies a different request'), { code: 'SUBMISSION_KEY_CONFLICT' });
+          return prior.result;
+        }
+        const result = await this.submitContributionAsync({ orgId, projectId, repoRef: repo.id, baseCommit, headCommit, intent, contributorName, principalId });
+        result.submission = { version: 1, requestHash, committed: true };
+        await this._asyncWrite(rel, { version: 1, orgId, projectId, principalId, requestHash, result });
+        await this._asyncAudit({ event: 'submission.commit', orgId, projectId, principalId, requestHash, changeId: result.change.id });
+        return result;
+      });
+    }
     const repo = await this.resolveRepositoryAsync(orgId, projectId, repoRef);
     if (!repo) throw new Error(`repository not found: ${repoRef}`);
     const git = this.gitRepo(orgId, projectId, repo.id);

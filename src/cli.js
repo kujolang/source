@@ -70,6 +70,8 @@ export async function run(argv) {
         const result = await submitFromWorkingDir({
           cwd: flag('--cwd') || process.cwd(),
           intent: flag('--intent') || '',
+          submissionKey: flag('--submission-key') || null,
+          recover: hasFlag('--recover'),
           remote: flag('--remote') || null,
           baseUrl: flag('--url') || null,
           credential: flag('--credential') || null,
@@ -590,7 +592,7 @@ export async function run(argv) {
           '  serve --port <n> [--host <addr>] [--store postgres] [--writer-lease --writer-lease-name <name> --writer-owner <id> --writer-lease-ms <n>] [--replication-role primary|standby --require-replication --min-replicas <n> --max-replication-lag-bytes <n>] [--trust-proxy] [--git-concurrency <n>] [--git-queue <n>] [--git-tenant-concurrency <n>] [--git-tenant-queue <n>] [--git-timeout-ms <n>] [--request-concurrency <n>] [--request-queue <n>] [--max-connections <n>] [--max-git-response <bytes>] [--max-workflow-jobs <n>] [--artifact-concurrency <n>] [--artifact-queue <n>]',
           '  worker --store postgres --handler-module <path> [--worker-id <id> --worker-concurrency <n> --worker-poll-ms <n> --worker-max-poll-ms <n> --worker-project-burst <n> --worker-jitter-ratio <0..1> --worker-handler-timeout-ms <n> --worker-shutdown-timeout-ms <n> --action-manifest <path> --action-keyring <path> --secret-provider-module <path> --secret-lease-ms <n>]',
           '  sync [--remote <name>] [--url <Source Git URL>] [--cwd <dir>] [--dry-run] [--credential <c>]',
-          '  submit [--remote <name>] [--intent <s>] [--url <base>] [--credential <c>] [--cwd <dir>]',
+          '  submit [--submission-key <key>] [--recover] [--remote <name>] [--intent <s>] [--url <base>] [--credential <c>] [--cwd <dir>]',
           '',
           'Env: SOURCE_DATA (default .source), SOURCE_STORE (json|sqlite|postgres)',
           'Flags: --store json|sqlite|postgres (select the storage backend)',

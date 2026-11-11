@@ -1384,6 +1384,16 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           return json(res, 202, job);
         }
 
+        const submissionMatch = rest.match(/^\/submissions\/([A-Za-z0-9._:-]{1,200})$/);
+        if (submissionMatch && req.method === 'GET') {
+          const credential = await sessionCredential(src, req);
+          const auth = await authorizeRequestAsync(src.capabilities, req, ACTIONS.submit_change, { org: orgId, project: projectId, credential });
+          if (!auth.ok) return json(res, auth.status, { error: auth.error });
+          const submissionKey = requestIdempotencyKey({ headers: { 'idempotency-key': submissionMatch[1] } }, orgId, projectId, 'submission');
+          const result = await src.getSubmissionAsync({ orgId, projectId, principalId: auth.cap.principalId, submissionKey });
+          return result ? json(res, 200, result) : json(res, 404, { error: 'submission not found' });
+        }
+
         // Contribution flow: a Git-only developer submits a change from a
         // working clone. Source creates the Work → Session → Change → Evidence
         // lifecycle server-side. Public projects support low-friction
@@ -1399,8 +1409,9 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
             ? await src.getProjectAsync(orgId, projectId)
             : src.getProject(orgId, projectId);
           if (!project) return json(res, 404, { error: 'project not found' });
+          const submissionKey = requestIdempotencyKey(req, orgId, projectId, 'submission');
           let submitPrincipalId = null;
-          if (project.visibility !== 'public') {
+          if (project.visibility !== 'public' || submissionKey) {
             const credential = await sessionCredential(src, req);
             const auth = typeof src.capabilities.authorizeAsync === 'function'
               ? await authorizeRequestAsync(src.capabilities, req, ACTIONS.submit_change, { org: orgId, project: projectId, credential })
@@ -1414,7 +1425,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
             return json(res, 503, { error: 'Git service busy; retry later' });
           }
           try {
-            const r = await src.submitContributionAsync({ ...body, orgId, projectId, principalId: submitPrincipalId });
+            const r = await src.submitContributionAsync({ ...body, orgId, projectId, principalId: submitPrincipalId, submissionKey });
             return json(res, 201, r);
           } finally {
             release();
@@ -1592,6 +1603,8 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
         if (!res.writableEnded) res.destroy(e);
         return;
       }
+      if (e?.code === 'SUBMISSION_KEY_CONFLICT') return json(res, 409, { error: e.message });
+      if (e?.code === 'SUBMISSION_STORE_UNSUPPORTED') return json(res, 501, { error: e.message });
       if (e?.code === 'DB_ADMISSION_EXHAUSTED') {
         res.setHeader('Retry-After', '1');
         return json(res, 503, { error: 'database admission capacity exhausted', retryable: true });
