@@ -64,3 +64,22 @@ for (const profile of ['default', 'private-load']) test(`benchmark completes rea
   assert.ok(report.raw.executions.every((row) => Number.isFinite(row.queueMs) && row.queueMs >= 0));
   assert.equal(report.workerMetrics.reduce((sum, worker) => sum + worker.completed, 0), 2);
 });
+
+
+test('keyed benchmark reconciles a lost committed response and promotes every proposal once', { skip: !process.env.SOURCE_TEST_DATABASE_URL, timeout: 90000 }, async (t) => {
+  const root = await mkdtemp(path.join(tmpdir(), 'source-bench-recovery-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const output = path.join(root, 'report.json');
+  await exec(process.execPath, [script, '--agents', '3', '--repos', '1', '--keyed-submissions', '--lose-submit-response', '1', '--output', output], { env: process.env, timeout: 80000, maxBuffer: 4 * 1024 * 1024 });
+  const report = JSON.parse(await readFile(output, 'utf8'));
+  assert.equal(report.status, 'passed');
+  assert.equal(report.submissionRecovery.responsesDropped, 1);
+  assert.equal(report.submissionRecovery.recovered, 1);
+  assert.equal(report.submissionRecovery.noDuplicateLifecycleRecords, true);
+  assert.equal(report.httpBeforeCleanup.routes.submit.requests, 3, 'uncertain POST was never replayed');
+  assert.equal(report.raw.proposals.filter(p => p.submissionFailure?.outcomeUnknown).length, 1);
+  assert.equal(report.correctness.allProposalsRetained, true);
+  assert.equal(report.correctness.exactVerifiedPromotion, true);
+  assert.equal(report.baseline.finalTreesEqual, true);
+  assert.equal(report.httpAfterCleanup.sockets.active, 0);
+});

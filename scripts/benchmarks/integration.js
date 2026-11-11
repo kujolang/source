@@ -47,10 +47,22 @@ async function agent(config) {
   await writeFile(path.join(config.cwd, 'features', `agent-${config.index}.txt`), `${config.index}\n`);
   await git(config.cwd, 'add', '.'); await git(config.cwd, 'commit', '-m', `agent ${config.index}`);
   const submitStarted = performance.now();
-  const result = await submitFromWorkingDir({ cwd: config.cwd, credential: config.credential });
-  if (config.privateProfile) assert.equal(result.session.principal, config.principalId, 'private submit retains authenticated principal');
+  let result, recovered = false, submissionFailure = null, recoveryMs = null;
+  const input = { cwd: config.cwd, credential: config.credential, submissionKey: config.submissionKey };
+  try { result = await submitFromWorkingDir(input); }
+  catch (error) {
+    if (!config.submissionKey || error.diagnostic?.outcomeUnknown !== true) throw error;
+    submissionFailure = error.diagnostic;
+    const recoveryStarted = performance.now();
+    // Read only. Never replay an uncertain mutation or invent a replacement key.
+    try { result = await submitFromWorkingDir({ ...input, recover: true }); }
+    catch { throw error; }
+    recoveryMs = performance.now() - recoveryStarted; recovered = true;
+  }
+  if (config.submissionKey) assert.equal(result.submission?.committed, true);
+  if (config.privateProfile || config.submissionKey) assert.equal(result.session.principal, config.principalId, 'private submit retains authenticated principal');
   assert.equal(await git(config.cwd, 'remote', 'get-url', 'origin'), 'git@github.com:fixture/unchanged.git');
-  return { index: config.index, repoIndex: config.repoIndex, changeId: result.change.id, workId: result.work.id, sessionId: result.session.id, evidenceId: result.evidence.id, baseCommit: result.change.baseCommit, headCommit: result.change.headCommit, cloneMs, submitMs: performance.now() - submitStarted, totalMs: performance.now() - started };
+  return { recovered, submissionFailure, recoveryMs, index: config.index, repoIndex: config.repoIndex, changeId: result.change.id, workId: result.work.id, sessionId: result.session.id, evidenceId: result.evidence.id, baseCommit: result.change.baseCommit, headCommit: result.change.headCommit, cloneMs, submitMs: performance.now() - submitStarted, totalMs: performance.now() - started };
 }
 
 async function worker(config) {
@@ -83,13 +95,16 @@ async function worker(config) {
 
 async function main() {
   const args = process.argv.slice(2); const flag = (name, fallback) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
-  if (args.includes('--help')) { console.log('SOURCE_TEST_DATABASE_URL=<disposable database> node scripts/benchmarks/integration.js --agents 10 --repos 1 --profile default|private-load --output /absolute/report.json'); return; }
+  if (args.includes('--help')) { console.log('SOURCE_TEST_DATABASE_URL=<disposable database> node scripts/benchmarks/integration.js --agents 10 --repos 1 --profile default|private-load [--keyed-submissions] [--lose-submit-response INDEX] --output /absolute/report.json'); return; }
   const agents = Number(flag('--agents', 10)), repos = Number(flag('--repos', 1));
   if (![agents, repos].every(Number.isSafeInteger) || agents < 1 || agents > 1000 || repos < 1 || repos > agents) throw new Error('harness supports 1-1000 agents and 1..agents repositories');
   const maxIntegrationProposals = Math.max(100, Math.ceil(agents / repos));
   const profile = flag('--profile', 'default');
   if (!['default', 'private-load'].includes(profile)) throw new Error('unknown benchmark profile');
   const privateProfile = profile === 'private-load';
+  const keyedSubmissions = args.includes('--keyed-submissions');
+  const loseSubmitResponse = args.includes('--lose-submit-response') ? Number(flag('--lose-submit-response')) : null;
+  if (loseSubmitResponse !== null && (!keyedSubmissions || !Number.isSafeInteger(loseSubmitResponse) || loseSubmitResponse < 0 || loseSubmitResponse >= agents)) throw new Error('response-loss injection requires keyed submissions and an existing agent index');
   const rateLimit = privateProfile ? { gitPush: { limit: 1000, windowMs: 60000 }, submit: { limit: 1000, windowMs: 60000 } } : {};
   const dsn = process.env.SOURCE_TEST_DATABASE_URL;
   const output = flag('--output');
@@ -101,7 +116,7 @@ async function main() {
   const schema = `source_bench_${process.pid}_${Date.now()}`;
   let store, server, httpTelemetry; const children = [], sockets = [], socketClosures = []; const executions = [], workerErrors = [];
   const cpuBefore = process.cpuUsage(); const began = Date.now();
-  const report = { version: 2, status: 'running', phase: 'setup', httpStatuses: {}, date: new Date().toISOString(), agents, repositories: repos, concurrency: { agentProcesses: agents, workerProcesses: 2, workerConcurrency: 2 }, host: { platform: process.platform, arch: process.arch, node: process.version, cpuCount: cpus().length, memoryBytes: totalmem() }, fixture: 'compatible independent files; fixed host Git-content checker; no repository code execution', profile, rateLimits: privateProfile ? 'explicit private-load operator profile; not default capacity' : 'unchanged server defaults', admissionConfiguration: rateLimit, maxIntegrationProposals, stages: {}, raw: {}, limitations: ['loopback single host; no deployed TLS latency', 'fixed Git-content verification, not application CI or isolated staging', 'no induced worker crash in this measurement', 'maximum 1000 agents per harness run; operator batch bound recorded explicitly', privateProfile ? 'private repositories; explicit 1000/min push and submit limits per shared address; server queue/concurrency defaults unchanged' : 'default same-address submit/read/push rate limits apply'] };
+  const report = { version: 2, status: 'running', phase: 'setup', httpStatuses: {}, date: new Date().toISOString(), agents, repositories: repos, concurrency: { agentProcesses: agents, workerProcesses: 2, workerConcurrency: 2 }, host: { platform: process.platform, arch: process.arch, node: process.version, cpuCount: cpus().length, memoryBytes: totalmem() }, fixture: 'compatible independent files; fixed host Git-content checker; no repository code execution', profile, keyedSubmissions, submissionRecovery: { injectedAgent: loseSubmitResponse, responsesDropped: 0, recovered: 0, strategy: 'one read-only lookup after unknown HTTP outcome; no POST replay' }, rateLimits: privateProfile ? 'explicit private-load operator profile; not default capacity' : 'unchanged server defaults', admissionConfiguration: rateLimit, maxIntegrationProposals, stages: {}, raw: {}, limitations: ['loopback single host; no deployed TLS latency', 'fixed Git-content verification, not application CI or isolated staging', 'no induced worker crash in this measurement', 'maximum 1000 agents per harness run; operator batch bound recorded explicitly', privateProfile ? 'private repositories; explicit 1000/min push and submit limits per shared address; server queue/concurrency defaults unchanged' : 'default same-address submit/read/push rate limits apply'] };
   const telemetry = new StageTelemetry();
   const phase = (name) => { telemetry.begin(name); report.phase = name; };
   phase('setup');
@@ -158,6 +173,21 @@ async function main() {
     });
     server.prependListener('request', (_req, res) => res.once('finish', () => { report.httpStatuses[res.statusCode] = (report.httpStatuses[res.statusCode] || 0) + 1; }));
     const baseUrl = `http://127.0.0.1:${server.address().port}`;
+    let lostResponse, faultPrincipal;
+    if (loseSubmitResponse !== null) {
+      server.prependListener('request', (req, res) => {
+        if (req.method === 'POST' && req.headers['idempotency-key'] === `benchmark-${loseSubmitResponse}`) lostResponse = res;
+      });
+      const submit = source.submitContributionAsync.bind(source);
+      source.submitContributionAsync = async (input) => {
+        const result = await submit(input);
+        if (input.principalId === faultPrincipal && report.submissionRecovery.responsesDropped === 0) {
+          assert.ok(lostResponse?.socket, 'fault must target a live committed response');
+          lostResponse.socket.destroy(); report.submissionRecovery.responsesDropped++;
+        }
+        return result;
+      };
+    }
     const workers = Array.from({ length: 2 }, (_, i) => spawnRole('worker', { dsn, databaseUser, schema, root, maxIntegrationProposals, serviceId: service.id, workerId: `benchmark-${i}` }));
     await Promise.all(workers.map((entry) => entry.wait('ready')));
     const clients = []; const clientConfigs = [];
@@ -171,8 +201,9 @@ async function main() {
     for (let i = 0; i < agents; i++) {
       const record = records[i % repos];
       const principal = await source.createPrincipalAsync({ type: 'service', name: `agent-${i}` });
-      const cap = await source.capabilities.issueAsync({ principalId: principal.id, allowed: ['read_source', 'git_push', ...(privateProfile ? ['submit_change'] : [])], scope: { org: record.scope.orgId, project: record.scope.projectId } });
-      const config = { root, cwd: path.join(root, `agent${i}`), index: i, repoIndex: i % repos, url: `${baseUrl}/git/${org.id}/${record.scope.projectId}/${record.repo.id}.git`, credential: cap.credential, principalId: principal.id, privateProfile };
+      const cap = await source.capabilities.issueAsync({ principalId: principal.id, allowed: ['read_source', 'git_push', ...(privateProfile || keyedSubmissions ? ['submit_change'] : [])], scope: { org: record.scope.orgId, project: record.scope.projectId } });
+      if (i === loseSubmitResponse) faultPrincipal = principal.id;
+      const config = { submissionKey: keyedSubmissions ? `benchmark-${i}` : null, root, cwd: path.join(root, `agent${i}`), index: i, repoIndex: i % repos, url: `${baseUrl}/git/${org.id}/${record.scope.projectId}/${record.repo.id}.git`, credential: cap.credential, principalId: principal.id, privateProfile };
       clientConfigs.push(config); clients.push(spawnRole('agent', config));
     }
     await Promise.all(clients.map((entry) => entry.wait('ready')));
@@ -183,6 +214,21 @@ async function main() {
     await Promise.all(clients.map((entry) => entry.closed));
     assert.equal(new Set(proposals.map((item) => item.changeId)).size, agents);
     report.raw.proposals = proposals;
+    report.submissionRecovery.recovered = proposals.filter(p => p.recovered).length;
+    report.submissionRecovery.lookupMs = stats(proposals.filter(p => p.recovered).map(p => p.recoveryMs));
+    if (loseSubmitResponse !== null) {
+      assert.equal(report.submissionRecovery.responsesDropped, 1);
+      assert.equal(proposals.find(p => p.index === loseSubmitResponse).recovered, true);
+    }
+    if (keyedSubmissions) {
+      for (let i = 0; i < records.length; i++) {
+        const { orgId, projectId } = records[i].scope;
+        const selected = proposals.filter(p => p.repoIndex === i);
+        assert.equal((await source.listWorkAsync(orgId, projectId)).length, selected.length, 'no duplicate Work records');
+        assert.equal((await source.listChangesAsync(orgId, projectId)).length, selected.length, 'no duplicate Change records');
+      }
+      report.submissionRecovery.noDuplicateLifecycleRecords = true;
+    }
     report.stages.submission = { wallMs: submissionWallMs, proposalsPerSecond: agents * 1000 / submissionWallMs, cloneMs: stats(proposals.map((p) => p.cloneMs)), submitMs: stats(proposals.map((p) => p.submitMs)) };
     phase('assembly');
     const candidates = [], assembly = [];
