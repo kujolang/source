@@ -1,5 +1,9 @@
 # Integration concurrency measurements
 
+## Matched serial/concurrent comparison — 2026-11-11
+
+The user authorized a bounded 100-contributor serial comparison, without video edits. Both fresh runs passed: serial full workflows 696.281s, concurrent combined workflow 126.034s, **5.52× faster / 81.9% less elapsed time**. All contributions were retained and final Git trees matched. This is one local scripted-fixture pair measuring concurrency plus batching, not LLM productivity. Implementation `e1800a1`; six benchmark tests and lint passed. Owned disposable database was dropped after completion. [Raw evidence, methodology and handoff](benchmarks/serial-comparison/README.md). The wider capacity campaign remains paused.
+
 Measured 2026-11-10 on local macOS x64: 12 logical CPUs, 16 GiB RAM,
 Node v26.12.1, Git 2.42.0, local PostgreSQL 14.20. This bounded synthetic
 correctness/measurement workload is not production capacity certification.

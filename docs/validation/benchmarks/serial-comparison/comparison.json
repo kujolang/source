@@ -1,0 +1,11 @@
+{
+  "serialWorkflowMs": 696280.791884,
+  "concurrentWorkflowMs": 126034.42752499999,
+  "speedRatio": 5.524528539996635,
+  "elapsedReductionPercent": 81.89890788399097,
+  "savedMs": 570246.364359,
+  "fullHarnessRatio": 5.021966871519283,
+  "identicalFinalTree": "062cca0a42a78f8f5f340eadccc0202eb7241e7a",
+  "sourceRevision": "e1800a1f16082f71bb713cedb8f9b67bd4b37996",
+  "scope": "one local matched pair; scripted compatible shared-file edits; concurrency plus batching versus complete serial lifecycles; no recorder or LLM calls"
+}

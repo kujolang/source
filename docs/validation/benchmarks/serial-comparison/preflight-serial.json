@@ -1,0 +1,243 @@
+{
+  "version": 1,
+  "status": "passed",
+  "date": "2026-11-11T16:24:04.840Z",
+  "mode": "serial",
+  "agents": 3,
+  "host": {
+    "node": "v26.12.1",
+    "platform": "darwin",
+    "cpuCount": 12,
+    "memoryBytes": 17179869184,
+    "git": "git version 2.50.1 (Apple Git-155)"
+  },
+  "profile": "private-load; 1000/min push and submit; server timeouts unchanged",
+  "workload": "same tiny scripted edits in separate sections of shared.txt; real authenticated HTTP/Git and PostgreSQL workers",
+  "recording": false,
+  "semantics": "one agent clones latest main, edits, submits, verifies and promotes before next agent starts",
+  "timings": {
+    "setupMs": 6324.225085,
+    "workflowMs": 16983.534186,
+    "finalAuditMs": 209.94207800000004,
+    "totalIncludingSetupAuditCleanupMs": 23649.661046
+  },
+  "batches": [
+    {
+      "batch": 0,
+      "count": 1,
+      "spawnReadyMs": 171.21729400000004,
+      "contributionMs": 2275.674245,
+      "assemblyAndGateMs": 739.9333539999989,
+      "verificationMs": 1263.912357000001,
+      "acceptancePromotionRetentionFetchMs": 1269.690665,
+      "totalMs": 5720.432172999999,
+      "baseCommit": "5fa1eb6acdacf8086e576bbe61410dfcbd05c8f6",
+      "headCommit": "5b347575dc29647236563b3983404edf93754b47",
+      "tree": "bd6f320d0cab6cbd30f32a72c3b08e41635035f7"
+    },
+    {
+      "batch": 1,
+      "count": 1,
+      "spawnReadyMs": 145.94244799999979,
+      "contributionMs": 2284.1499349999995,
+      "assemblyAndGateMs": 734.0834130000003,
+      "verificationMs": 1211.4177560000007,
+      "acceptancePromotionRetentionFetchMs": 1257.371242000001,
+      "totalMs": 5632.9658709999985,
+      "baseCommit": "5b347575dc29647236563b3983404edf93754b47",
+      "headCommit": "e75de48fbd3aacd3ed9fb066ef4b2c15ddee92f0",
+      "tree": "5f25f591a3bd619cfbc6f0552e5dca307586e602"
+    },
+    {
+      "batch": 2,
+      "count": 1,
+      "spawnReadyMs": 169.85817300000053,
+      "contributionMs": 2277.935415,
+      "assemblyAndGateMs": 733.2963440000021,
+      "verificationMs": 1260.3875109999972,
+      "acceptancePromotionRetentionFetchMs": 1188.085339000001,
+      "totalMs": 5629.564074000002,
+      "baseCommit": "e75de48fbd3aacd3ed9fb066ef4b2c15ddee92f0",
+      "headCommit": "1a9e6c67d789e664752d08438f6af2436205aad6",
+      "tree": "7cf821b603d9a977bd6d0dc12bc633698ce92e12"
+    }
+  ],
+  "proposals": [
+    {
+      "recovered": false,
+      "submissionFailure": null,
+      "recoveryMs": null,
+      "index": 0,
+      "repoIndex": 0,
+      "changeId": "C1",
+      "workId": "W1",
+      "sessionId": "S1",
+      "evidenceId": "E1",
+      "baseCommit": "5fa1eb6acdacf8086e576bbe61410dfcbd05c8f6",
+      "headCommit": "f5eb6a773b2a62c36554e81096e21aac7c0ed358",
+      "cloneMs": 389.787181,
+      "submitMs": 1543.7473909999999,
+      "totalMs": 2263.2810680000002
+    },
+    {
+      "recovered": false,
+      "submissionFailure": null,
+      "recoveryMs": null,
+      "index": 1,
+      "repoIndex": 0,
+      "changeId": "C2",
+      "workId": "W2",
+      "sessionId": "S2",
+      "evidenceId": "E2",
+      "baseCommit": "5b347575dc29647236563b3983404edf93754b47",
+      "headCommit": "00ffba66df2d6f931588c49bb08e150ed880e48e",
+      "cloneMs": 380.73663,
+      "submitMs": 1557.036493,
+      "totalMs": 2271.238816
+    },
+    {
+      "recovered": false,
+      "submissionFailure": null,
+      "recoveryMs": null,
+      "index": 2,
+      "repoIndex": 0,
+      "changeId": "C3",
+      "workId": "W3",
+      "sessionId": "S3",
+      "evidenceId": "E3",
+      "baseCommit": "e75de48fbd3aacd3ed9fb066ef4b2c15ddee92f0",
+      "headCommit": "a0f71952ccc2b369d3f7e068c1035840419714cc",
+      "cloneMs": 370.318691,
+      "submitMs": 1551.418643,
+      "totalMs": 2261.950133
+    }
+  ],
+  "executions": [
+    {
+      "jobId": "J1",
+      "candidateId": "2fda4b62db65a6c218432f91bd025350d0b93cd3be21236da21370dea6f5429b",
+      "workerId": "comparison-0",
+      "queueMs": 450,
+      "executionMs": 601
+    },
+    {
+      "jobId": "J2",
+      "candidateId": "0d1c5f4fe333d9dfa8a031b6f5f3082c04348a118fa604c4ef356f03cc5f2585",
+      "workerId": "comparison-0",
+      "queueMs": 450,
+      "executionMs": 566
+    },
+    {
+      "jobId": "J3",
+      "candidateId": "3bc354a3a77112bab750939004c0d3d8beac0c6db1cc8b888c288d97a4a8e947",
+      "workerId": "comparison-1",
+      "queueMs": 507,
+      "executionMs": 529
+    }
+  ],
+  "sourceRevision": "003ca9c229429586bef7a128c2c9a50b9e1bfa35",
+  "harnessSha256": "1ec35753ecb7e36695647b65d05a5bf60cab362c02076b027b4d72d6230518a7",
+  "rolesSha256": "76643feca40484c3212b7df842cb296670a78153a5d7c7c6b6477abf4df3bed7",
+  "httpTimeouts": {
+    "headersMs": 15000,
+    "requestMs": 120000
+  },
+  "finalTree": "7cf821b603d9a977bd6d0dc12bc633698ce92e12",
+  "finalContentSha256": "78be6abe73d54c2769d9d2efa3fbd12c0a1ed9fe4b0beaf56bc1b20783eef11c",
+  "correctness": {
+    "exactFinalContent": true,
+    "allContributorAncestryRetained": true,
+    "noDuplicateWorkOrChanges": true,
+    "unverifiedAcceptanceRejectedEveryBatch": true,
+    "exactVerifiedPromotionEveryBatch": true,
+    "verificationJobs": 3
+  },
+  "httpBeforeCleanup": {
+    "scope": "passive server HTTP/socket observations; no raw URLs, headers, bodies or error text; at most 50 failed and pending samples",
+    "sockets": {
+      "opened": 19,
+      "closed": 19,
+      "closedWithError": 0,
+      "active": 0,
+      "peakActive": 2,
+      "timeouts": 0,
+      "errors": {}
+    },
+    "routes": {
+      "git": {
+        "requests": 37,
+        "finished": 37,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {
+          "200": 36,
+          "401": 1
+        }
+      },
+      "submit": {
+        "requests": 3,
+        "finished": 3,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {
+          "201": 3
+        }
+      },
+      "other": {
+        "requests": 0,
+        "finished": 0,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {}
+      }
+    },
+    "pendingCount": 0,
+    "pending": [],
+    "failures": [],
+    "socketFailures": []
+  },
+  "httpAfterCleanup": {
+    "scope": "passive server HTTP/socket observations; no raw URLs, headers, bodies or error text; at most 50 failed and pending samples",
+    "sockets": {
+      "opened": 19,
+      "closed": 19,
+      "closedWithError": 0,
+      "active": 0,
+      "peakActive": 2,
+      "timeouts": 0,
+      "errors": {}
+    },
+    "routes": {
+      "git": {
+        "requests": 37,
+        "finished": 37,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {
+          "200": 36,
+          "401": 1
+        }
+      },
+      "submit": {
+        "requests": 3,
+        "finished": 3,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {
+          "201": 3
+        }
+      },
+      "other": {
+        "requests": 0,
+        "finished": 0,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {}
+      }
+    },
+    "pendingCount": 0,
+    "pending": [],
+    "failures": [],
+    "socketFailures": []
+  }
+}
