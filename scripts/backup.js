@@ -11,6 +11,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { verifyBackup } from '../src/backup-verification.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -111,6 +112,7 @@ async function main() {
       manifest.files.push({ name: path.basename(file), bytes: info.size, sha256: await sha256(file) });
     }
     await writeFile(path.join(staging, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
+    await verifyBackup(staging);
     await rename(staging, finalDir);
     process.stdout.write(`${JSON.stringify({ backup: finalDir, manifest: path.join(finalDir, 'manifest.json'), files: manifest.files }, null, 2)}\n`);
   } catch (error) {
