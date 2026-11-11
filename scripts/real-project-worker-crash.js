@@ -83,7 +83,7 @@ export async function crashAndRecover({ source, store, schema, scope, input, wor
   const stale = { id: interrupted.id, workerId: oldLease.worker_id, leaseToken: oldLease.lease_token };
   assert.equal(await source.jobs.complete({ ...stale, result: { forged: true } }), false);
   assert.equal(await source.jobs.extend({ ...stale, leaseMs: 60000 }), null);
-  assert.equal(await source.jobs.fail({ ...stale, error: 'stale crash fixture' }), false);
+  assert.equal(await source.jobs.fail({ ...stale, error: 'stale crash fixture' }), null);
   await assert.rejects(() => source._projectMutationAsync(scope.orgId, scope.projectId,
     () => store.lockJobLeaseAsync({ ...scope, ...stale })), /lease expired, cancelled, or superseded/);
   const afterJobs = await source.jobs.list(scope);
