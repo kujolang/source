@@ -40,6 +40,16 @@ future builds. Dependencies are available at `/node_modules` for `/workspace`
 module resolution; no host dependency directory or Docker socket is mounted.
 Review the committed manifests and operator build definition before using it.
 
+For Source browser staging, add `--browser` after the commit. This uses a pinned
+Debian Node base and imports only committed sibling Lens bridge files and its
+lockfile, plus an operator-owned check baked into `/opt`. The runtime still has
+no external network or published ports. Actual candidate Source code serves
+container-loopback requests to Chromium; desktop/mobile evidence and screenshots
+are retained in the original execution artifact before teardown. Configure this
+check as environment-dependent (`deterministic: false`). It exercises the Lens
+browser bridge, not the full Lens CLI gate adapter. See
+[implementation, exact evidence and reproduction](../validation/browser-staging.md).
+
 Commands are argument arrays quoted for the container shell. The existing runner
 enforces no network, read-only container root, dropped capabilities, no privilege
 escalation, bounded memory/CPU/PIDs/output/time, and a writable disposable workspace.

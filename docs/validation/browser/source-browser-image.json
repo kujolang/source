@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "revision": "9648ffa5c891ecd3ed0701e435a2301bcee5d0fd",
+  "base": "node@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
+  "image": "sha256:18c7ae155770d3d895ad79dc8b278d2019b80c07d1d84c551e5614bc5642feba",
+  "toolVersions": {
+    "node": "v26.13.0",
+    "git": "git version 2.39.5",
+    "gitHttpBackendSha256": "e6ae9a59c377a191c34b4e234d3386a70b1a5a6131cffe00e2f6d0bbb0e9e493",
+    "debian": "12.15",
+    "playwright": "1.61.1",
+    "lensBridge": "1.1.1",
+    "chromium": "149.0.7827.55",
+    "pg": "8.23.0",
+    "yaml": "4.3.2"
+  },
+  "packageSha256": "15c3ba40fae1dbd1ba5f56076f83d7b9510f0780afab08fd0ca7d690ff629b07",
+  "lockSha256": "f14fe1019bd41024adcdf37d9f3f8ddea70364ec904094e27a01aa54f301965b",
+  "dockerfileSha256": "74170330a0145f5ccb773f8610a41cca35d4c401a6935eb9d394f20d272ddd6c",
+  "buildNetwork": true,
+  "installScripts": false,
+  "runtimeProbeNetwork": "none",
+  "browserBuild": {
+    "lensRevision": "91049646d70c11bf0c6071f39cf7dfac6b1ba70b",
+    "files": {
+      "bridge/browser-bridge.js": "ad91fb7cd4d2737df1d211e88c3441efc49954432fee1c91c0d5d6fa5e56f369",
+      "bridge/evidence.js": "2ed40e12349ac094860f30da2f8a410588860a8b1b989235b997ab0224640550",
+      "bridge/flow-bridge.js": "b35a096eeef1ecf193ae9ba09c9b7409f588a2222ac97309ec27f4f4f820dd67",
+      "bridge/inspect-bridge.js": "08d459399fe3ae895dad507ccea99411d5f125e2662619da18751903d5f9b572",
+      "bridge/network-policy.js": "17a0ce8e97005122285f5b80da5df9eba8a510646eb119d9c4054b589917d38d",
+      "bridge/package-lock.json": "bea5418c6bb9b91bccd18e5aac70b97237113f13fc3e424ec1872b0fd3d14428",
+      "bridge/package.json": "9b998d63467b347638703d0e4f95a74caea48bd6cc4b4f51e5a64e55a28ed91e",
+      "bridge/readiness.js": "8de03811a97400c7f0c974b3bf9c444ca4e94c91607044677c738d61cd445900",
+      "bridge/runtime.js": "465218d1a1a609d17f21cd325701ec19d2dcd52e61b687fcfc881d1cb751fdaf",
+      "bridge/session-client.js": "9eedd52b2bf39674ec5a182785ca04c4f3a5614051c6b6e4cca02eb0edc1c8a8",
+      "bridge/session.js": "f0e88122d2019b064affa120cd1a30da18853f98164b6559d0c958f77df98851"
+    },
+    "checkerSha256": "3f6a700a304558c356e055c0e506f525312ca5b2ad36b5b18ef3fa6861f185aa",
+    "contract": "Lens browser bridge capture/inspect, not full Lens CLI"
+  },
+  "reproducibility": "npm dependencies use committed integrity locks; OS packages and browser installation resolve at build time. The resulting image ID pins the complete local image, not a reproducible future build or registry distribution."
+}

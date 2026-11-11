@@ -373,3 +373,16 @@ admission/security timeouts unchanged. Client connect/first-byte timing and an
 independently resourced load generator are needed to distinguish service limits
 from cohosted process pressure. See [measurements and boundaries](../validation/concurrency-results.md).
 The hot-repository stress gate remains failed; 1,000 agents remain unmeasured.
+
+## Actual Source browser staging — 2026-11-10
+
+At `9648ffa`, the real PostgreSQL/CLI/OCI lifecycle includes a non-reusable browser
+check: actual Source endpoint health/private authorization, Lens-bridge desktop
+and mobile rendering, PNG evidence and authenticated project navigation. Exact
+promotion and independent restore preserve all four receipts, including original
+screenshots. At `200558d`, a deliberately regressed UI fails in actual Chromium,
+cannot borrow a good candidate's evidence, and cannot promote. See
+[browser staging evidence](../validation/browser-staging.md).
+This closes the demonstrated single-service local browser path only. Full Lens
+CLI, broader journeys, accessibility/visual baselines, multiple services/provider
+contracts, Workcell compatibility and deployment/load/migration gates remain open.

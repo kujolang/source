@@ -1,0 +1,229 @@
+{
+  "good": {
+    "version": 1,
+    "assemblyContract": "original-git-objects-v1",
+    "context": {
+      "orgId": "O1",
+      "projectId": "P1",
+      "repoId": "R1",
+      "branch": "main",
+      "policyHash": "e445c722606ad009bc965e69ba224efa24c6ec3833671a188c9b0a1508b50dd0"
+    },
+    "baseCommit": "debe983845362cdfb696ffadc4185bf8e69ee47c",
+    "headCommit": "c5272e58fb50950a49735a7db788811062d99558",
+    "tree": "9b4b86ce5fd6f7ba62cb9cb0e3e9d6440ba3b2ac",
+    "proposals": [
+      {
+        "id": "C1",
+        "baseCommit": "debe983845362cdfb696ffadc4185bf8e69ee47c",
+        "headCommit": "9648ffa5c891ecd3ed0701e435a2301bcee5d0fd",
+        "dependsOn": [],
+        "files": [
+          {
+            "status": "M",
+            "from": "scripts/build-self-verification-image.js",
+            "to": "scripts/build-self-verification-image.js"
+          },
+          {
+            "status": "M",
+            "from": "scripts/real-project-lifecycle.js",
+            "to": "scripts/real-project-lifecycle.js"
+          },
+          {
+            "status": "A",
+            "from": "scripts/source-browser-staging.mjs",
+            "to": "scripts/source-browser-staging.mjs"
+          }
+        ]
+      }
+    ],
+    "requiredVerification": [
+      "preflight",
+      "integration"
+    ],
+    "state": "proposed",
+    "id": "bb853514b847740e05dac90a93628247d64e07ffa911b6423826d1a0018b87d3"
+  },
+  "bad": {
+    "version": 1,
+    "assemblyContract": "original-git-objects-v1",
+    "context": {
+      "orgId": "O1",
+      "projectId": "P1",
+      "repoId": "R1",
+      "branch": "main",
+      "policyHash": "e445c722606ad009bc965e69ba224efa24c6ec3833671a188c9b0a1508b50dd0"
+    },
+    "baseCommit": "debe983845362cdfb696ffadc4185bf8e69ee47c",
+    "headCommit": "873b3331c126888c6aebbaf1db51e40f4370ac70",
+    "tree": "a6b4e145b149399f041cdfbd2c361a5116ba090c",
+    "proposals": [
+      {
+        "id": "C2",
+        "baseCommit": "debe983845362cdfb696ffadc4185bf8e69ee47c",
+        "headCommit": "6a8deeaeea7c73ef63f46ae272e080abaf0dd484",
+        "dependsOn": [],
+        "files": [
+          {
+            "status": "M",
+            "from": "scripts/build-self-verification-image.js",
+            "to": "scripts/build-self-verification-image.js"
+          },
+          {
+            "status": "M",
+            "from": "scripts/real-project-lifecycle.js",
+            "to": "scripts/real-project-lifecycle.js"
+          },
+          {
+            "status": "A",
+            "from": "scripts/source-browser-staging.mjs",
+            "to": "scripts/source-browser-staging.mjs"
+          },
+          {
+            "status": "M",
+            "from": "src/web.js",
+            "to": "src/web.js"
+          }
+        ]
+      }
+    ],
+    "requiredVerification": [
+      "preflight",
+      "integration"
+    ],
+    "state": "proposed",
+    "id": "5e0896e73ecb5a4af099ea7dc44f130ad44e5b9c8708bfe66ae41e71455d8b20"
+  },
+  "passReceipt": {
+    "version": 1,
+    "identity": "226c558880a6f8eec2df1fc315bdbb67f4e645ac1a443707995764962ee31607",
+    "candidateId": "bb853514b847740e05dac90a93628247d64e07ffa911b6423826d1a0018b87d3",
+    "commit": "c5272e58fb50950a49735a7db788811062d99558",
+    "tree": "9b4b86ce5fd6f7ba62cb9cb0e3e9d6440ba3b2ac",
+    "policyHash": "75a98ae69a1e32205d1b67ecb7f1c0d4d40d7b8b88a412b0dae8f077bad7ab5a",
+    "checkId": "browser",
+    "producer": "U3",
+    "execution": {
+      "identity": "226c558880a6f8eec2df1fc315bdbb67f4e645ac1a443707995764962ee31607",
+      "commit": "c5272e58fb50950a49735a7db788811062d99558",
+      "tree": "9b4b86ce5fd6f7ba62cb9cb0e3e9d6440ba3b2ac",
+      "command": [
+        "node",
+        "/opt/source-browser-staging.mjs"
+      ],
+      "environment": "source-oci-v1:74bd070d68c1542ba327f549f293839cee6f237cc5ec6aea5fd1000440bf205a",
+      "inputs": {},
+      "externalState": {},
+      "toolVersions": {
+        "node": "v26.13.0",
+        "git": "git version 2.39.5",
+        "gitHttpBackendSha256": "e6ae9a59c377a191c34b4e234d3386a70b1a5a6131cffe00e2f6d0bbb0e9e493",
+        "debian": "12.15",
+        "playwright": "1.61.1",
+        "lensBridge": "1.1.1",
+        "chromium": "149.0.7827.55",
+        "pg": "8.23.0",
+        "yaml": "4.3.2"
+      },
+      "status": "pass",
+      "startedAt": 1794360052869,
+      "finishedAt": 1794360059394,
+      "durationMs": 6525,
+      "stderr": "",
+      "exitCode": 0,
+      "runtimeSignal": null,
+      "export": {
+        "files": 292,
+        "bytes": 2988974,
+        "commit": "c5272e58fb50950a49735a7db788811062d99558",
+        "tree": "9b4b86ce5fd6f7ba62cb9cb0e3e9d6440ba3b2ac"
+      },
+      "cleanupConfirmed": true,
+      "workspaceRemoved": true
+    },
+    "artifactRef": {
+      "hash": "c86847a4b6665a6e35cd70231081467cbafd06c72719f27cad0514c110771af8"
+    },
+    "recordedAt": 1794360059468,
+    "expiresAt": 1794360652869,
+    "provenance": "authorized-service-attestation",
+    "id": "d400ec09736445cd52c4e801eb9acb1acc6081f94522cb1f218d68c101487d15"
+  },
+  "failReceipt": {
+    "version": 1,
+    "identity": "5a180377feefc2b3b1f0fcb6c5a835b18e26fd6979dfbc5c6606c3453e6418fe",
+    "candidateId": "5e0896e73ecb5a4af099ea7dc44f130ad44e5b9c8708bfe66ae41e71455d8b20",
+    "commit": "873b3331c126888c6aebbaf1db51e40f4370ac70",
+    "tree": "a6b4e145b149399f041cdfbd2c361a5116ba090c",
+    "policyHash": "75a98ae69a1e32205d1b67ecb7f1c0d4d40d7b8b88a412b0dae8f077bad7ab5a",
+    "checkId": "browser",
+    "producer": "U3",
+    "execution": {
+      "identity": "5a180377feefc2b3b1f0fcb6c5a835b18e26fd6979dfbc5c6606c3453e6418fe",
+      "commit": "873b3331c126888c6aebbaf1db51e40f4370ac70",
+      "tree": "a6b4e145b149399f041cdfbd2c361a5116ba090c",
+      "command": [
+        "node",
+        "/opt/source-browser-staging.mjs"
+      ],
+      "environment": "source-oci-v1:74bd070d68c1542ba327f549f293839cee6f237cc5ec6aea5fd1000440bf205a",
+      "inputs": {},
+      "externalState": {},
+      "toolVersions": {
+        "node": "v26.13.0",
+        "git": "git version 2.39.5",
+        "gitHttpBackendSha256": "e6ae9a59c377a191c34b4e234d3386a70b1a5a6131cffe00e2f6d0bbb0e9e493",
+        "debian": "12.15",
+        "playwright": "1.61.1",
+        "lensBridge": "1.1.1",
+        "chromium": "149.0.7827.55",
+        "pg": "8.23.0",
+        "yaml": "4.3.2"
+      },
+      "status": "fail",
+      "startedAt": 1794360059676,
+      "finishedAt": 1794360063041,
+      "durationMs": 3365,
+      "stderr": "",
+      "exitCode": 1,
+      "runtimeSignal": null,
+      "export": {
+        "files": 292,
+        "bytes": 2988968,
+        "commit": "873b3331c126888c6aebbaf1db51e40f4370ac70",
+        "tree": "a6b4e145b149399f041cdfbd2c361a5116ba090c"
+      },
+      "cleanupConfirmed": true,
+      "workspaceRemoved": true
+    },
+    "artifactRef": {
+      "hash": "aca4467df34c96f11ff61dc7811add2bee66feea6dbfd5644d028f28649a19a3"
+    },
+    "recordedAt": 1794360063113,
+    "expiresAt": 1794360659676,
+    "provenance": "authorized-service-attestation",
+    "id": "21257c7130ccb8ec51afcd70818596c17b2d66be123b045c7bf4d31079e8423f"
+  },
+  "failureOutput": "{\"version\":1,\"kind\":\"source-browser-staging\",\"status\":\"failed\",\"scope\":\"actual Source candidate, isolated local JSON store, Lens browser bridge plus operator assertions; not a full Lens CLI gate or remote provider deployment\",\"render\":{\"url\":\"http://127.0.0.1:39237/login\",\"final_url\":\"http://127.0.0.1:39237/login\",\"started_at\":\"2026-11-11T01:21:01.659Z\",\"finished_at\":\"2026-11-11T01:21:02.732Z\",\"duration_ms\":1073,\"viewports\":[{\"timings\":{\"context_create_ms\":17.86,\"page_create_ms\":77.34,\"navigation_ms\":155.14,\"readiness_ms\":63.44,\"screenshot_ms\":95.14,\"dom_capture_ms\":18.58,\"link_capture_ms\":6.16,\"context_close_ms\":10.75,\"total_bridge_ms\":451.9},\"context_cleanup_failed\":false,\"readiness\":{\"reason\":\"explicit-selector\",\"duration_ms\":63},\"name\":\"desktop\",\"width\":1440,\"height\":900,\"final_url\":\"http://127.0.0.1:39237/login\",\"screenshot\":\"/tmp/source-browser-stage-q7fGOl/screenshots/desktop.png\",\"network_policy\":{\"mode\":\"loopback-http\",\"service_workers\":\"blocked\",\"blocked_requests\":0},\"console_messages\":[],\"network_events\":[],\"dom_summary\":{\"viewport\":\"desktop\",\"url\":\"http://127.0.0.1:39237/login\",\"final_url\":\"http://127.0.0.1:39237/login\",\"title\":\"Source Login\",\"body_text_length\":481,\"visible_element_count\":40,\"document_width\":1440,\"document_height\":900,\"viewport_width\":1440,\"viewport_height\":900,\"has_body\":true,\"has_main\":true,\"heading_count\":2,\"link_count\":0,\"button_count\":1,\"input_count\":5,\"overflow_elements\":[],\"visible_text_sample\":\"KUJO SOURCE \u00b7 LOCAL CONTROL PLANE\\n\\nRegressed sign-in heading\\n\\nUse the principal, organization, and project IDs created for this Source instance.\\n\\nPRINCIPAL ID\\nPASSWORD\\nORG ID\\nPROJECT ID\\nENABLE PROJECT MANAGEMENT CONTROLS (ROLE-GATED)\\nSIGN IN\\n\\nFIRST RUN\\n\\nBring your workspace online\\n\\nSource gives humans a visual control plane while agents use the same capability-gated API.\\n\\nnode bin/source.js demo --password 'choose-a-strong-password'\\n\\nSource never ships with a default password.\",\"page_text_contains\":{\"_note\":\"Full text available via body_text_length. Use Spec assertions for substring checks.\"}},\"links\":[],\"navigation_error\":null,\"accessibility\":null,\"metrics\":null,\"evidence_limits\":{\"max_console_messages\":1000,\"max_network_events\":2000,\"max_captured_links\":5000,\"dropped_console_messages\":0,\"dropped_network_events\":0,\"dropped_links\":0,\"max_string_bytes\":16384,\"max_collection_bytes\":1048576,\"byte_limit_reached\":false}},{\"timings\":{\"context_create_ms\":7.99,\"page_create_ms\":76.21,\"navigation_ms\":110.57,\"readiness_ms\":50.64,\"screenshot_ms\":47.24,\"dom_capture_ms\":10.69,\"link_capture_ms\":5.06,\"context_close_ms\":12.52,\"total_bridge_ms\":325.68},\"context_cleanup_failed\":false,\"readiness\":{\"reason\":\"explicit-selector\",\"duration_ms\":51},\"name\":\"mobile\",\"width\":390,\"height\":844,\"final_url\":\"http://127.0.0.1:39237/login\",\"screenshot\":\"/tmp/source-browser-stage-q7fGOl/screenshots/mobile.png\",\"network_policy\":{\"mode\":\"loopback-http\",\"service_workers\":\"blocked\",\"blocked_requests\":0},\"console_messages\":[],\"network_events\":[],\"dom_summary\":{\"viewport\":\"mobile\",\"url\":\"http://127.0.0.1:39237/login\",\"final_url\":\"http://127.0.0.1:39237/login\",\"title\":\"Source Login\",\"body_text_length\":481,\"visible_element_count\":40,\"document_width\":390,\"document_height\":1169,\"viewport_width\":390,\"viewport_height\":844,\"has_body\":true,\"has_main\":true,\"heading_count\":2,\"link_count\":0,\"button_count\":1,\"input_count\":5,\"overflow_elements\":[{\"selector\":\"code\",\"width\":610}],\"visible_text_sample\":\"KUJO SOURCE \u00b7 LOCAL CONTROL PLANE\\n\\nRegressed sign-in heading\\n\\nUse the principal, organization, and project IDs created for this Source instance.\\n\\nPRINCIPAL ID\\nPASSWORD\\nORG ID\\nPROJECT ID\\nENABLE PROJECT MANAGEMENT CONTROLS (ROLE-GATED)\\nSIGN IN\\n\\nFIRST RUN\\n\\nBring your workspace online\\n\\nSource gives humans a visual control plane while agents use the same capability-gated API.\\n\\nnode bin/source.js demo --password 'choose-a-strong-password'\\n\\nSource never ships with a default password.\",\"page_text_contains\":{\"_note\":\"Full text available via body_text_length. Use Spec assertions for substring checks.\"}},\"links\":[],\"navigation_error\":null,\"accessibility\":null,\"metrics\":null,\"evidence_limits\":{\"max_console_messages\":1000,\"max_network_events\":2000,\"max_captured_links\":5000,\"dropped_console_messages\":0,\"dropped_network_events\":0,\"dropped_links\":0,\"max_string_bytes\":16384,\"max_collection_bytes\":1048576,\"byte_limit_reached\":false}}],\"provider_errors\":[],\"metadata\":{\"bridge\":\"lens-browser-bridge\",\"version\":\"1.1.1\",\"playwright_version\":\"1.61.1\",\"node_version\":\"v26.13.0\",\"browser\":\"chromium\",\"throttle\":\"none\",\"device\":\"none\",\"auth\":\"none\",\"evidence_limits\":{\"max_console_messages_per_viewport\":1000,\"max_network_events_per_viewport\":2000,\"max_captured_links_per_viewport\":5000,\"dropped_console_messages\":0,\"dropped_network_events\":0,\"dropped_links\":0},\"timings\":{\"process_boot_ms\":1209.14,\"runtime_load_ms\":0.1,\"browser_launch_ms\":242.37,\"browser_close_ms\":43.29,\"total_bridge_ms\":1073.44},\"browser_launches\":1,\"contexts_created\":2,\"pages_created\":2,\"pages_captured\":2,\"viewport_timings\":[{\"viewport_index\":0,\"timings\":{\"context_create_ms\":17.86,\"page_create_ms\":77.34,\"navigation_ms\":155.14,\"readiness_ms\":63.44,\"screenshot_ms\":95.14,\"dom_capture_ms\":18.58,\"link_capture_ms\":6.16,\"context_close_ms\":10.75,\"total_bridge_ms\":451.9},\"readiness\":{\"reason\":\"explicit-selector\",\"duration_ms\":63}},{\"viewport_index\":1,\"timings\":{\"context_create_ms\":7.99,\"page_create_ms\":76.21,\"navigation_ms\":110.57,\"readiness_ms\":50.64,\"screenshot_ms\":47.24,\"dom_capture_ms\":10.69,\"link_capture_ms\":5.06,\"context_close_ms\":12.52,\"total_bridge_ms\":325.68},\"readiness\":{\"reason\":\"explicit-selector\",\"duration_ms\":51}}]}},\"screenshots\":[],\"error\":\"The input did not match the regular expression /Sign in with a human principal/. Input:\\n\\n'KUJO SOURCE \u00b7 LOCAL CONTROL PLANE\\\\n' +\\n  '\\\\n' +\\n  'Regressed sign-in heading\\\\n' +\\n  '\\\\n' +\\n  'Use the principal, organization, and project IDs created for this Source instance.\\\\n' +\\n  '\\\\n' +\\n  'PRINCIPAL ID\\\\n' +\\n  'PASSWORD\\\\n' +\\n  'ORG ID\\\\n' +\\n  'PROJECT ID\\\\n' +\\n  'ENABLE PROJECT MANAGEMENT CONTROLS (ROLE-GATED)\\\\n' +\\n  'SIGN IN\\\\n' +\\n  '\\\\n' +\\n  'FIRST RUN\\\\n' +\\n  '\\\\n' +\\n  'Bring your workspace online\\\\n' +\\n  '\\\\n' +\\n  'Source gives humans a visual control plane while agents use the same capability-gated API.\\\\n' +\\n  '\\\\n' +\\n  \\\"node bin/source.js demo --password 'choose-a-strong-password'\\\\n\\\" +\\n  '\\\\n' +\\n  'Source never ships with a default password.'\\n\",\"disposableApplicationRemoved\":true}\n",
+  "rejectedWrongCandidateEvidence": true,
+  "regressedUiDenied": true,
+  "browserEvidenceNotReusable": true,
+  "canonicalUnchangedUntilGoodAcceptance": true,
+  "workspacesEmpty": true,
+  "validation": {
+    "command": "SOURCE_TEST_BROWSER_IMAGE_REPORT=<image report> node --test tests/browser-staging-live.test.js",
+    "resultLines": [
+      "\u2714 actual browser staging rejects regressed Source UI and cannot transfer passing evidence (13684.465873ms)",
+      "\u2139 tests 1",
+      "\u2139 suites 0",
+      "\u2139 pass 1",
+      "\u2139 fail 0",
+      "\u2139 cancelled 0",
+      "\u2139 skipped 0",
+      "\u2139 todo 0",
+      "\u2139 duration_ms 13931.639648"
+    ],
+    "testSha256": "1101444e79877564a20c7d64d3bad0aef0fd89092126a763460213a9bb7900c4",
+    "scope": "actual Source Git trees, actual OCI and Chromium; separate JSON-store broker fixture, not the PostgreSQL lifecycle run"
+  }
+}
