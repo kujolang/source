@@ -1,0 +1,1949 @@
+{
+  "version": 2,
+  "status": "failed",
+  "phase": "submission",
+  "httpStatuses": {
+    "200": 774,
+    "401": 1
+  },
+  "date": "2026-11-11T01:05:35.648Z",
+  "agents": 250,
+  "repositories": 1,
+  "concurrency": {
+    "agentProcesses": 250,
+    "workerProcesses": 2,
+    "workerConcurrency": 2
+  },
+  "host": {
+    "platform": "darwin",
+    "arch": "x64",
+    "node": "v26.12.1",
+    "cpuCount": 12,
+    "memoryBytes": 17179869184,
+    "git": "git version 2.42.0"
+  },
+  "fixture": "compatible independent files; fixed host Git-content checker; no repository code execution",
+  "profile": "private-load",
+  "rateLimits": "explicit private-load operator profile; not default capacity",
+  "admissionConfiguration": {
+    "gitPush": {
+      "limit": 1000,
+      "windowMs": 60000
+    },
+    "submit": {
+      "limit": 1000,
+      "windowMs": 60000
+    }
+  },
+  "maxIntegrationProposals": 250,
+  "stages": {},
+  "raw": {
+    "completedClients": []
+  },
+  "limitations": [
+    "loopback single host; no deployed TLS latency",
+    "fixed Git-content verification, not application CI or isolated staging",
+    "no induced worker crash in this measurement",
+    "maximum 1000 agents per harness run; operator batch bound recorded explicitly",
+    "private repositories; explicit 1000/min push and submit limits per shared address; server queue/concurrency defaults unchanged"
+  ],
+  "sourceRevision": "357ffa0e1d80128f0ee4e5191fd45983e63f6cc3",
+  "harnessSha256": "7c6c0e69db64270a2a9b634cd1b87b06640a7ccba6c95b82fabd4642b5f005d1",
+  "telemetrySha256": "acd659092128cf9f029080777399738bef242ef934b92aca5577711b8b1e7309",
+  "httpTimeouts": {
+    "headersMs": 15000,
+    "requestMs": 120000,
+    "keepAliveMs": 5000
+  },
+  "anonymousGitRejected": true,
+  "error": "Source Git ls-remote failed; check credentials, connectivity, and fast-forward history (no force or deletion is performed)",
+  "failureDiagnostic": {
+    "operation": "ls-remote",
+    "kind": "transport",
+    "exitCode": 128,
+    "curlCode": null,
+    "code": null,
+    "signal": null,
+    "killed": false,
+    "httpStatus": null
+  },
+  "httpBeforeCleanup": {
+    "scope": "passive server HTTP/socket observations; no raw URLs, headers, bodies or error text; at most 50 failed and pending samples",
+    "sockets": {
+      "opened": 489,
+      "closed": 270,
+      "closedWithError": 15,
+      "active": 219,
+      "peakActive": 250,
+      "timeouts": 0,
+      "errors": {
+        "ERR_HTTP_REQUEST_TIMEOUT": 15
+      }
+    },
+    "routes": {
+      "git": {
+        "requests": 785,
+        "finished": 772,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {
+          "200": 771,
+          "401": 1
+        }
+      },
+      "submit": {
+        "requests": 0,
+        "finished": 0,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {}
+      },
+      "other": {
+        "requests": 0,
+        "finished": 0,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {}
+      }
+    },
+    "pendingCount": 13,
+    "pending": [
+      {
+        "route": "git",
+        "elapsedMs": 614.6692890000013,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": true,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 461.0126539999983,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": true,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 460.19699599999876,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": true,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 415.8666319999975,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 390.02805400000216,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": true,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 389.69731700000557,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 293.3256079999992,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 291.7293869999994,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 236.12046900000132,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 233.58068900000217,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 107.03558700000576,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 106.17973800000618,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 101.81544900000154,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      }
+    ],
+    "failures": [],
+    "socketFailures": [
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 16465.942383,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 16441.073140999997,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 16396.991182,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 16244.960797,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 16190.596214000001,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15810.882343999998,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15803.687729999998,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15709.017296999999,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15675.837080999998,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15635.010406999998,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15585.901437000004,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15475.722715,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15474.792234999997,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15293.072331000003,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15027.949751,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      }
+    ]
+  },
+  "httpAfterCleanup": {
+    "scope": "passive server HTTP/socket observations; no raw URLs, headers, bodies or error text; at most 50 failed and pending samples",
+    "sockets": {
+      "opened": 491,
+      "closed": 491,
+      "closedWithError": 15,
+      "active": 0,
+      "peakActive": 250,
+      "timeouts": 0,
+      "errors": {
+        "ERR_HTTP_REQUEST_TIMEOUT": 15
+      }
+    },
+    "routes": {
+      "git": {
+        "requests": 788,
+        "finished": 775,
+        "closedBeforeFinish": 13,
+        "abortedBodies": 4,
+        "statuses": {
+          "200": 774,
+          "401": 1
+        }
+      },
+      "submit": {
+        "requests": 0,
+        "finished": 0,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {}
+      },
+      "other": {
+        "requests": 0,
+        "finished": 0,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {}
+      }
+    },
+    "pendingCount": 0,
+    "pending": [],
+    "failures": [
+      {
+        "route": "git",
+        "elapsedMs": 862.8397870000044,
+        "requestComplete": true,
+        "requestAborted": true,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 992.9914339999959,
+        "requestComplete": true,
+        "requestAborted": true,
+        "responseHeadersSent": true,
+        "responseEnded": true
+      },
+      {
+        "route": "git",
+        "elapsedMs": 1051.2683959999995,
+        "requestComplete": true,
+        "requestAborted": true,
+        "responseHeadersSent": true,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 41.98308399999951,
+        "requestComplete": true,
+        "requestAborted": true,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 79.18042199999763,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 79.39012899999943,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 864.5752580000044,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 992.5721460000059,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": true,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 861.3899949999977,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "git",
+        "elapsedMs": 1055.939959999996,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": true,
+        "responseEnded": true
+      },
+      {
+        "route": "git",
+        "elapsedMs": 1152.3941290000002,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": true,
+        "responseEnded": true
+      },
+      {
+        "route": "git",
+        "elapsedMs": 1178.6791769999982,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": true,
+        "responseEnded": true
+      },
+      {
+        "route": "git",
+        "elapsedMs": 1224.360195000001,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": true,
+        "responseEnded": true
+      }
+    ],
+    "socketFailures": [
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 16465.942383,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 16441.073140999997,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 16396.991182,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 16244.960797,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 16190.596214000001,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15810.882343999998,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15803.687729999998,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15709.017296999999,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15675.837080999998,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15635.010406999998,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15585.901437000004,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15475.722715,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15474.792234999997,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15293.072331000003,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15027.949751,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      }
+    ]
+  },
+  "telemetry": {
+    "scope": "API/harness process per stage; host free bytes include all activity, not memory available or attributable usage; sampled RSS can miss peaks",
+    "sampleIntervalMs": 1000,
+    "eventLoopResolutionMs": 20,
+    "stages": [
+      {
+        "phase": "setup",
+        "wallMs": 10875.039847,
+        "parentCpuMicros": {
+          "user": 696727,
+          "system": 284235
+        },
+        "parentEventLoop": {
+          "idle": 6623.382268,
+          "active": 4251.5949719961945,
+          "utilization": 0.39095208000616305
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 399,
+          "p50": 20.512767,
+          "p95": 23.281663,
+          "p99": 25.903103,
+          "max": 66.486271
+        },
+        "samples": 11,
+        "parentSampledPeakRssBytes": 107548672,
+        "hostMinimumFreeBytes": 30982144
+      },
+      {
+        "phase": "submission",
+        "wallMs": 22246.92462,
+        "parentCpuMicros": {
+          "user": 1824574,
+          "system": 1101065
+        },
+        "parentEventLoop": {
+          "idle": 893.4019719999997,
+          "active": 21353.532986010912,
+          "utilization": 0.9598415703697514
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 326,
+          "p50": 49.512447,
+          "p95": 138.936319,
+          "p99": 232.783871,
+          "max": 673.710079
+        },
+        "samples": 22,
+        "parentSampledPeakRssBytes": 134737920,
+        "hostMinimumFreeBytes": 23207936
+      },
+      {
+        "phase": "cleanup",
+        "wallMs": 2235.0219339999967,
+        "parentCpuMicros": {
+          "user": 631263,
+          "system": 4226514
+        },
+        "parentEventLoop": {
+          "idle": 682.7249759999995,
+          "active": 1552.2985709937348,
+          "utilization": 0.6945334303442515
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 76,
+          "p50": 20.004863,
+          "p95": 21.135359,
+          "p99": 33.177599,
+          "max": 41.353215
+        },
+        "samples": 4,
+        "parentSampledPeakRssBytes": 148992000,
+        "hostMinimumFreeBytes": 72826880
+      }
+    ]
+  },
+  "childResources": [
+    {
+      "role": "worker",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "worker",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": {
+        "cpuMicros": {
+          "user": 158082,
+          "system": 54365
+        },
+        "peakRssBytes": 54304768,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": {
+        "cpuMicros": {
+          "user": 156783,
+          "system": 42815
+        },
+        "peakRssBytes": 54444032,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": {
+        "cpuMicros": {
+          "user": 162221,
+          "system": 42295
+        },
+        "peakRssBytes": 55443456,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    }
+  ],
+  "gitBackendOutcomes": {
+    "exit_0": 779,
+    "aborted": 7
+  },
+  "elapsedMs": 35360,
+  "parentCpuMicros": {
+    "user": 3154492,
+    "system": 5612628
+  },
+  "parentPeakRssBytes": 148996096
+}

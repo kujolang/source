@@ -1,0 +1,19 @@
+Revision: 357ffa0
+Command: SOURCE_TEST_DATABASE_URL=<disposable PostgreSQL DSN> node --test --test-concurrency=1 tests/benchmark-telemetry.test.js tests/integration-benchmark.test.js
+Result lines only; PostgreSQL bootstrap notices omitted.
+
+✔ stage telemetry observes an actual event-loop stall and closes each phase separately (210.648662ms)
+✔ HTTP diagnostics distinguish pending, finished and aborted requests without retaining private input (86.390003ms)
+✔ HTTP diagnostics preserve native parser rejection and bounded failure samples (48.554431ms)
+✔ HTTP diagnostics observe native header timeout without suppressing its 408 response (65.021146ms)
+✔ benchmark checker rejects missing, corrupted and unexpected candidate content (848.570769ms)
+✔ benchmark completes real HTTP submissions, separate workers and exact promotions across repositories: default (10959.279343ms)
+✔ benchmark completes real HTTP submissions, separate workers and exact promotions across repositories: private-load (11341.660192ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 23789.47655

@@ -361,3 +361,15 @@ and exact promotion plus independent restore succeed. See
 This closes the single local queue-integrated crash demonstration. It does not
 close deployed failover, sustained recovery load, host/daemon loss, staging,
 Workcell host compatibility or the outstanding hot-repository/1,000-agent gates.
+
+## Hot-repository capacity diagnosis — 2026-11-10
+
+Two additional 250-process hot-repository runs failed before submission. Passive
+HTTP diagnostics at `357ffa0` identify 15 native header deadlines on connections
+with zero bytes received after 15–16.5 seconds; all sockets are accounted for at
+cleanup. This narrows the newly reproduced failure to pre-handler connection
+progress and does not establish the earlier submission reset's cause. Keep
+admission/security timeouts unchanged. Client connect/first-byte timing and an
+independently resourced load generator are needed to distinguish service limits
+from cohosted process pressure. See [measurements and boundaries](../validation/concurrency-results.md).
+The hot-repository stress gate remains failed; 1,000 agents remain unmeasured.

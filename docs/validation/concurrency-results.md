@@ -560,3 +560,54 @@ client scheduling delays, Git descendants or available memory. Only five of 252
 child resource reports were available after cleanup. A passing distributed run
 does not establish hot-repository reliability; this failure remains an open
 load milestone. Limits, timeouts and authentication were unchanged.
+
+### 250-agent hot-repository native header timeouts — 2026-11-10
+
+Two fresh runs retain the same 250 independent agent processes, one private
+repository, two workers, explicit 1000/min push/submit profile, Git 2.42.0 and
+unchanged server admission/timeouts. Passive HTTP diagnostics now record route
+counts, incomplete responses and bounded socket-error samples without retaining
+URLs, headers, bodies or error text. They do not install server `clientError` or
+`timeout` handlers, consume bodies, write sockets or replay requests.
+
+- At `15d5c9f`, the [first observation](benchmarks/agents-250-repos-1-http-observation.json)
+  failed during clone with HTTP 408 after 34.590 seconds including cleanup.
+  Before cleanup, 27 socket errors were classified only as `other`, 663 Git
+  requests had reached the handler and zero submissions had arrived. Its
+  after-cleanup snapshot was too early to include all socket close events;
+  do not interpret its remaining active counts as leaked sockets.
+- At `357ffa0`, the [classified run](benchmarks/agents-250-repos-1-header-timeouts.json)
+  failed on a Git `ls-remote` transport error after 35.360 seconds. Before cleanup,
+  all 15 socket errors were `ERR_HTTP_REQUEST_TIMEOUT`. Every sample had zero
+  request bytes read, zero requests observed and 51 response bytes written,
+  after 15.028–16.466 seconds. This is the native HTTP header deadline before
+  request handling, consistent with Node's 408 response. There were 785 handled
+  Git requests, 772 finished responses and zero submissions. Final cleanup now
+  awaits socket close events: all 491 sockets closed and no request remained
+  pending. The 13 incomplete responses reported after cleanup are distinguished
+  from the zero incomplete responses before the harness stopped its children.
+
+The classified run's submission phase lasted 22.247 seconds. Parent event-loop
+utilization was 0.960; delay p50/p95/p99/max was
+49.512/138.936/232.784/673.710 ms. Host sampled free memory reached 23,207,936 bytes.
+Free memory is not available memory, and this is not client CPU/scheduling or
+whole-host attribution. All 250 clients and their Git descendants share the
+16-GiB host with the server/database. The evidence establishes empty-connection
+header expiry in this run; it does not prove whether client scheduling, memory
+pressure, network/OS behavior or another mechanism delayed the first bytes.
+It also does not prove the cause of the earlier submission `ECONNRESET`.
+
+No assembly, verification, promotion, baseline comparison or 250-agent capacity
+claim follows from either failed run. Do not raise security deadlines or reduce
+the actual concurrent population merely to obtain a passing result. The next
+load investigation needs client-side connect/first-byte timing and independently
+resourced load generation to separate source-service capacity from cohosted
+generator pressure, while retaining the same policy and correctness assertions.
+The 250 hot-repository and 1,000-agent gates remain open.
+
+The [focused regression record](benchmarks/http-observation-regressions.txt)
+contains seven passing tests, zero skips, in 23.789 seconds. Real sockets prove
+native malformed-request 400 and incomplete-header 408 behavior remains intact,
+pending/finished/aborted observations differ correctly, private input is omitted,
+and failure samples are capped. Both default and private two-repository
+end-to-end profiles still pass with the report assertions and settled cleanup.
