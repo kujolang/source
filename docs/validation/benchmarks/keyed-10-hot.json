@@ -1,0 +1,848 @@
+{
+  "version": 2,
+  "status": "passed",
+  "phase": "complete",
+  "httpStatuses": {
+    "200": 94,
+    "201": 9,
+    "401": 1
+  },
+  "date": "2026-11-11T01:43:23.087Z",
+  "agents": 10,
+  "repositories": 1,
+  "concurrency": {
+    "agentProcesses": 10,
+    "workerProcesses": 2,
+    "workerConcurrency": 2
+  },
+  "host": {
+    "platform": "darwin",
+    "arch": "x64",
+    "node": "v26.12.1",
+    "cpuCount": 12,
+    "memoryBytes": 17179869184,
+    "git": "git version 2.50.1 (Apple Git-155)"
+  },
+  "fixture": "compatible independent files; fixed host Git-content checker; no repository code execution",
+  "profile": "private-load",
+  "keyedSubmissions": true,
+  "submissionRecovery": {
+    "injectedAgent": 3,
+    "responsesDropped": 1,
+    "recovered": 1,
+    "strategy": "one read-only lookup after unknown HTTP outcome; no POST replay",
+    "lookupMs": {
+      "samples": 1,
+      "total": 201.81265600000006,
+      "p50": 201.81265600000006,
+      "p95": 201.81265600000006,
+      "p99": 201.81265600000006
+    },
+    "noDuplicateLifecycleRecords": true
+  },
+  "rateLimits": "explicit private-load operator profile; not default capacity",
+  "admissionConfiguration": {
+    "gitPush": {
+      "limit": 1000,
+      "windowMs": 60000
+    },
+    "submit": {
+      "limit": 1000,
+      "windowMs": 60000
+    }
+  },
+  "maxIntegrationProposals": 100,
+  "stages": {
+    "submission": {
+      "wallMs": 8202.195371,
+      "proposalsPerSecond": 1.2191857847420202,
+      "cloneMs": {
+        "samples": 10,
+        "total": 9964.252635,
+        "p50": 999.6170720000001,
+        "p95": 1212.502004,
+        "p99": 1212.502004
+      },
+      "submitMs": {
+        "samples": 10,
+        "total": 49736.791279,
+        "p50": 4824.426566,
+        "p95": 6370.846013,
+        "p99": 6370.846013
+      }
+    },
+    "assemblyMs": {
+      "samples": 1,
+      "total": 3802.0369949999986,
+      "p50": 3802.0369949999986,
+      "p95": 3802.0369949999986,
+      "p99": 3802.0369949999986
+    },
+    "verification": {
+      "wallMs": 1984.604894,
+      "queueMs": {
+        "samples": 1,
+        "total": 898,
+        "p50": 898,
+        "p95": 898,
+        "p99": 898
+      },
+      "executionMs": {
+        "samples": 1,
+        "total": 850,
+        "p50": 850,
+        "p95": 850,
+        "p99": 850
+      },
+      "completed": 1,
+      "failed": 0,
+      "abandoned": 0,
+      "recoveryMs": null
+    },
+    "promotionMs": {
+      "samples": 1,
+      "total": 659.6919280000002,
+      "p50": 659.6919280000002,
+      "p95": 659.6919280000002,
+      "p99": 659.6919280000002
+    },
+    "fetchMs": {
+      "samples": 1,
+      "total": 613.5687199999993,
+      "p50": 613.5687199999993,
+      "p95": 613.5687199999993,
+      "p99": 613.5687199999993
+    },
+    "reuse": {
+      "requests": 1,
+      "hits": 1,
+      "coalescedRequests": 1,
+      "assertions": "same job ID while active; same exact candidate receipts reused after completion"
+    }
+  },
+  "raw": {
+    "proposals": [
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 0,
+        "repoIndex": 0,
+        "changeId": "C2",
+        "workId": "W2",
+        "sessionId": "S2",
+        "evidenceId": "E2",
+        "baseCommit": "ff3a87a64b7c0049e41433392d3aa35bf992e16e",
+        "headCommit": "b746b34d913e0349075e510e46a3fc57b1410bfd",
+        "cloneMs": 821.9489950000001,
+        "submitMs": 3874.810547,
+        "totalMs": 5380.319329999999
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 1,
+        "repoIndex": 0,
+        "changeId": "C10",
+        "workId": "W10",
+        "sessionId": "S10",
+        "evidenceId": "E10",
+        "baseCommit": "ff3a87a64b7c0049e41433392d3aa35bf992e16e",
+        "headCommit": "91d5764ff5ab00d02d90f3b10efe8ad10baa5222",
+        "cloneMs": 1115.680818,
+        "submitMs": 6370.846013,
+        "totalMs": 8182.067626
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 2,
+        "repoIndex": 0,
+        "changeId": "C1",
+        "workId": "W1",
+        "sessionId": "S1",
+        "evidenceId": "E1",
+        "baseCommit": "ff3a87a64b7c0049e41433392d3aa35bf992e16e",
+        "headCommit": "357aa2c481da304329f90d4ce91cdc69d87402b6",
+        "cloneMs": 842.9087310000001,
+        "submitMs": 3456.063725,
+        "totalMs": 4987.883406
+      },
+      {
+        "recovered": true,
+        "submissionFailure": {
+          "operation": "submit",
+          "kind": "transport",
+          "code": "ECONNRESET",
+          "timedOut": false,
+          "responseReceived": false,
+          "outcomeUnknown": true
+        },
+        "recoveryMs": 201.81265600000006,
+        "index": 3,
+        "repoIndex": 0,
+        "changeId": "C3",
+        "workId": "W3",
+        "sessionId": "S3",
+        "evidenceId": "E3",
+        "baseCommit": "ff3a87a64b7c0049e41433392d3aa35bf992e16e",
+        "headCommit": "f4a80afc7f38c7cd1e7fa710d02d1b027c82ca09",
+        "cloneMs": 857.6383450000001,
+        "submitMs": 4409.271537,
+        "totalMs": 5948.417245
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 4,
+        "repoIndex": 0,
+        "changeId": "C9",
+        "workId": "W9",
+        "sessionId": "S9",
+        "evidenceId": "E9",
+        "baseCommit": "ff3a87a64b7c0049e41433392d3aa35bf992e16e",
+        "headCommit": "dc2935fe0663fcbdb69d035e4df9ac01145c09dc",
+        "cloneMs": 1140.162351,
+        "submitMs": 6025.4554259999995,
+        "totalMs": 7835.218821999999
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 5,
+        "repoIndex": 0,
+        "changeId": "C7",
+        "workId": "W7",
+        "sessionId": "S7",
+        "evidenceId": "E7",
+        "baseCommit": "ff3a87a64b7c0049e41433392d3aa35bf992e16e",
+        "headCommit": "600e7345825ca7088c4e7ddbe13bd736be906119",
+        "cloneMs": 1006.620541,
+        "submitMs": 5508.118748999999,
+        "totalMs": 7189.451608
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 6,
+        "repoIndex": 0,
+        "changeId": "C4",
+        "workId": "W4",
+        "sessionId": "S4",
+        "evidenceId": "E4",
+        "baseCommit": "ff3a87a64b7c0049e41433392d3aa35bf992e16e",
+        "headCommit": "9ec01809d4b20d4df0e21c11e2b33e1a39e7d3dd",
+        "cloneMs": 934.5154239999999,
+        "submitMs": 4506.74219,
+        "totalMs": 6135.012918
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 7,
+        "repoIndex": 0,
+        "changeId": "C6",
+        "workId": "W6",
+        "sessionId": "S6",
+        "evidenceId": "E6",
+        "baseCommit": "ff3a87a64b7c0049e41433392d3aa35bf992e16e",
+        "headCommit": "5bb53014a048aa1c998e69ab4f54630564ec79f3",
+        "cloneMs": 1032.658354,
+        "submitMs": 5111.39262,
+        "totalMs": 6831.705709
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 8,
+        "repoIndex": 0,
+        "changeId": "C8",
+        "workId": "W8",
+        "sessionId": "S8",
+        "evidenceId": "E8",
+        "baseCommit": "ff3a87a64b7c0049e41433392d3aa35bf992e16e",
+        "headCommit": "77f4e5086f993affce29755b412f27135799c3ed",
+        "cloneMs": 1212.502004,
+        "submitMs": 5649.663906,
+        "totalMs": 7524.1567319999995
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 9,
+        "repoIndex": 0,
+        "changeId": "C5",
+        "workId": "W5",
+        "sessionId": "S5",
+        "evidenceId": "E5",
+        "baseCommit": "ff3a87a64b7c0049e41433392d3aa35bf992e16e",
+        "headCommit": "b3b52941e9d1ad83a0146aaa52cf53c7a76fd596",
+        "cloneMs": 999.6170720000001,
+        "submitMs": 4824.426566,
+        "totalMs": 6483.928992
+      }
+    ],
+    "assemblyMs": [
+      3802.0369949999986
+    ],
+    "executions": [
+      {
+        "jobId": "J1",
+        "candidateId": "bebfd1d5af007688ca00556925214fac9487bd1301fa40b6d14ec54732fe3c11",
+        "workerId": "benchmark-1",
+        "queueMs": 898,
+        "executionMs": 850
+      }
+    ],
+    "promotionMs": [
+      659.6919280000002
+    ],
+    "fetchMs": [
+      613.5687199999993
+    ],
+    "baselineChecksMs": [
+      361.2612790000021,
+      407.65525499999785,
+      472.0127900000007,
+      506.34968200000003,
+      561.6220299999986,
+      624.6344209999988,
+      667.3526349999993,
+      735.9829470000004,
+      804.2130489999981,
+      848.085282
+    ],
+    "baselineAssemblyMs": [
+      102.88283799999772,
+      102.73100200000044,
+      100.16010900000038,
+      104.22205899999972,
+      105.22404200000165,
+      102.73858699999982,
+      107.7483650000031,
+      105.03681300000244,
+      109.12875300000087,
+      115.9081920000026
+    ]
+  },
+  "limitations": [
+    "loopback single host; no deployed TLS latency",
+    "fixed Git-content verification, not application CI or isolated staging",
+    "no induced worker crash in this measurement",
+    "maximum 1000 agents per harness run; operator batch bound recorded explicitly",
+    "private repositories; explicit 1000/min push and submit limits per shared address; server queue/concurrency defaults unchanged"
+  ],
+  "sourceRevision": "f16dfbd3c499ba721ed0a2c2b205baf7f40f810a",
+  "harnessSha256": "3a1ed927af8b8e71174341757666ed5b3f63d98795569c38545f1b2df2dd14ce",
+  "telemetrySha256": "acd659092128cf9f029080777399738bef242ef934b92aca5577711b8b1e7309",
+  "httpTimeouts": {
+    "headersMs": 15000,
+    "requestMs": 120000,
+    "keepAliveMs": 5000
+  },
+  "anonymousGitRejected": true,
+  "workerMetrics": [
+    {
+      "claimed": 0,
+      "completed": 0,
+      "failed": 0,
+      "errors": 0,
+      "activeJobs": 0,
+      "stopping": true
+    },
+    {
+      "claimed": 1,
+      "completed": 1,
+      "failed": 0,
+      "errors": 0,
+      "activeJobs": 0,
+      "stopping": true
+    }
+  ],
+  "baseline": {
+    "method": "sequential cumulative merge plus identical checker once per proposal; no speculative rerun penalty",
+    "checks": 10,
+    "executionMs": {
+      "samples": 10,
+      "total": 5989.169369999996,
+      "p50": 561.6220299999986,
+      "p95": 848.085282,
+      "p99": 848.085282
+    },
+    "assemblyMs": {
+      "samples": 10,
+      "total": 1055.7807600000087,
+      "p50": 104.22205899999972,
+      "p95": 115.9081920000026,
+      "p99": 115.9081920000026
+    },
+    "finalTreesEqual": true
+  },
+  "comparison": {
+    "checksAvoided": 9,
+    "sourceChecks": 1,
+    "baselineChecks": 10,
+    "sourceVerificationMs": 850,
+    "baselineVerificationMs": 5989.169369999996
+  },
+  "storage": {
+    "filesystemAllocatedBytes": 2777088,
+    "postgresRelationBytes": 1277952
+  },
+  "network": {
+    "serverReceivedBytes": 53268,
+    "serverSentBytes": 72028,
+    "scope": "all loopback HTTP/Git during run"
+  },
+  "correctness": {
+    "allProposalsRetained": true,
+    "exactVerifiedPromotion": true,
+    "unverifiedAcceptanceRejected": true,
+    "duplicatePromotionIdempotent": true,
+    "baselineTreeEquality": true,
+    "conflicts": 0,
+    "humanInterventions": 0,
+    "acceptance": "automated harness acting as configured human maintainer"
+  },
+  "httpBeforeCleanup": {
+    "scope": "passive server HTTP/socket observations; no raw URLs, headers, bodies or error text; at most 50 failed and pending samples",
+    "sockets": {
+      "opened": 53,
+      "closed": 53,
+      "closedWithError": 0,
+      "active": 0,
+      "peakActive": 11,
+      "timeouts": 0,
+      "errors": {}
+    },
+    "routes": {
+      "git": {
+        "requests": 94,
+        "finished": 94,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {
+          "200": 93,
+          "401": 1
+        }
+      },
+      "submit": {
+        "requests": 10,
+        "finished": 9,
+        "closedBeforeFinish": 1,
+        "abortedBodies": 0,
+        "statuses": {
+          "201": 9
+        }
+      },
+      "other": {
+        "requests": 1,
+        "finished": 1,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {
+          "200": 1
+        }
+      }
+    },
+    "pendingCount": 0,
+    "pending": [],
+    "failures": [
+      {
+        "route": "submit",
+        "elapsedMs": 1222.6687619999993,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      }
+    ],
+    "socketFailures": []
+  },
+  "httpAfterCleanup": {
+    "scope": "passive server HTTP/socket observations; no raw URLs, headers, bodies or error text; at most 50 failed and pending samples",
+    "sockets": {
+      "opened": 53,
+      "closed": 53,
+      "closedWithError": 0,
+      "active": 0,
+      "peakActive": 11,
+      "timeouts": 0,
+      "errors": {}
+    },
+    "routes": {
+      "git": {
+        "requests": 94,
+        "finished": 94,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {
+          "200": 93,
+          "401": 1
+        }
+      },
+      "submit": {
+        "requests": 10,
+        "finished": 9,
+        "closedBeforeFinish": 1,
+        "abortedBodies": 0,
+        "statuses": {
+          "201": 9
+        }
+      },
+      "other": {
+        "requests": 1,
+        "finished": 1,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {
+          "200": 1
+        }
+      }
+    },
+    "pendingCount": 0,
+    "pending": [],
+    "failures": [
+      {
+        "route": "submit",
+        "elapsedMs": 1222.6687619999993,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      }
+    ],
+    "socketFailures": []
+  },
+  "telemetry": {
+    "scope": "API/harness process per stage; host free bytes include all activity, not memory available or attributable usage; sampled RSS can miss peaks",
+    "sampleIntervalMs": 1000,
+    "eventLoopResolutionMs": 20,
+    "stages": [
+      {
+        "phase": "setup",
+        "wallMs": 7565.400167,
+        "parentCpuMicros": {
+          "user": 355922,
+          "system": 110201
+        },
+        "parentEventLoop": {
+          "idle": 4402.391114,
+          "active": 3162.948177989803,
+          "utilization": 0.41808411439507265
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 227,
+          "p50": 20.430847,
+          "p95": 22.118399,
+          "p99": 22.609919,
+          "max": 96.600063
+        },
+        "samples": 7,
+        "parentSampledPeakRssBytes": 89710592,
+        "hostMinimumFreeBytes": 109518848
+      },
+      {
+        "phase": "submission",
+        "wallMs": 8220.79967,
+        "parentCpuMicros": {
+          "user": 907959,
+          "system": 255635
+        },
+        "parentEventLoop": {
+          "idle": 5896.109329999999,
+          "active": 2324.6614920034845,
+          "utilization": 0.2827790169969659
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 359,
+          "p50": 20.725759,
+          "p95": 39.550975,
+          "p99": 62.357503,
+          "max": 71.499775
+        },
+        "samples": 11,
+        "parentSampledPeakRssBytes": 106655744,
+        "hostMinimumFreeBytes": 39120896
+      },
+      {
+        "phase": "assembly",
+        "wallMs": 4063.249593999999,
+        "parentCpuMicros": {
+          "user": 113105,
+          "system": 57698
+        },
+        "parentEventLoop": {
+          "idle": 3905.7138649999997,
+          "active": 157.5487750142911,
+          "utilization": 0.03877395801658959
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 193,
+          "p50": 20.873215,
+          "p95": 22.151167,
+          "p99": 22.609919,
+          "max": 25.886719
+        },
+        "samples": 6,
+        "parentSampledPeakRssBytes": 108068864,
+        "hostMinimumFreeBytes": 252510208
+      },
+      {
+        "phase": "verification",
+        "wallMs": 1984.7936789999985,
+        "parentCpuMicros": {
+          "user": 54315,
+          "system": 15208
+        },
+        "parentEventLoop": {
+          "idle": 1924.6634720000002,
+          "active": 60.154630002143676,
+          "utilization": 0.03030737675228977
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 93,
+          "p50": 20.873215,
+          "p95": 22.134783,
+          "p99": 22.773759,
+          "max": 22.822911
+        },
+        "samples": 4,
+        "parentSampledPeakRssBytes": 108937216,
+        "hostMinimumFreeBytes": 285065216
+      },
+      {
+        "phase": "promotion",
+        "wallMs": 2721.517175000001,
+        "parentCpuMicros": {
+          "user": 138532,
+          "system": 42107
+        },
+        "parentEventLoop": {
+          "idle": 2591.512896000002,
+          "active": 130.0393379940051,
+          "utilization": 0.047781312579537084
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 130,
+          "p50": 20.824063,
+          "p95": 22.102015,
+          "p99": 22.446079,
+          "max": 22.511615
+        },
+        "samples": 4,
+        "parentSampledPeakRssBytes": 110342144,
+        "hostMinimumFreeBytes": 323657728
+      },
+      {
+        "phase": "baseline",
+        "wallMs": 8048.459972000004,
+        "parentCpuMicros": {
+          "user": 41607,
+          "system": 31250
+        },
+        "parentEventLoop": {
+          "idle": 7976.130508999999,
+          "active": 72.34825998944507,
+          "utilization": 0.008989060177210236
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 383,
+          "p50": 20.824063,
+          "p95": 22.085631,
+          "p99": 22.151167,
+          "max": 22.429695
+        },
+        "samples": 10,
+        "parentSampledPeakRssBytes": 110391296,
+        "hostMinimumFreeBytes": 287338496
+      },
+      {
+        "phase": "cleanup",
+        "wallMs": 218.12496999999712,
+        "parentCpuMicros": {
+          "user": 78587,
+          "system": 446061
+        },
+        "parentEventLoop": {
+          "idle": 130.3113970000013,
+          "active": 87.82165600474036,
+          "utilization": 0.40260590861867845
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 10,
+          "p50": 20.103167,
+          "p95": 21.774335,
+          "p99": 21.774335,
+          "max": 21.774335
+        },
+        "samples": 3,
+        "parentSampledPeakRssBytes": 111284224,
+        "hostMinimumFreeBytes": 404164608
+      }
+    ]
+  },
+  "childResources": [
+    {
+      "role": "worker",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 312823,
+          "system": 108552
+        },
+        "peakRssBytes": 61865984,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "worker",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 360939,
+          "system": 119466
+        },
+        "peakRssBytes": 64684032,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 271394,
+          "system": 63101
+        },
+        "peakRssBytes": 57516032,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 272568,
+          "system": 68639
+        },
+        "peakRssBytes": 57528320,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 276661,
+          "system": 69306
+        },
+        "peakRssBytes": 57593856,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 292768,
+          "system": 74504
+        },
+        "peakRssBytes": 57798656,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 284556,
+          "system": 69576
+        },
+        "peakRssBytes": 57286656,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 285462,
+          "system": 71119
+        },
+        "peakRssBytes": 57294848,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 293697,
+          "system": 67654
+        },
+        "peakRssBytes": 57274368,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 291704,
+          "system": 67441
+        },
+        "peakRssBytes": 57335808,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 262866,
+          "system": 59103
+        },
+        "peakRssBytes": 57044992,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 262577,
+          "system": 61709
+        },
+        "peakRssBytes": 57118720,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    }
+  ],
+  "gitBackendOutcomes": {
+    "exit_0": 93
+  },
+  "elapsedMs": 32826,
+  "parentCpuMicros": {
+    "user": 1693033,
+    "system": 959147
+  },
+  "parentPeakRssBytes": 111284224
+}

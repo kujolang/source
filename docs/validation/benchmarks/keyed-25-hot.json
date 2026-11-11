@@ -1,0 +1,1298 @@
+{
+  "version": 2,
+  "status": "passed",
+  "phase": "complete",
+  "httpStatuses": {
+    "200": 229,
+    "201": 24,
+    "401": 1
+  },
+  "date": "2026-11-11T01:45:41.258Z",
+  "agents": 25,
+  "repositories": 1,
+  "concurrency": {
+    "agentProcesses": 25,
+    "workerProcesses": 2,
+    "workerConcurrency": 2
+  },
+  "host": {
+    "platform": "darwin",
+    "arch": "x64",
+    "node": "v26.12.1",
+    "cpuCount": 12,
+    "memoryBytes": 17179869184,
+    "git": "git version 2.50.1 (Apple Git-155)"
+  },
+  "fixture": "compatible independent files; fixed host Git-content checker; no repository code execution",
+  "profile": "private-load",
+  "keyedSubmissions": true,
+  "submissionRecovery": {
+    "injectedAgent": 12,
+    "responsesDropped": 1,
+    "recovered": 1,
+    "strategy": "one read-only lookup after unknown HTTP outcome; no POST replay",
+    "lookupMs": {
+      "samples": 1,
+      "total": 201.9096499999996,
+      "p50": 201.9096499999996,
+      "p95": 201.9096499999996,
+      "p99": 201.9096499999996
+    },
+    "noDuplicateLifecycleRecords": true
+  },
+  "rateLimits": "explicit private-load operator profile; not default capacity",
+  "admissionConfiguration": {
+    "gitPush": {
+      "limit": 1000,
+      "windowMs": 60000
+    },
+    "submit": {
+      "limit": 1000,
+      "windowMs": 60000
+    }
+  },
+  "maxIntegrationProposals": 100,
+  "stages": {
+    "submission": {
+      "wallMs": 18395.106052,
+      "proposalsPerSecond": 1.3590571279844232,
+      "cloneMs": {
+        "samples": 25,
+        "total": 68282.97444600001,
+        "p50": 2539.641474,
+        "p95": 5034.649595999999,
+        "p99": 5928.337174
+      },
+      "submitMs": {
+        "samples": 25,
+        "total": 250150.467963,
+        "p50": 10245.669116000001,
+        "p95": 11783.836727,
+        "p99": 11842.204290000001
+      }
+    },
+    "assemblyMs": {
+      "samples": 1,
+      "total": 10106.285159,
+      "p50": 10106.285159,
+      "p95": 10106.285159,
+      "p99": 10106.285159
+    },
+    "verification": {
+      "wallMs": 2841.5366189999986,
+      "queueMs": {
+        "samples": 1,
+        "total": 943,
+        "p50": 943,
+        "p95": 943,
+        "p99": 943
+      },
+      "executionMs": {
+        "samples": 1,
+        "total": 1668,
+        "p50": 1668,
+        "p95": 1668,
+        "p99": 1668
+      },
+      "completed": 1,
+      "failed": 0,
+      "abandoned": 0,
+      "recoveryMs": null
+    },
+    "promotionMs": {
+      "samples": 1,
+      "total": 658.7651349999942,
+      "p50": 658.7651349999942,
+      "p95": 658.7651349999942,
+      "p99": 658.7651349999942
+    },
+    "fetchMs": {
+      "samples": 1,
+      "total": 522.2673579999973,
+      "p50": 522.2673579999973,
+      "p95": 522.2673579999973,
+      "p99": 522.2673579999973
+    },
+    "reuse": {
+      "requests": 1,
+      "hits": 1,
+      "coalescedRequests": 1,
+      "assertions": "same job ID while active; same exact candidate receipts reused after completion"
+    }
+  },
+  "raw": {
+    "proposals": [
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 0,
+        "repoIndex": 0,
+        "changeId": "C6",
+        "workId": "W6",
+        "sessionId": "S6",
+        "evidenceId": "E6",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "8662bad7404cf4adc781b613b7058e01e20c6cab",
+        "cloneMs": 1166.8807129999998,
+        "submitMs": 9414.079227999999,
+        "totalMs": 11338.169402000001
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 1,
+        "repoIndex": 0,
+        "changeId": "C1",
+        "workId": "W1",
+        "sessionId": "S1",
+        "evidenceId": "E1",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "573193a424e4ca6f7b4cb19edae687c822bb2892",
+        "cloneMs": 1061.152479,
+        "submitMs": 6636.435351,
+        "totalMs": 8595.16346
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 2,
+        "repoIndex": 0,
+        "changeId": "C2",
+        "workId": "W2",
+        "sessionId": "S2",
+        "evidenceId": "E2",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "e4f2aa4713e4c871fbca94c52bb15f88537c81d7",
+        "cloneMs": 1400.950573,
+        "submitMs": 7081.1486890000015,
+        "totalMs": 9448.824450999999
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 3,
+        "repoIndex": 0,
+        "changeId": "C8",
+        "workId": "W8",
+        "sessionId": "S8",
+        "evidenceId": "E8",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "eb7f6af513e5f997120e528e93d523aacb4a7d09",
+        "cloneMs": 1271.4142279999999,
+        "submitMs": 9729.676736000001,
+        "totalMs": 12031.746115
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 4,
+        "repoIndex": 0,
+        "changeId": "C3",
+        "workId": "W3",
+        "sessionId": "S3",
+        "evidenceId": "E3",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "1e10e20ebb57bf2c179f4383d9443297f1e348a4",
+        "cloneMs": 1228.425388,
+        "submitMs": 7900.333877000001,
+        "totalMs": 10041.045757
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 5,
+        "repoIndex": 0,
+        "changeId": "C4",
+        "workId": "W4",
+        "sessionId": "S4",
+        "evidenceId": "E4",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "a9b1b7a0406f59e33d3eb0f15122c3092239f61b",
+        "cloneMs": 1037.537429,
+        "submitMs": 8661.711834,
+        "totalMs": 10537.511617
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 6,
+        "repoIndex": 0,
+        "changeId": "C11",
+        "workId": "W11",
+        "sessionId": "S11",
+        "evidenceId": "E11",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "fb23aeb5da1a2546eb772d132fbfb45a3bbaa193",
+        "cloneMs": 1726.372495,
+        "submitMs": 10245.669116000001,
+        "totalMs": 13081.404077
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 7,
+        "repoIndex": 0,
+        "changeId": "C9",
+        "workId": "W9",
+        "sessionId": "S9",
+        "evidenceId": "E9",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "94d42ecf46f0102715be2bc2a9f728fcdfc66609",
+        "cloneMs": 1577.812399,
+        "submitMs": 9879.093427,
+        "totalMs": 12354.242946
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 8,
+        "repoIndex": 0,
+        "changeId": "C5",
+        "workId": "W5",
+        "sessionId": "S5",
+        "evidenceId": "E5",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "46dccc4d0fd7a9389b8f9e318a99b817303502ad",
+        "cloneMs": 1370.53772,
+        "submitMs": 8644.683022,
+        "totalMs": 10931.939623
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 9,
+        "repoIndex": 0,
+        "changeId": "C22",
+        "workId": "W22",
+        "sessionId": "S22",
+        "evidenceId": "E22",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "0a8386427eeeaebd0f54a7525e2bf1bc543bb7b1",
+        "cloneMs": 4337.927102,
+        "submitMs": 11842.204290000001,
+        "totalMs": 17089.329231
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 10,
+        "repoIndex": 0,
+        "changeId": "C7",
+        "workId": "W7",
+        "sessionId": "S7",
+        "evidenceId": "E7",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "332a87ffa3d4ff15c7cea3438741935cd5d53375",
+        "cloneMs": 1608.5241810000002,
+        "submitMs": 8989.66269,
+        "totalMs": 11577.689158
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 11,
+        "repoIndex": 0,
+        "changeId": "C12",
+        "workId": "W12",
+        "sessionId": "S12",
+        "evidenceId": "E12",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "8d4493656671f669b2491a4bc45f239b92a00a59",
+        "cloneMs": 2277.054449,
+        "submitMs": 10036.682487999999,
+        "totalMs": 13434.079774
+      },
+      {
+        "recovered": true,
+        "submissionFailure": {
+          "operation": "submit",
+          "kind": "transport",
+          "code": "ECONNRESET",
+          "timedOut": false,
+          "responseReceived": false,
+          "outcomeUnknown": true
+        },
+        "recoveryMs": 201.9096499999996,
+        "index": 12,
+        "repoIndex": 0,
+        "changeId": "C10",
+        "workId": "W10",
+        "sessionId": "S10",
+        "evidenceId": "E10",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "9885d6ab733bd07488e569ecb659c7cecc75bda9",
+        "cloneMs": 2117.311534,
+        "submitMs": 9902.539893000001,
+        "totalMs": 12859.579853000001
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 13,
+        "repoIndex": 0,
+        "changeId": "C13",
+        "workId": "W13",
+        "sessionId": "S13",
+        "evidenceId": "E13",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "027c8dc249575f74392c233cbd314112a7842ddb",
+        "cloneMs": 2600.3645819999997,
+        "submitMs": 10143.717013000001,
+        "totalMs": 13713.177198
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 14,
+        "repoIndex": 0,
+        "changeId": "C15",
+        "workId": "W15",
+        "sessionId": "S15",
+        "evidenceId": "E15",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "bc434718c4a91aec32a166202e312036de4a8307",
+        "cloneMs": 2780.9739929999996,
+        "submitMs": 10536.480067,
+        "totalMs": 14392.895159000002
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 15,
+        "repoIndex": 0,
+        "changeId": "C23",
+        "workId": "W23",
+        "sessionId": "S23",
+        "evidenceId": "E23",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "2fd97fce97722b50f4e1c540a6533dee4cae85c1",
+        "cloneMs": 4734.130401,
+        "submitMs": 11722.513211,
+        "totalMs": 17408.593550999998
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 16,
+        "repoIndex": 0,
+        "changeId": "C14",
+        "workId": "W14",
+        "sessionId": "S14",
+        "evidenceId": "E14",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "da4e4f2592e56b673d7202f76ce4e941ead94350",
+        "cloneMs": 2539.641474,
+        "submitMs": 10564.036640999999,
+        "totalMs": 13986.00967
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 17,
+        "repoIndex": 0,
+        "changeId": "C19",
+        "workId": "W19",
+        "sessionId": "S19",
+        "evidenceId": "E19",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "604bb392fe6da248def4e7a0098f4cd7d3c9299d",
+        "cloneMs": 4097.712423,
+        "submitMs": 10780.090614,
+        "totalMs": 15853.948124
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 18,
+        "repoIndex": 0,
+        "changeId": "C21",
+        "workId": "W21",
+        "sessionId": "S21",
+        "evidenceId": "E21",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "f5208623ef013f5dd062ae74a555c997c385c8a8",
+        "cloneMs": 4298.968955,
+        "submitMs": 11258.499287000002,
+        "totalMs": 16653.093809
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 19,
+        "repoIndex": 0,
+        "changeId": "C24",
+        "workId": "W24",
+        "sessionId": "S24",
+        "evidenceId": "E24",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "985d0b69f8a1f7e049d2a6c31283873a43deaf33",
+        "cloneMs": 5034.649595999999,
+        "submitMs": 11783.836727,
+        "totalMs": 17743.997577
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 20,
+        "repoIndex": 0,
+        "changeId": "C20",
+        "workId": "W20",
+        "sessionId": "S20",
+        "evidenceId": "E20",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "2143e162c2b2da541489395b443a6f32b4cfa842",
+        "cloneMs": 4254.982503,
+        "submitMs": 10979.799028000001,
+        "totalMs": 16235.544251999998
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 21,
+        "repoIndex": 0,
+        "changeId": "C18",
+        "workId": "W18",
+        "sessionId": "S18",
+        "evidenceId": "E18",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "08c93e64b33e1b21cba3511539e123e9f1894380",
+        "cloneMs": 3971.9700099999995,
+        "submitMs": 10348.702517999998,
+        "totalMs": 15340.579560999999
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 22,
+        "repoIndex": 0,
+        "changeId": "C25",
+        "workId": "W25",
+        "sessionId": "S25",
+        "evidenceId": "E25",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "d08a9d25673528fad5cdccae297f01726f461538",
+        "cloneMs": 5928.337174,
+        "submitMs": 11359.322183,
+        "totalMs": 17990.04702
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 23,
+        "repoIndex": 0,
+        "changeId": "C17",
+        "workId": "W17",
+        "sessionId": "S17",
+        "evidenceId": "E17",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "1d51b9d42d40f9d57b2fcac25eb416b4317bd138",
+        "cloneMs": 3204.385338,
+        "submitMs": 10831.694226,
+        "totalMs": 14907.047778
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 24,
+        "repoIndex": 0,
+        "changeId": "C16",
+        "workId": "W16",
+        "sessionId": "S16",
+        "evidenceId": "E16",
+        "baseCommit": "7e779b2efc80192db52345ffeb8b033cc7e776fc",
+        "headCommit": "b79c1aba74c990d08b3eeae131faf37a695a4805",
+        "cloneMs": 2654.9573069999997,
+        "submitMs": 10877.855807,
+        "totalMs": 14502.126304
+      }
+    ],
+    "assemblyMs": [
+      10106.285159
+    ],
+    "executions": [
+      {
+        "jobId": "J1",
+        "candidateId": "fd487a87c7b9700065b6d048ed484d72bd7a5ef31ab7e1e1813c2d3d012d6743",
+        "workerId": "benchmark-0",
+        "queueMs": 943,
+        "executionMs": 1668
+      }
+    ],
+    "promotionMs": [
+      658.7651349999942
+    ],
+    "fetchMs": [
+      522.2673579999973
+    ],
+    "baselineChecksMs": [
+      344.66772499999934,
+      409.88405500000226,
+      470.99097499999334,
+      491.57832100000087,
+      538.5582060000015,
+      580.5126709999968,
+      656.6572430000015,
+      691.9424450000006,
+      739.7462559999985,
+      794.5140600000013,
+      835.7074439999997,
+      908.6500279999964,
+      990.3854439999996,
+      1069.2569740000035,
+      1098.0812779999978,
+      1151.9475359999997,
+      1190.7828410000002,
+      1272.3315440000006,
+      1270.3889199999976,
+      1340.8708299999998,
+      1420.6433289999986,
+      1443.6007610000015,
+      1494.2649800000072,
+      1559.0689279999933,
+      1667.0823359999922
+    ],
+    "baselineAssemblyMs": [
+      93.86838200000057,
+      109.33168199999636,
+      104.89654499999597,
+      104.53533299999981,
+      104.8485589999982,
+      98.98513499999535,
+      99.02644000000146,
+      102.70171699999628,
+      99.82522899999458,
+      100.90154400000029,
+      98.61054000000149,
+      102.6959410000054,
+      110.70002999999997,
+      100.75549099999625,
+      113.89019399999961,
+      110.23251799999707,
+      108.18831800000044,
+      110.46560099999624,
+      111.31675399999949,
+      173.6476399999956,
+      110.10089900000457,
+      112.7579259999984,
+      105.6715039999981,
+      107.4000090000045,
+      110.53466299999855
+    ]
+  },
+  "limitations": [
+    "loopback single host; no deployed TLS latency",
+    "fixed Git-content verification, not application CI or isolated staging",
+    "no induced worker crash in this measurement",
+    "maximum 1000 agents per harness run; operator batch bound recorded explicitly",
+    "private repositories; explicit 1000/min push and submit limits per shared address; server queue/concurrency defaults unchanged"
+  ],
+  "sourceRevision": "f16dfbd3c499ba721ed0a2c2b205baf7f40f810a",
+  "harnessSha256": "3a1ed927af8b8e71174341757666ed5b3f63d98795569c38545f1b2df2dd14ce",
+  "telemetrySha256": "acd659092128cf9f029080777399738bef242ef934b92aca5577711b8b1e7309",
+  "httpTimeouts": {
+    "headersMs": 15000,
+    "requestMs": 120000,
+    "keepAliveMs": 5000
+  },
+  "anonymousGitRejected": true,
+  "workerMetrics": [
+    {
+      "claimed": 1,
+      "completed": 1,
+      "failed": 0,
+      "errors": 0,
+      "activeJobs": 0,
+      "stopping": true
+    },
+    {
+      "claimed": 0,
+      "completed": 0,
+      "failed": 0,
+      "errors": 0,
+      "activeJobs": 0,
+      "stopping": true
+    }
+  ],
+  "baseline": {
+    "method": "sequential cumulative merge plus identical checker once per proposal; no speculative rerun penalty",
+    "checks": 25,
+    "executionMs": {
+      "samples": 25,
+      "total": 24432.115129999984,
+      "p50": 990.3854439999996,
+      "p95": 1559.0689279999933,
+      "p99": 1667.0823359999922
+    },
+    "assemblyMs": {
+      "samples": 25,
+      "total": 2705.8885939999745,
+      "p50": 105.6715039999981,
+      "p95": 113.89019399999961,
+      "p99": 173.6476399999956
+    },
+    "finalTreesEqual": true
+  },
+  "comparison": {
+    "checksAvoided": 24,
+    "sourceChecks": 1,
+    "baselineChecks": 25,
+    "sourceVerificationMs": 1668,
+    "baselineVerificationMs": 24432.115129999984
+  },
+  "storage": {
+    "filesystemAllocatedBytes": 5881856,
+    "postgresRelationBytes": 1884160
+  },
+  "network": {
+    "serverReceivedBytes": 129839,
+    "serverSentBytes": 201373,
+    "scope": "all loopback HTTP/Git during run"
+  },
+  "correctness": {
+    "allProposalsRetained": true,
+    "exactVerifiedPromotion": true,
+    "unverifiedAcceptanceRejected": true,
+    "duplicatePromotionIdempotent": true,
+    "baselineTreeEquality": true,
+    "conflicts": 0,
+    "humanInterventions": 0,
+    "acceptance": "automated harness acting as configured human maintainer"
+  },
+  "httpBeforeCleanup": {
+    "scope": "passive server HTTP/socket observations; no raw URLs, headers, bodies or error text; at most 50 failed and pending samples",
+    "sockets": {
+      "opened": 128,
+      "closed": 128,
+      "closedWithError": 0,
+      "active": 0,
+      "peakActive": 26,
+      "timeouts": 0,
+      "errors": {}
+    },
+    "routes": {
+      "git": {
+        "requests": 229,
+        "finished": 229,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {
+          "200": 228,
+          "401": 1
+        }
+      },
+      "submit": {
+        "requests": 25,
+        "finished": 24,
+        "closedBeforeFinish": 1,
+        "abortedBodies": 0,
+        "statuses": {
+          "201": 24
+        }
+      },
+      "other": {
+        "requests": 1,
+        "finished": 1,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {
+          "200": 1
+        }
+      }
+    },
+    "pendingCount": 0,
+    "pending": [],
+    "failures": [
+      {
+        "route": "submit",
+        "elapsedMs": 3594.7501550000015,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      }
+    ],
+    "socketFailures": []
+  },
+  "httpAfterCleanup": {
+    "scope": "passive server HTTP/socket observations; no raw URLs, headers, bodies or error text; at most 50 failed and pending samples",
+    "sockets": {
+      "opened": 128,
+      "closed": 128,
+      "closedWithError": 0,
+      "active": 0,
+      "peakActive": 26,
+      "timeouts": 0,
+      "errors": {}
+    },
+    "routes": {
+      "git": {
+        "requests": 229,
+        "finished": 229,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {
+          "200": 228,
+          "401": 1
+        }
+      },
+      "submit": {
+        "requests": 25,
+        "finished": 24,
+        "closedBeforeFinish": 1,
+        "abortedBodies": 0,
+        "statuses": {
+          "201": 24
+        }
+      },
+      "other": {
+        "requests": 1,
+        "finished": 1,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {
+          "200": 1
+        }
+      }
+    },
+    "pendingCount": 0,
+    "pending": [],
+    "failures": [
+      {
+        "route": "submit",
+        "elapsedMs": 3594.7501550000015,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      }
+    ],
+    "socketFailures": []
+  },
+  "telemetry": {
+    "scope": "API/harness process per stage; host free bytes include all activity, not memory available or attributable usage; sampled RSS can miss peaks",
+    "sampleIntervalMs": 1000,
+    "eventLoopResolutionMs": 20,
+    "stages": [
+      {
+        "phase": "setup",
+        "wallMs": 7809.7049910000005,
+        "parentCpuMicros": {
+          "user": 416862,
+          "system": 133372
+        },
+        "parentEventLoop": {
+          "idle": 4575.540279999999,
+          "active": 3234.1079680019334,
+          "utilization": 0.4141169826476329
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 238,
+          "p50": 20.889599,
+          "p95": 22.298623,
+          "p99": 24.231935,
+          "max": 77.660159
+        },
+        "samples": 8,
+        "parentSampledPeakRssBytes": 93515776,
+        "hostMinimumFreeBytes": 121688064
+      },
+      {
+        "phase": "submission",
+        "wallMs": 18405.339347,
+        "parentCpuMicros": {
+          "user": 1961051,
+          "system": 653418
+        },
+        "parentEventLoop": {
+          "idle": 9688.175434,
+          "active": 8717.167342000499,
+          "utilization": 0.4736215700023354
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 691,
+          "p50": 20.987903,
+          "p95": 58.982399,
+          "p99": 97.779711,
+          "max": 147.324927
+        },
+        "samples": 20,
+        "parentSampledPeakRssBytes": 115212288,
+        "hostMinimumFreeBytes": 34168832
+      },
+      {
+        "phase": "assembly",
+        "wallMs": 10405.646944999997,
+        "parentCpuMicros": {
+          "user": 210706,
+          "system": 134446
+        },
+        "parentEventLoop": {
+          "idle": 10071.478000000001,
+          "active": 334.18464200210474,
+          "utilization": 0.03211565216934669
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 496,
+          "p50": 20.840447,
+          "p95": 22.118399,
+          "p99": 22.675455,
+          "max": 27.279359
+        },
+        "samples": 12,
+        "parentSampledPeakRssBytes": 108580864,
+        "hostMinimumFreeBytes": 706510848
+      },
+      {
+        "phase": "verification",
+        "wallMs": 2841.746140999996,
+        "parentCpuMicros": {
+          "user": 115309,
+          "system": 18371
+        },
+        "parentEventLoop": {
+          "idle": 2757.1045699999995,
+          "active": 84.6659080101781,
+          "utilization": 0.02979336602492317
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 134,
+          "p50": 20.856831,
+          "p95": 22.102015,
+          "p99": 22.478847,
+          "max": 22.560767
+        },
+        "samples": 5,
+        "parentSampledPeakRssBytes": 110567424,
+        "hostMinimumFreeBytes": 788488192
+      },
+      {
+        "phase": "promotion",
+        "wallMs": 3467.0557810000028,
+        "parentCpuMicros": {
+          "user": 124047,
+          "system": 55428
+        },
+        "parentEventLoop": {
+          "idle": 3304.889611999999,
+          "active": 162.1854810011282,
+          "utilization": 0.04677876211234271
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 166,
+          "p50": 20.774911,
+          "p95": 22.102015,
+          "p99": 22.265855,
+          "max": 22.347775
+        },
+        "samples": 6,
+        "parentSampledPeakRssBytes": 110645248,
+        "hostMinimumFreeBytes": 841752576
+      },
+      {
+        "phase": "baseline",
+        "wallMs": 29032.396682000006,
+        "parentCpuMicros": {
+          "user": 118141,
+          "system": 79294
+        },
+        "parentEventLoop": {
+          "idle": 28849.111054999998,
+          "active": 183.30064200026754,
+          "utilization": 0.00631365536949887
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 1383,
+          "p50": 20.873215,
+          "p95": 22.085631,
+          "p99": 22.118399,
+          "max": 22.577151
+        },
+        "samples": 31,
+        "parentSampledPeakRssBytes": 98054144,
+        "hostMinimumFreeBytes": 766504960
+      },
+      {
+        "phase": "cleanup",
+        "wallMs": 332.43956199999957,
+        "parentCpuMicros": {
+          "user": 150916,
+          "system": 874074
+        },
+        "parentEventLoop": {
+          "idle": 163.30320800000482,
+          "active": 169.14874199873157,
+          "utilization": 0.5087915471675666
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 16,
+          "p50": 19.972095,
+          "p95": 20.283391,
+          "p99": 20.774911,
+          "max": 20.774911
+        },
+        "samples": 2,
+        "parentSampledPeakRssBytes": 101003264,
+        "hostMinimumFreeBytes": 802811904
+      }
+    ]
+  },
+  "childResources": [
+    {
+      "role": "worker",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 333359,
+          "system": 109696
+        },
+        "peakRssBytes": 64966656,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "worker",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 279534,
+          "system": 99566
+        },
+        "peakRssBytes": 61579264,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 271741,
+          "system": 67258
+        },
+        "peakRssBytes": 57348096,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 270592,
+          "system": 65868
+        },
+        "peakRssBytes": 57335808,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 269853,
+          "system": 67527
+        },
+        "peakRssBytes": 57413632,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 272759,
+          "system": 69908
+        },
+        "peakRssBytes": 57491456,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 290202,
+          "system": 71754
+        },
+        "peakRssBytes": 57344000,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 291683,
+          "system": 71380
+        },
+        "peakRssBytes": 57335808,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 290738,
+          "system": 71739
+        },
+        "peakRssBytes": 57348096,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 305860,
+          "system": 69871
+        },
+        "peakRssBytes": 57266176,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 301756,
+          "system": 68811
+        },
+        "peakRssBytes": 57257984,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 315567,
+          "system": 71956
+        },
+        "peakRssBytes": 57262080,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 303958,
+          "system": 74270
+        },
+        "peakRssBytes": 57364480,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 295177,
+          "system": 67888
+        },
+        "peakRssBytes": 57348096,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 308518,
+          "system": 76852
+        },
+        "peakRssBytes": 57561088,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 308514,
+          "system": 72786
+        },
+        "peakRssBytes": 57380864,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 302371,
+          "system": 70030
+        },
+        "peakRssBytes": 57298944,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 301836,
+          "system": 70884
+        },
+        "peakRssBytes": 57331712,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 306947,
+          "system": 70168
+        },
+        "peakRssBytes": 57409536,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 296010,
+          "system": 71091
+        },
+        "peakRssBytes": 57364480,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 285068,
+          "system": 70498
+        },
+        "peakRssBytes": 57348096,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 293367,
+          "system": 73942
+        },
+        "peakRssBytes": 57573376,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 279674,
+          "system": 70808
+        },
+        "peakRssBytes": 57376768,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 295821,
+          "system": 71926
+        },
+        "peakRssBytes": 57425920,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 291916,
+          "system": 70075
+        },
+        "peakRssBytes": 57270272,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 293677,
+          "system": 68659
+        },
+        "peakRssBytes": 57311232,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 308391,
+          "system": 71798
+        },
+        "peakRssBytes": 57589760,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    }
+  ],
+  "gitBackendOutcomes": {
+    "exit_0": 228
+  },
+  "elapsedMs": 72297,
+  "parentCpuMicros": {
+    "user": 3099689,
+    "system": 1949220
+  },
+  "parentPeakRssBytes": 117035008
+}

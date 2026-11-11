@@ -20,10 +20,11 @@ node scripts/benchmarks/integration.js \
   --agents 10 --repos 5 --output /absolute/agents-10-distributed.json
 ```
 
-The current harness accepts 1–100 agents. Source's integration planner accepts
-at most 100 proposals per candidate. Larger stages require explicit multi-batch
-and stale-proposal orchestration; the harness does not lower requested concurrency
-or bypass that limit. The default benchmark profile keeps server settings unchanged;
+The current harness accepts 1–1000 agents. Source's integration planner defaults
+to 100 proposals per candidate and has an explicit configurable hard maximum of
+1000. The harness declares the required per-repository bound in each report; it
+does not silently lower the concurrent population. A supported harness argument
+is not evidence that the corresponding workload passes. The default benchmark profile keeps server settings unchanged;
 the separately named private-load profile below declares its operator configuration.
 A same-address burst above ten submissions can encounter the default rate limit;
 a failed run records failure, not capacity.
@@ -132,15 +133,17 @@ candidates: their 100% hit result proves correctness, not an expected cache rate
 | 10 | Passed this compatible-file lifecycle | Passed, five repos |
 | 25 | Passed after bounded backoff and gzip fix | Passed with bounded backoff, five repos |
 | 100 | Default failed admission; private-load lifecycle passed | Default failed admission; private-load passed (ten repos) |
-| 250 | Not measured; beyond harness bound | Not measured |
-| 1,000+ | Not measured; multi-batch orchestration required | Not measured |
+| 250 | Failed: native header timeouts; root cause not fully established | Passed once, ten repos, private-load; sustained capacity unproven |
+| 1,000+ | End-to-end lifecycle not measured; harness maximum is 1000 | End-to-end lifecycle not measured |
 
-Still required: repeated/sustained workloads; ten-way conflicts and semantic
-shared-dependency cases; isolated application/unit/integration/browser checks;
-worker crash/recovery timing under load; full host/network utilization;
-real-project lifecycle; larger stages; deployment capacity and security gates.
-Existing crash tests are in [failure recovery](failure-recovery.md), not folded
-into these measurements. Recovery duration is null, not zero, in raw reports.
+Still required within the load measurements: repeated/sustained workloads,
+conflict/shared-dependency traffic, isolated application checks, worker crash
+recovery under load, full host/network attribution, larger passing stages, and
+deployed capacity/security evidence. Separate actual-project lifecycle, browser
+staging and crash/restore proofs are recorded in [failure recovery](failure-recovery.md)
+and [browser staging](browser-staging.md); they do not certify those behaviors
+at benchmark concurrency. Historical reports with recovery duration null mean
+unmeasured, not zero. Keyed submission recovery measurements are dated below.
 
 ## 25-agent pilot: default admission limit reached
 
@@ -611,3 +614,22 @@ native malformed-request 400 and incomplete-header 408 behavior remains intact,
 pending/finished/aborted observations differ correctly, private input is omitted,
 and failure samples are capped. Both default and private two-repository
 end-to-end profiles still pass with the report assertions and settled cleanup.
+
+
+### Keyed submissions with one lost response — pause checkpoint
+
+At `f16dfbd`, optional keyed-mode private-load runs passed at
+[10 agents / one repo](benchmarks/keyed-10-hot.json),
+[25 agents / one repo](benchmarks/keyed-25-hot.json), and
+[25 agents / five repos](benchmarks/keyed-25-distributed.json).
+Whole harness times were 32.826, 72.297 and 73.196 seconds respectively. Each
+injected one response loss after a real PostgreSQL commit, recovered the original
+result by read-only lookup without POST replay, retained all proposals, verified
+and promoted exact candidates, and matched the baseline's final tree. Recovery
+lookups took 201.813, 201.910 and 252.393 ms. Work/Change counts excluded duplicate
+lifecycles; all observed sockets closed. Original transport errors remain in the
+reports. These are local fixtures, not production capacity or a 100/250 rerun.
+Four benchmark regression tests passed with zero skips in 58.385 seconds.
+
+The user deferred additional 100/250/1000 capacity work. See the
+[handoff](../HANDOFF.md) for current proof, limitations and restart instructions.
