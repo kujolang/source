@@ -102,7 +102,7 @@ async function worker(config) {
     const startedAt = Date.now();
     const meta = await store.getJobAsync({ id: job.id, orgId: job.orgId, projectId: job.projectId });
     const pending = exec(check.command[0], check.command.slice(1), { env: env(), timeout: 120000, maxBuffer: 1024 * 1024, signal });
-    pending.child.stdin.end(JSON.stringify({ repository, commit: candidate.headCommit, expected: candidate.proposals.length }));
+    pending.child.stdin.end(JSON.stringify({ repository, commit: candidate.headCommit, baseCommit: candidate.baseCommit, expected: candidate.proposals.length }));
     const result = await pending;
     const finishedAt = Date.now();
     process.send({ type: 'execution', value: { jobId: job.id, candidateId: candidate.id, workerId: config.workerId, queueMs: startedAt - Date.parse(meta.createdAt), executionMs: finishedAt - startedAt } });
