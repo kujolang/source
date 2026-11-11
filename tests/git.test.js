@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { mkdtempSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, existsSync, renameSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -8,6 +8,26 @@ import { freshSource, seedRepo } from './helpers.js';
 import { Source } from '../src/source.js';
 
 const run = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+
+test('relocated metadata resolves Git only beneath the configured restored root', async (t) => {
+  const { src, dir, org, project } = freshSource();
+  const { repo, head, work } = seedRepo(src, org.id, project.id);
+  const moved = `${dir}-restored`; renameSync(dir, moved);
+  t.after(() => { rmSync(moved, { recursive: true, force: true }); rmSync(work, { recursive: true, force: true }); });
+  const restored = new Source(moved);
+  const expected = path.join(moved, 'orgs', org.id, 'projects', project.id, 'repos', `${repo.id}.git`);
+  assert.equal(restored.getRepository(org.id, project.id, repo.id).barePath, expected);
+  assert.equal((await restored.getRepositoryAsync(org.id, project.id, repo.id)).barePath, expected);
+  assert.equal((await restored.resolveRepositoryAsync(org.id, project.id, repo.name)).barePath, expected);
+  assert.equal(restored.gitRepo(org.id, project.id, repo.id).revParse('main'), head);
+  const historical = restored.store.readJson(`orgs/${org.id}/projects/${project.id}/repos/${repo.id}.json`);
+  assert.equal(historical.barePath, repo.barePath, 'reads do not rewrite historical metadata');
+  restored.store.findRepositoryAsync = async () => historical;
+  assert.equal((await restored.resolveRepositoryAsync(org.id, project.id, repo.id)).barePath, expected, 'optimized store lookup also relocates');
+  delete restored.store.findRepositoryAsync;
+  restored.store.readJsonManyAsync = async () => [{ json: historical }];
+  assert.equal((await restored.resolveRepositoryAsync(org.id, project.id, repo.id)).barePath, expected, 'batched store lookup also relocates');
+});
 
 test('Git repositories can live on a separate shared root', () => {
   const dataRoot = mkdtempSync(path.join(tmpdir(), 'source-metadata-'));

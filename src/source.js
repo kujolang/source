@@ -362,12 +362,21 @@ export class Source {
   }
 
   getRepository(orgId, projectId, repoId) {
-    return this.store.readJson(`${this._projectRel(orgId, projectId)}/repos/${repoId}.json`);
+    return this._repositoryAtRoot(orgId, projectId, this.store.readJson(`${this._projectRel(orgId, projectId)}/repos/${repoId}.json`));
+  }
+
+  _repositoryAtRoot(orgId, projectId, repo) {
+    if (!repo) return repo;
+    if (![orgId, projectId, repo.id].every(id => typeof id === 'string' && /^[A-Za-z0-9_-]+$/.test(id))) throw new Error('invalid repository location identity');
+    // Stored absolute paths describe the creating host, not authority to access
+    // that host after restore/failover. All readers use this instance's Git root.
+    return { ...repo, barePath: this._repoPath(orgId, projectId, repo.id) };
   }
 
   async getRepositoryAsync(orgId, projectId, repoId) {
     const rel = `${this._projectRel(orgId, projectId)}/repos/${repoId}.json`;
-    return typeof this.store.readJsonAsync === 'function' ? this.store.readJsonAsync(rel) : this.getRepository(orgId, projectId, repoId);
+    const repo = typeof this.store.readJsonAsync === 'function' ? await this.store.readJsonAsync(rel) : this.store.readJson(rel);
+    return this._repositoryAtRoot(orgId, projectId, repo);
   }
 
   async updateRepositoryAsync({ orgId, projectId, repoId, name, defaultBranch }) {
@@ -429,7 +438,7 @@ export class Source {
 
   async resolveRepositoryAsync(orgId, projectId, repoRef) {
     if (typeof this.store.findRepositoryAsync === 'function') {
-      return this.store.findRepositoryAsync(orgId, projectId, repoRef);
+      return this._repositoryAtRoot(orgId, projectId, await this.store.findRepositoryAsync(orgId, projectId, repoRef));
     }
     const readJson = typeof this.store.readJsonAsync === 'function'
       ? (rel) => this.store.readJsonAsync(rel)
@@ -438,11 +447,11 @@ export class Source {
     if (!project) return null;
     if (typeof this.store.readJsonManyAsync === 'function') {
       const rows = await this.store.readJsonManyAsync(project.repositories.map((id) => `${this._projectRel(orgId, projectId)}/repos/${id}.json`));
-      return rows.map((row) => row.json).find((repo) => repo && (repo.id === repoRef || repo.name === repoRef)) || null;
+      return this._repositoryAtRoot(orgId, projectId, rows.map((row) => row.json).find((repo) => repo && (repo.id === repoRef || repo.name === repoRef)) || null);
     }
     for (const id of project.repositories) {
       const repo = await readJson(`${this._projectRel(orgId, projectId)}/repos/${id}.json`);
-      if (repo && (repo.id === repoRef || repo.name === repoRef)) return repo;
+      if (repo && (repo.id === repoRef || repo.name === repoRef)) return this._repositoryAtRoot(orgId, projectId, repo);
     }
     return null;
   }
