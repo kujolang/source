@@ -21,7 +21,7 @@ The first recorded attempt failed during submission with ECONNRESET and two serv
 - `assets/raw-run.mp4`, original WebM and `assets/attempt-1.webm`: local source recordings.
 - `renders/source-0.2.0-100-agents.mp4`: final local delivery.
 
-Large source recordings, derived shots and voice stems remain local caches. The committed master audio and editable source keep the edit reviewable; see the media manifest for exact hashes. No video has been posted publicly or added to the GitHub release.
+The successful raw MP4, derived shot MP4s, master audio and editable source are committed. Original WebMs, voice stems and delivery exports remain local caches; see the media manifest for exact hashes. No video has been posted publicly or added to the GitHub release.
 
 ## Reproduce
 
