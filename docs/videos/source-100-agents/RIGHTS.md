@@ -7,3 +7,5 @@ Narration: requested ElevenLabs eleven_v4, Siren (eXpIbVcVbLo8ZJQDlDnl). Generat
 Music: reused original Kujo procedural composition from kujo-hyperframes/trust-at-speed/audio/music.wav, via kujo-hermes/demo/checkout-video/assets/music-original.wav. SHA-256 9c3a2f31fc9180c4e0f162a213d4338f290e91cfa0c5ae85c27a7972e1fccd5d. Provenance: kujo-hermes/demo/walkthrough/evidence/asset-sources.json and kujo-hyperframes/video-lens-v1.1.0/RIGHTS.md. No third-party samples. Loop edited with crossfades; no new paid music generation.
 
 GSAP runtime reused from the local Kujo Hermes composition (official jsDelivr distribution). HyperFrames directional-wipe registry component was evaluated and retained as an unmounted reference. Inter and JetBrains Mono resolve through HyperFrames' bundled fonts. No stock photos or invented logos.
+
+Brand revision: Departure Mono regular WOFF2 and the unmodified Kujo SVG logomark copied directly from the local kujolang.ai website repository. The font OFL license is bundled in assets/fonts. Exact hashes and source paths are in evidence/brand-assets.json. Title type uses the native regular weight without synthetic bold.

@@ -13,3 +13,7 @@ Audio: Siren eleven_v4, unmodified speaking rate, seven independent cues. Origin
 The failed first capture is preserved. Reduced recorder overhead accompanied a successful repeat, but causality and reliable capacity under cohosted recording load are not proven. SignalBox capture cap_288a07c7-a9e1-453e-a9dd-0c8aa531f3eb and signal sig_6f0e4240-4f49-438b-95dc-1260dd81b58e preserve that open performance question; exact and concept retrieval passed. An older capacity signal was related, not duplicated. Routine successful tests and video work were excluded from SignalBox.
 
 Final delivery: 55.733333s, 1920×1080, 30fps, AAC audio. Full-file decode passed and decoded frames at 0/11/26/36/54s were inspected. The final audio inspection returned no warnings. SHA-256 and exact stream metadata are in evidence/delivery.json and evidence/final-media.json.
+
+## Brand revision
+
+Titles now use the exact Departure Mono regular font from kujolang.ai, with its OFL license bundled. The closing card uses the site's unmodified SVG mark. Reviewed snapshots at 0.5, 45.4, 52.3 and 55.483 seconds: both title lines fit and the logo, version, supporting copy and URL remain inside the safe area. Raw recorded footage and existing narration are unchanged. Timing interpretation is retained in evidence/timing-explanation.json: 156.602 seconds from the agent barrier through promotion/retention checks, versus 240.318 seconds for the whole harness including the sequential baseline. The baseline is not a full serial-agent workflow, so no end-to-end speedup is established.

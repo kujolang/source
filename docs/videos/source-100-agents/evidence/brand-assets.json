@@ -1,0 +1,14 @@
+[
+  {
+    "file": "assets/fonts/DepartureMono-Regular.woff2",
+    "source": "kujolang.ai/assets/css/fonts/DepartureMono-Regular.woff2",
+    "sha256": "5b4fed1daa90708aa9c6ee1190abca9dc22164a1c1def0020386e46b61038cfb",
+    "unchanged": true
+  },
+  {
+    "file": "assets/kujo-logomark.svg",
+    "source": "kujolang.ai/assets/images/kujo-logomark.svg",
+    "sha256": "cecb66eae65116fadf29a93ce3adae28956b17cfaf1e8d9e0910c280935ef412",
+    "unchanged": true
+  }
+]

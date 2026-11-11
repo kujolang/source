@@ -1,7 +1,12 @@
 """Build the editable edit from real recordings and generated voice receipts."""
-import json,pathlib,subprocess,math,html
+import json,pathlib,subprocess,math,html,sys
 root=pathlib.Path(__file__).resolve().parents[1]
-def run(*args):subprocess.run(args,cwd=root,check=True)
+def run(*args):
+ if '--reuse-media' in sys.argv and args[0]=='ffmpeg':
+  if args[-1] not in ('assets/voice.wav', 'assets/music-bed.wav'):
+   assert (root/args[-1]).exists(), f'Missing cached media: {args[-1]}'
+  return
+ subprocess.run(args,cwd=root,check=True)
 voices=json.loads((root/'evidence/narration.json').read_text());durations=[math.ceil((v['duration']+.6)*30)/30 for v in voices];durations[-1]+=1
 starts=[];total=0
 for d in durations:starts.append(total);total+=d
@@ -23,14 +28,14 @@ filters.append(''.join(labels)+f'amix=inputs={len(labels)}:normalize=0,apad,atri
 run('ffmpeg','-y','-v','error',*inputs,'-filter_complex',';'.join(filters),'-map','[voice]','assets/voice.wav')
 run('ffmpeg','-y','-v','error',*sum((['-i','assets/music-original.wav'] for _ in range(5)),[]),'-filter_complex','[0:a][1:a]acrossfade=d=1[m1];[m1][2:a]acrossfade=d=1[m2];[m2][3:a]acrossfade=d=1[m3];[m3][4:a]acrossfade=d=1,volume=0.12,afade=t=in:d=0.4,afade=t=out:st='+str(total-2)+':d=2[music]','-map','[music]','-t',str(total),'assets/music-bed.wav')
 run('ffmpeg','-y','-v','error','-i','assets/voice.wav','-i','assets/music-bed.wav','-filter_complex','[0:a][1:a]amix=inputs=2:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=9','-t',str(total),'-c:a','aac','-b:a','192k','assets/master.m4a')
-common='''#root{position:absolute;inset:0;background:#f4f5f3;color:#111615;font-family:Inter,sans-serif;overflow:hidden}*{box-sizing:border-box}h1{margin:0;font-size:126px;line-height:1.04;letter-spacing:-5px;font-weight:900}p{font-size:38px;line-height:1.35;margin:30px 0 0}.copy{position:absolute;left:192px;right:192px;top:190px}.line{overflow:hidden}.bar{width:112px;height:10px;background:#111615;margin-bottom:55px}.note{position:absolute;bottom:104px;left:192px;font-size:28px;color:#47534b}video{position:absolute;inset:0;width:1920px;height:1080px;object-fit:contain}'''
+common='''@font-face{font-family:Departure Mono;src:url('assets/fonts/DepartureMono-Regular.woff2') format('woff2');font-style:normal;font-weight:400;font-display:block}#root{position:absolute;inset:0;background:#f4f5f3;color:#111615;font-family:Inter,sans-serif;overflow:hidden}*{box-sizing:border-box}h1{margin:0;font-family:Departure Mono,monospace;font-size:112px;line-height:1.12;letter-spacing:-2px;font-weight:400}.brand-mark{display:block;width:144px;height:144px;margin-bottom:36px}p{font-size:38px;line-height:1.35;margin:30px 0 0}.copy{position:absolute;left:192px;right:192px;top:190px}.line{overflow:hidden}.bar{width:112px;height:10px;background:#111615;margin-bottom:55px}.note{position:absolute;bottom:104px;left:192px;font-size:28px;color:#47534b}video{position:absolute;inset:0;width:1920px;height:1080px;object-fit:contain}'''
 for i,d in enumerate(durations):
  parts=[]
  if i==0:parts.append('<div class="clip" id="hook-card" data-start="0" data-duration="2"><div class="copy"><h1>100 agents.<br>One shared file.</h1></div></div>')
  for n,c in enumerate(clips):
   if c['scene']==i:parts.append(f'<video id="footage-{n}" class="clip" data-start="{c["start"]}" data-duration="{c["duration"]}" src="{c["file"]}" muted playsinline></video>')
  if i==5:parts.append(f'<div class="clip" id="scope-card" data-hold data-start="0" data-duration="{d}"><div class="copy"><div class="bar"></div><h1>Same file.<br>Separate sections.</h1><p>This run tests compatible edits.</p></div><div class="note">100 scripted processes · local fixture · cuts shown</div></div>')
- if i==6:parts.append(f'<div class="clip" id="close-card" data-hold data-start="0" data-duration="{d}"><div class="copy"><div class="bar"></div><h1>Source <span style="font-weight:400">0.2.0</span></h1><p>Try it alongside your current setup.</p><p style="margin-top:65px;font-size:44px">github.com/kujolang/source</p></div></div>')
+ if i==6:parts.append(f'<div class="clip" id="close-card" data-hold data-start="0" data-duration="{d}"><div class="copy"><img id="kujo-mark" class="brand-mark" src="assets/kujo-logomark.svg" alt="Kujo"><h1>Source <span style="font-weight:400">0.2.0</span></h1><p>Try it alongside your current setup.</p><p style="margin-top:65px;font-size:44px">github.com/kujolang/source</p></div></div>')
  if i in [1,2,3,4]:parts.append(f'<div id="cut-label-{i}" class="clip" data-start="0" data-duration="{d}" style="position:absolute;left:1280px;top:38px;width:560px;height:54px;background:#111615;color:#d8e1dc;font-size:28px;text-align:right;z-index:8">RECORDED LIVE · EDITED EXCERPTS</div>')
  motion=''
  if i in [0,5,6]:motion="tl.fromTo('.copy',{x:80},{x:0,duration:.4,ease:'power3.out'},0);"

@@ -19,9 +19,9 @@ The first recorded attempt failed during submission with ECONNRESET and two serv
 - `evidence/narration.json` and alignment files: exact voice model, voice ID, generation-time tier, hashes and timing.
 - `TRANSCRIPT.md`, `SPEC.md`, `STORYLINES.md`, `REVIEW.md`: editorial source and review.
 - `assets/raw-run.mp4`, original WebM and `assets/attempt-1.webm`: local source recordings.
-- `renders/source-0.2.0-100-agents.mp4`: final local delivery.
+- `renders/source-0.2.0-100-agents-branded.mp4`: final local delivery.
 
-The successful raw MP4, derived shot MP4s, master audio and editable source are committed. Original WebMs, voice stems and delivery exports remain local caches; see the media manifest for exact hashes. At the user’s request for a phone download, a 480p copy (854×480, 1,279,243 bytes) is now attached to the v0.2.0 release: [download MP4](https://github.com/kujolang/source/releases/download/v0.2.0/source-0.2.0-100-agents-480p.mp4). The 1080p master remains local.
+The successful raw MP4, derived shot MP4s, master audio and editable source are committed. Original WebMs, voice stems and delivery exports remain local caches; see the media manifest for exact hashes. At the user’s request for a phone download, the branded 480p copy (854×480) is now attached to the v0.2.0 release: [download MP4](https://github.com/kujolang/source/releases/download/v0.2.0/source-0.2.0-100-agents-branded-480p.mp4). The 1080p master remains local.
 
 ## Reproduce
 
@@ -35,4 +35,12 @@ PATH="/usr/bin:$PATH" SOURCE_TEST_DATABASE_URL='postgresql:///YOUR_DISPOSABLE_DA
 
 `record.mjs` documents the local Chrome/Puppeteer recording setup; adapt its executable/module paths and disposable database name. Never rerun into existing evidence or overwrite a successful take. It records actual events as they happen. Each agent edits its isolated clone; there is no shared working-tree race.
 
-From this video directory, `python3 scripts/build.py` rebuilds the edit from local media. `scripts/voice.py` generates missing authorized takes only, refuses uncertain retries, and requires the successful report. `npx hyperframes check --json`, `snapshot --review`, `preview --background`, and `render --quality delivery --output renders/source-0.2.0-100-agents.mp4` validate, preview and render. Audio was measured, not auditioned by the agent.
+From this video directory, `python3 scripts/build.py` rebuilds the edit from local media. `scripts/voice.py` generates missing authorized takes only, refuses uncertain retries, and requires the successful report. `npx hyperframes check --json`, `snapshot --review`, `preview --background`, and `render --quality delivery --output renders/source-0.2.0-100-agents-branded.mp4` validate, preview and render. Audio was measured, not auditioned by the agent.
+
+## Branding and timing interpretation
+
+The current title cards use the exact Departure Mono regular font and SVG mark from kujolang.ai. Source assets and hashes are in `evidence/brand-assets.json`; branded render verification is in `evidence/brand-delivery.json`. Previous exports and their verification evidence remain available for provenance. Audio and real run footage are unchanged.
+
+The measured start barrier through promotion and retention assertions took 156.602s. The 240.318s harness total also includes setup, a separate sequential-merge baseline and cleanup. Source ran one combined checker (0.466s execution) versus 100 checker invocations (43.880s execution) in that baseline: 99 checks avoided. Source assembly took 44.282s versus 16.610s for baseline merges, so checker savings alone must not be advertised as a whole-workflow speedup. The serial baseline reused already-created proposals; it did not repeat cloning, editing, authenticated submission and promotion one agent at a time. A full serial-agent comparison is unmeasured.
+
+Independent task execution can reduce waiting when tasks can overlap, especially with expensive checks. Source additionally retains contributor identity/history, checks the combined result, and binds promotion to exact verified evidence. Conflicts, dependencies and resource contention limit parallel gains. The tiny scripted edits in this demonstration are chiefly evidence of concurrency and retention, not real coding productivity.

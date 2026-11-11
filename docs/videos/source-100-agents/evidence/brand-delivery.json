@@ -1,0 +1,26 @@
+{
+  "passed": true,
+  "fullDecodePassed": true,
+  "duration": 55.733333,
+  "fps": 30,
+  "resolution": "1920x1080",
+  "decodedTitleFramesReviewed": [
+    0.5,
+    45.4,
+    52.3
+  ],
+  "brandAssetsByteIdenticalToWebsite": true,
+  "audioRegenerated": false,
+  "files": [
+    {
+      "file": "renders/source-0.2.0-100-agents-branded.mp4",
+      "bytes": 5797820,
+      "sha256": "cb81bd83bae497b87ba05c90c6124c22fd530b8fc97ff40a1b42f4826c4593d3"
+    },
+    {
+      "file": "renders/source-0.2.0-100-agents-branded-480p.mp4",
+      "bytes": 1281533,
+      "sha256": "57985cdd61a6d9e2a3b244842017820305d92484071672292096939e1d02e800"
+    }
+  ]
+}

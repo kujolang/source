@@ -1,0 +1,15 @@
+{
+  "source": "evidence/run.json and evidence/events.jsonl",
+  "barrierThroughPromotionAndRetentionSeconds": 156.602,
+  "entireHarnessIncludingSequentialBaselineAndCleanupSeconds": 240.318,
+  "concurrentSubmissionSeconds": 96.857071263,
+  "sourceAssemblySeconds": 44.282153526,
+  "sourceVerificationWallSeconds": 2.529718002,
+  "sourceCheckerSeconds": 0.466,
+  "sequentialBaselineCheckerSeconds": 43.879747614,
+  "sourceCheckCount": 1,
+  "sequentialBaselineCheckCount": 100,
+  "checksAvoided": 99,
+  "fullSequentialAgentWorkflowMeasured": false,
+  "interpretation": "A concurrency and retention demonstration with measured verification savings. Sequential baseline merges and verifies already-created proposals; it does not repeat one-at-a-time cloning, editing, authenticated submission and promotion. Do not claim 100x or an end-to-end speedup. Independent tasks may overlap; actual benefit depends on task duration, conflicts, resources and verification cost."
+}
