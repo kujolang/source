@@ -77,3 +77,23 @@ test('HTTP diagnostics preserve native parser rejection and bounded failure samp
   assert.equal(report.failures.length, 50); assert.equal(report.pendingCount, 0);
   assert.ok(!JSON.stringify(report).includes('unknown-private-path'));
 });
+
+test('HTTP diagnostics observe native header timeout without suppressing its 408 response', async t => {
+  const server = http.createServer({ headersTimeout: 50, requestTimeout: 1000, connectionsCheckingInterval: 10 });
+  const telemetry = new HttpTelemetry(server);
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => { server.closeAllConnections(); return new Promise(resolve => server.close(resolve)); });
+  const socket = net.connect(server.address().port, '127.0.0.1');
+  let output = '';
+  socket.on('data', bytes => { output += bytes; });
+  socket.once('connect', () => socket.write('GET /private-secret HTTP/1.1\r\nHost: localhost\r\n'));
+  await new Promise((resolve, reject) => { socket.once('close', resolve); socket.once('error', reject); });
+  await sleep(10);
+  assert.match(output, /^HTTP\/1.1 408/);
+  const snapshot = telemetry.snapshot();
+  assert.equal(snapshot.sockets.errors.ERR_HTTP_REQUEST_TIMEOUT, 1);
+  assert.equal(snapshot.socketFailures[0].requestsObserved, 0);
+  assert.ok(snapshot.socketFailures[0].bytesRead > 0);
+  assert.equal(snapshot.sockets.active, 0);
+  assert.ok(!JSON.stringify(snapshot).includes('private-secret'));
+});

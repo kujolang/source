@@ -49,6 +49,7 @@ for (const profile of ['default', 'private-load']) test(`benchmark completes rea
   assert.equal(report.httpBeforeCleanup.pendingCount, 0);
   assert.ok(report.httpBeforeCleanup.sockets.opened > 0);
   assert.equal(report.httpAfterCleanup.pendingCount, 0);
+  assert.equal(report.httpAfterCleanup.sockets.active, 0);
   if (profile === 'private-load') {
     assert.equal(report.anonymousGitRejected, true);
     assert.deepEqual(report.admissionConfiguration, { gitPush: { limit: 1000, windowMs: 60000 }, submit: { limit: 1000, windowMs: 60000 } });

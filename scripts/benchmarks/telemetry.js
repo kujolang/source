@@ -62,17 +62,25 @@ export class HttpTelemetry {
       { requests: 0, finished: 0, closedBeforeFinish: 0, abortedBodies: 0, statuses: {} }]));
     this.sockets = { opened: 0, closed: 0, closedWithError: 0, active: 0, peakActive: 0, timeouts: 0, errors: {} };
     this.failures = [];
+    this.socketFailures = [];
+    const socketState = new WeakMap();
     server.on('connection', socket => {
+      const observed = { started: performance.now(), requests: 0 };
+      socketState.set(socket, observed);
       this.sockets.opened++; this.sockets.active++;
       this.sockets.peakActive = Math.max(this.sockets.peakActive, this.sockets.active);
       socket.once('close', hadError => { this.sockets.closed++; this.sockets.active--; if (hadError) this.sockets.closedWithError++; });
       socket.on('timeout', () => { this.sockets.timeouts++; });
       socket.on('error', error => {
-        const code = ['ECONNRESET', 'EPIPE', 'ETIMEDOUT'].includes(error.code) ? error.code : 'other';
+        const code = ['ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ERR_HTTP_REQUEST_TIMEOUT', 'HPE_HEADER_OVERFLOW', 'HPE_INVALID_METHOD'].includes(error.code) ? error.code : 'other';
         this.sockets.errors[code] = (this.sockets.errors[code] || 0) + 1;
+        if (this.socketFailures.length < 50) this.socketFailures.push({ code, elapsedMs: performance.now() - observed.started,
+          requestsObserved: observed.requests, bytesRead: socket.bytesRead, bytesWritten: socket.bytesWritten });
       });
     });
     server.prependListener('request', (req, res) => {
+      const observed = socketState.get(req.socket);
+      if (observed) observed.requests++;
       const route = req.url.startsWith('/git/') ? 'git' : /^\/api\/v1\/orgs\/[^/]+\/projects\/[^/]+\/submit(?:\?|$)/.test(req.url) ? 'submit' : 'other';
       const counts = this.routes[route]; counts.requests++;
       const entry = { route, req, res, started: performance.now() };
@@ -102,6 +110,6 @@ export class HttpTelemetry {
   snapshot() {
     return structuredClone({ scope: 'passive server HTTP/socket observations; no raw URLs, headers, bodies or error text; at most 50 failed and pending samples',
       sockets: this.sockets, routes: this.routes, pendingCount: this.pending.size,
-      pending: [...this.pending].slice(0, 50).map(entry => this.describe(entry)), failures: this.failures });
+      pending: [...this.pending].slice(0, 50).map(entry => this.describe(entry)), failures: this.failures, socketFailures: this.socketFailures });
   }
 }
