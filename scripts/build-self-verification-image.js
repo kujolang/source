@@ -41,7 +41,7 @@ WORKDIR /workspace
   const probe = `const {execFileSync}=require('node:child_process'),fs=require('node:fs');
 const gitPath=execFileSync('git',['--exec-path'],{encoding:'utf8'}).trim();
 fs.accessSync(gitPath+'/git-http-backend',fs.constants.X_OK);
-console.log(JSON.stringify({node:process.version,git:execFileSync('git',['--version'],{encoding:'utf8'}).trim(),gitDaemon:execFileSync('apk',['info','-v','git-daemon'],{encoding:'utf8'}).trim(),alpine:fs.readFileSync('/etc/alpine-release','utf8').trim(),pg:require('/node_modules/pg/package.json').version,yaml:require('/node_modules/js-yaml/package.json').version}));`;
+console.log(JSON.stringify({node:process.version,git:execFileSync('git',['--version'],{encoding:'utf8'}).trim(),gitHttpBackendSha256:require('node:crypto').createHash('sha256').update(fs.readFileSync(gitPath+'/git-http-backend')).digest('hex'),alpine:fs.readFileSync('/etc/alpine-release','utf8').trim(),pg:require('/node_modules/pg/package.json').version,yaml:require('/node_modules/js-yaml/package.json').version}));`;
   const { stdout } = await exec('docker', ['run', '--rm', '--network=none', '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--user=65532:65532', '--memory=256m', '--cpus=1', '--pids-limit=64', '--entrypoint=node', image, '-e', probe], { timeout: 30000, maxBuffer: 65536 });
   console.log(JSON.stringify({ version: 1, revision, base, image, toolVersions: JSON.parse(stdout),
     packageSha256: sha256(manifest), lockSha256: sha256(lock), dockerfileSha256: sha256(dockerfile),
