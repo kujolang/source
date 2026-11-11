@@ -21,6 +21,25 @@ candidate. Changing the profile requires policy update, replanning and fresh
 verification. The manifest is an operator attestation about the pinned image;
 Source does not independently discover every executable's version.
 
+The image may be a registry reference (`name@sha256:<64 lowercase hex>`) or a
+full local image ID (`sha256:<64 lowercase hex>`). Mutable tags and abbreviated
+IDs are rejected. The exact reference is retained in the profile: switching
+between a registry manifest digest and its local config ID changes the verification
+environment even when they resolve to the same image. Local IDs must already be
+loaded on each worker; they do not provide registry distribution or authenticity.
+
+For Source's own real-project verification, an operator can run
+`node scripts/build-self-verification-image.js [commit]`. The script sends only
+that commit's package manifests and a fixed operator Dockerfile to Docker. It
+installs Git and locked npm dependencies with lifecycle scripts disabled, then
+probes versions without network or elevated container privileges. JSON stdout
+records the complete image ID, base digest, manifest/build-definition hashes and
+observed versions. The build needs network; verification does not. Alpine Git
+resolves at build time, so this is an immutable result, not a promise of identical
+future builds. Dependencies are available at `/node_modules` for `/workspace`
+module resolution; no host dependency directory or Docker socket is mounted.
+Review the committed manifests and operator build definition before using it.
+
 Commands are argument arrays quoted for the container shell. The existing runner
 enforces no network, read-only container root, dropped capabilities, no privilege
 escalation, bounded memory/CPU/PIDs/output/time, and a writable disposable workspace.

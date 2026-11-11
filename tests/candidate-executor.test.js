@@ -14,6 +14,18 @@ import { exportCandidate, CandidateContainerExecutor } from '../src/candidate-ex
 const exec = promisify(execFile);
 const image = `fixture/runner@sha256:${'a'.repeat(64)}`;
 
+test('local full image IDs bind verification to immutable operator-built dependencies', async (t) => {
+  const f = await fixture(t);
+  const make = (image) => new CandidateContainerExecutor({ workspaceRoot: f.root, image, toolVersions: { node: 'fixture' } });
+  const first = make(`sha256:${'a'.repeat(64)}`);
+  assert.equal(first.profile.image, `sha256:${'a'.repeat(64)}`);
+  assert.notEqual(first.environment, make(`sha256:${'b'.repeat(64)}`).environment);
+  assert.notEqual(first.environment, make(image).environment);
+  for (const invalid of ['sha256:abcd', 'a'.repeat(64), `sha256:${'A'.repeat(64)}`, 'local:latest', `sha256:${'a'.repeat(64)} extra`]) {
+    assert.throws(() => make(invalid), /digest-pinned/);
+  }
+});
+
 test('unconfirmed container cleanup preserves the workspace and a durable recovery record', async (t) => {
   const f = await fixture(t);
   const controller = new AbortController();

@@ -89,7 +89,9 @@ export async function exportCandidate({ repository, candidate, workspace, signal
 
 export class CandidateContainerExecutor {
   constructor({ workspaceRoot, image, toolVersions, runtime = 'podman', timeoutMs = 900000, maxOutputBytes = 8 * 1024 * 1024, memory = '1g', cpus = 2, pidsLimit = 256, maxActive = 8, queue = 64, spawnProcess } = {}) {
-    if (typeof image !== 'string' || !/^[^\s@]+@sha256:[a-f0-9]{64}$/.test(image)) throw new Error('candidate executor requires a digest-pinned image');
+    // Local operator builds have an immutable config ID but may have no registry
+    // manifest digest. Preserve the full identifier in the environment identity.
+    if (typeof image !== 'string' || !/^(?:[^\s@]+@)?sha256:[a-f0-9]{64}$/.test(image)) throw new Error('candidate executor requires a digest-pinned image');
     if (!toolVersions || typeof toolVersions !== 'object' || Array.isArray(toolVersions) || !Object.keys(toolVersions).length || !Object.values(toolVersions).every((value) => typeof value === 'string' && value.length > 0)) throw new Error('candidate executor requires pinned tool versions');
     const uid = process.getuid?.(); const gid = process.getgid?.();
     if (!Number.isInteger(uid) || !Number.isInteger(gid) || uid === 0) throw new Error('candidate executor requires a non-root POSIX worker');
