@@ -124,7 +124,10 @@ node /path/to/source/bin/source.js sync --url http://127.0.0.1:8787/git/O1/P1/R1
 node /path/to/source/bin/source.js sync --dry-run
 node /path/to/source/bin/source.js sync
 
-# Submit a committed feature for Source review, leaving GitHub as origin.
+# After the initial sync, create and commit a new feature.
+git switch -c my-feature
+# Edit files, then git add and git commit.
+# Submit that committed feature for Source review, leaving GitHub as origin.
 node /path/to/source/bin/source.js submit --intent "Describe the change"
 ```
 
