@@ -1,0 +1,68 @@
+Source submission recovery verification (local, 2026-11-10)
+
+source-submission-recovery-tests.log
+✔ keyed submissions serialize across stores and retain the original result (7111.509543ms)
+✔ failure after evidence insertion rolls back the entire keyed submission (7620.710097ms)
+✔ SIGKILL after actual evidence insertion leaves no partial submission and permits retry (10249.692103ms)
+✔ HTTP key requires authentication on public projects and CLI recovery does no Git transfer (7616.955764ms)
+✔ lost HTTP acknowledgment recovers a committed result without duplicate lifecycle records (7095.134059ms)
+✔ independent submission processes deduplicate and fresh processes retrieve the receipt (13089.118876ms)
+✔ nontransactional stores reject keyed submission before creating work (101.323602ms)
+✔ recovery client rejects absent or unsafe keys before repository access (2.825295ms)
+✔ project transaction context cannot escape its scope or outlive its callback (76.607418ms)
+✔ source submit: a Git-only developer contributes without knowing Source (3376.689437ms)
+✔ source submit: a contribution can be completed end-to-end by a maintainer (3590.640948ms)
+✔ source submit: empty change is rejected (2402.988341ms)
+✔ secondary remote submit uses fresh Source history even when GitHub origin already has HEAD (3524.715453ms)
+✔ explicit and configured remote selection supports a nonstandard default branch (4714.194858ms)
+✔ private secondary-remote submit authenticates API using argument credential (4327.634243ms)
+✔ private secondary-remote submit authenticates API using environment credential (4043.173468ms)
+✔ authenticated submit refuses a different API origin before pushing (1234.246229ms)
+✔ sync adds Source remote, copies branches/tags and leaves origin/upstream untouched (3272.436591ms)
+✔ sync dry run leaves refs unchanged; divergent push is atomic and never deletes remote branches (3179.504555ms)
+✔ sync rejects missing credentials on private repos and invalid destinations (1985.971273ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 89709.436378
+
+source-submission-final-tests.log
+✔ backoff honors seconds/date Retry-After, falls back conservatively and shares a bounded budget (4.199625ms)
+✔ Git retries only explicit HTTP 429 and never exposes failed argv credentials (2.203821ms)
+✔ real Git HTTP throttle is classified without retaining remote stderr (126.89579ms)
+✔ submit replays only explicit pre-admission rejection, never uncertain mutation results (11.001018ms)
+✔ server marks throttled submit before mutation and client waits for admission (1247.088319ms)
+✔ Git failure diagnostics retain safe process facts without stderr, argv or arbitrary fields (1.007287ms)
+✔ real truncated HTTP response retains only numeric curl diagnosis (117.891603ms)
+✔ submit preserves safe nested transport codes but never retries an uncertain mutation (1.757913ms)
+✔ parallel transaction writes commit together and caught SQL failures cannot report success (2925.283965ms)
+✔ Postgres artifacts preserve empty and binary bytes through sync and async reads (2949.95343ms)
+✔ Postgres JSON preserves backslashes, quotes, newlines and Unicode (2939.567671ms)
+✔ Postgres retention preserves dependencies needed by queued jobs (2883.736366ms)
+✔ independent Postgres Source instances retain concurrent evidence relationships (5976.307906ms)
+✔ Postgres listing applies literal scope, unique children and cursor before limit (3221.284775ms)
+✔ transaction serializes parallel and nested queries on one client (11.140938ms)
+✔ callback failure drains admitted queries before rollback and rejects escaped contexts (3.660781ms)
+✔ SQL failure poisons the transaction even when the callback catches it (2.129813ms)
+✔ failed rollback discards the client and retains the original error (0.915498ms)
+✔ keyed submissions serialize across stores and retain the original result (7176.376009ms)
+✔ failure after evidence insertion rolls back the entire keyed submission (7291.57796ms)
+✔ SIGKILL after actual evidence insertion leaves no partial submission and permits retry (10132.070039ms)
+✔ HTTP key requires authentication on public projects and CLI recovery does no Git transfer (9631.046222ms)
+✔ lost HTTP acknowledgment recovers a committed result without duplicate lifecycle records (7382.541931ms)
+✔ independent submission processes deduplicate and fresh processes retrieve the receipt (12947.83993ms)
+✔ nontransactional stores reject keyed submission before creating work (103.470089ms)
+✔ recovery client rejects absent or unsafe keys before repository access (0.916765ms)
+✔ project transaction context cannot escape its scope or outlive its callback (75.621612ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 27
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 78378.017378

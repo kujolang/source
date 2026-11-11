@@ -670,3 +670,14 @@ exact promotion and fresh-process restore. Neither proves host/daemon loss, reap
 power-loss durability, orphan workspace cleanup before journaling, or resolution
 of an in-flight create request whose prepared resource is absent. Operator steps
 and remaining windows are documented in the execution guide.
+
+
+### Keyed contribution interruption and lost acknowledgment
+
+Optional authenticated PostgreSQL submissions now commit their lifecycle and
+original response receipt atomically. Real-process SIGKILL after evidence writes,
+post-commit HTTP socket loss, independent-process duplicate requests, principal
+isolation and read-only CLI recovery are covered in the
+[keyed submission validation](submission-recovery.md). This guarantee applies only
+to explicitly keyed submissions; Git upload and unkeyed lifecycle creation remain
+outside it. A missing receipt can race an in-flight transaction.

@@ -176,3 +176,54 @@ exit/code/signal, numeric curl and HTTP codes). HTTP submission errors retain
 allowlisted cause codes and mark the outcome unknown. Neither includes raw
 stderr, command arguments, response text or credentials. Server metrics expose
 `source_git_backend_outcomes_total` with bounded exit/outcome labels.
+
+## Recoverable submissions (PostgreSQL)
+
+Use an explicit, unique key for a contribution whose response you may need to
+recover. A capability with `submit_change` is required even for public projects;
+the normal Git push also needs `read_source` and `git_push`.
+
+```bash
+# Run against a PostgreSQL-backed Source server, with SOURCE_CREDENTIAL set.
+node /path/to/source/bin/source.js submit --submission-key feature-123 --intent "Add feature"
+
+# After a lost response, retrieve the committed original result. No fetch/push.
+node /path/to/source/bin/source.js submit --submission-key feature-123 --recover
+```
+
+The key accepts 1–200 ASCII letters, digits, dots, underscores, colons or hyphens.
+Treat it as an identifier, never a credential or secret. It is scoped to the
+project and authenticated principal. A renewed capability for that same principal
+can recover it; another principal cannot. Authorization is checked on every HTTP
+request, including recovery. Keep the key until the contribution is reconciled.
+
+The POST uses `Idempotency-Key`; GET
+`/api/v1/orgs/{org}/projects/{project}/submissions/{key}` reads the saved result.
+Body-supplied keys cannot override the header. The transaction commits Work,
+Session, Change, evidence/artifacts, audit entries and the original response
+receipt together. Same-key requests with the same normalized repository ID,
+base/head, intent, contributor name and principal return that original response.
+Different payloads return HTTP 409. The receipt is a snapshot, not the change's
+current review or promotion status.
+
+Recovery does not calculate a new base or inspect local HEAD. If Source's default
+branch has advanced, use `--recover` before attempting another submission: an
+ordinary repeated CLI submit can calculate a different base and receive 409.
+A 404 means no committed receipt is visible to this principal at that moment;
+an earlier request may still be in flight. Never change keys merely because a
+response was lost. Replaying the exact original request with the same key is
+safe; using a fresh key can create another contribution.
+
+This mode requires PostgreSQL (other stores return 501). Unkeyed submission
+retains its existing behavior and has no atomic recovery guarantee. The client
+does not automatically replay network errors or 5xx responses, even with a key.
+A server that does not confirm the versioned recovery receipt produces an
+explicit unknown-outcome error rather than a false recovery guarantee.
+
+Git object upload precedes the database transaction. A failed transaction can
+leave an unreferenced-by-lifecycle contribution ref, but cannot partially commit
+the keyed lifecycle. This is not a transaction spanning Git and PostgreSQL, does
+not update protected canonical refs, and does not prove host/power-loss durability
+or cross-region failover. Receipt retention currently follows project data;
+operators must include it in PostgreSQL backup/restore and avoid deleting it
+while retries may still arrive.

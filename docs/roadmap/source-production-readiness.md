@@ -386,3 +386,13 @@ cannot borrow a good candidate's evidence, and cannot promote. See
 This closes the demonstrated single-service local browser path only. Full Lens
 CLI, broader journeys, accessibility/visual baselines, multiple services/provider
 contracts, Workcell compatibility and deployment/load/migration gates remain open.
+
+## Keyed contribution recovery increment
+
+Optional authenticated `submit --submission-key KEY` now groups lifecycle records,
+artifacts, audit and a durable original-response receipt in one PostgreSQL
+transaction. Read-only `--recover` avoids recomputing Git history. Repeated requests
+are scoped to project/principal, conflicting payloads fail, and unsupported stores
+reject the mode. The Git upload remains separate; unkeyed clients keep their
+existing behavior. See [submission recovery validation](../validation/submission-recovery.md).
+This does not close the hot-250/1000-agent, production failover or migration gates.
