@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, readFile, writeFile, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, readdir, rm, rename } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -13,11 +13,13 @@ import { PostgresStore } from '../src/postgres-store.js';
 import { startServer } from '../src/api.js';
 import { CandidateContainerExecutor } from '../src/candidate-executor.js';
 import { authenticatedGit } from '../src/remote.js';
+import { restoreDrill } from './restore-drill.js';
 
 const exec = promisify(execFile);
 const repository = fileURLToPath(new URL('..', import.meta.url));
 const cli = path.join(repository, 'bin/source.js');
-const [baseRef, headRef, imageReport, output] = process.argv.slice(2);
+const [baseRef, headRef, imageReport, output, restoreFlag] = process.argv.slice(2);
+if (restoreFlag && restoreFlag !== '--restore') throw new Error('optional final argument must be --restore');
 const dsn = process.env.SOURCE_TEST_DATABASE_URL;
 if (!dsn || !baseRef || !headRef || !imageReport || !path.isAbsolute(output || '')) throw new Error('SOURCE_TEST_DATABASE_URL=<disposable DB> node scripts/real-project-lifecycle.js BASE HEAD image-report.json /absolute/result.json');
 const env = { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' };
@@ -86,7 +88,7 @@ try {
   const commands = [
     { id: 'preflight', tier: 0, command: ['node', 'scripts/lint.js'] },
     { id: 'runtime', tier: 1, command: ['node', '--test', '--test-concurrency=1', '--test-reporter=tap', '--test-name-pattern=^(?!live container environment)', 'tests/action-runner.test.js', 'tests/candidate-executor.test.js', 'tests/execution-attempts.test.js', 'tests/github-actions.test.js'] },
-    { id: 'git-api', tier: 2, command: ['node', '--test', '--test-concurrency=1', '--test-reporter=tap', 'tests/integration-api.test.js', 'tests/integration-broker.test.js', 'tests/submit.test.js', 'tests/sync.test.js'] },
+    { id: 'git-api', tier: 2, command: ['node', '--test', '--test-concurrency=1', '--test-reporter=tap', 'tests/integration-api.test.js', 'tests/integration-broker.test.js', 'tests/submit.test.js', 'tests/sync.test.js', 'tests/git.test.js', 'tests/backup.test.js'] },
   ];
   const policy = { version: 'source-real-project-v1', securityPolicyVersion: '1', checks: commands.map(check => ({ ...check, version: '1', toolVersions: executor.profile.toolVersions, environment: executor.environment, inputs: {}, externalState: {}, deterministic: true, maxAgeMs: 3600000, maxAttempts: 1, producers: [service.id] })) };
   await source.integration.configure({ ...scope, repoId: repo.id, principalId: human.id, policy });
@@ -153,18 +155,52 @@ try {
   await git(fresh, 'merge-base', '--is-ancestor', report.proposal, 'HEAD');
   assert.deepEqual(await readdir(workspaces), []);
   report.assertions = { privateGitDenied: true, protectedPushDenied: true, unauthorizedPromotionDenied: true, unverifiedAcceptanceDenied: true, originAndUpstreamPreserved: true, actualCliSyncAndSubmit: true, separateCliWorker: true, coalesced: true, immutableArtifactsVerified: true, exactEvidenceReused: true, idempotentPromotion: true, freshCloneMatchesCandidate: true, proposalAncestryPreserved: true, workspacesEmpty: true };
+  if (restoreFlag) {
+    report.limitations = report.limitations.filter(value => !value.startsWith('no backup/restore'));
+    report.limitations.push('quiesced local backup/restore, not online snapshots, power-loss or replicated-primary failover; no worker-crash injection');
+    const status = await source.integration.status(input);
+    server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
+    report.gitBackendOutcomes = Object.fromEntries(server.metrics.gitBackendOutcomes); server = null;
+    await store.closeAsync(); store = null;
+    const backupAt = Date.now();
+    const backup = JSON.parse((await exec(process.execPath, [path.join(repository, 'scripts/backup.js'), '--data-root', data, '--schema', schema, '--output', path.join(root, 'backups')], { env: { ...env, SOURCE_DATABASE_URL: dsn, PGUSER: databaseUser }, timeout: 120000, maxBuffer: 1024 * 1024 })).stdout);
+    const manifest = JSON.parse(await readFile(backup.manifest, 'utf8'));
+    // The source's filesystem path disappears before the restore starts. This
+    // proves restored operations cannot accidentally read the original Git root.
+    await rename(data, `${data}-offline`);
+    const restored = await restoreDrill({ backup: backup.backup, dsn, validateRestored: async config => {
+      const pending = exec(process.execPath, [path.join(repository, 'scripts/check-restored-project.js')], { env: { ...env, SOURCE_RESTORED_DATABASE_URL: config.dsn, PGUSER: databaseUser }, timeout: 120000, maxBuffer: 2 * 1024 * 1024 });
+      pending.child.stdin.end(JSON.stringify({ dataRoot: config.dataRoot, gitRoot: config.gitRoot, schema: config.schema,
+        expected: { originalDataRoot: data, scope: { ...scope, repoId: repo.id }, candidate: plan.candidate, status,
+          receipts: report.receipts.map(entry => entry.receipt), maintainerId: human.id,
+          jobs: report.jobs.map(({ id, status, attempts, result }) => ({ id, status, attempts, result })),
+          gitCredential: contributorCredential, maintainerCredential } }));
+      return JSON.parse((await pending).stdout);
+    } });
+    assert.equal(restored.gitRepositories, 1);
+    assert.equal(await git(path.join(`${data}-offline`, 'orgs', org.id, 'projects', project.id, 'repos', `${repo.id}.git`), 'rev-parse', branch), plan.candidate.headCommit);
+    store = new PostgresStore({ dsn, schema });
+    const original = new Source(`${data}-offline`, { store });
+    assert.deepEqual(await original.integration.status(input), status, 'original control-plane records unchanged');
+    report.backupRestore = { quiesced: true, workerStopped: true, apiStopped: true, originalPoolClosed: true,
+      manifest, restore: restored, originalStateUnchanged: true, elapsedMs: Date.now() - backupAt,
+      checkerSha256: hash(await readFile(path.join(repository, 'scripts/check-restored-project.js'))) };
+  }
   report.status = 'passed';
 } catch (error) {
-  report.status = 'failed'; report.error = error.message; report.failureDiagnostic = error.diagnostic || null; process.exitCode = 1;
+  report.status = 'failed'; report.error = error.message; report.failureDiagnostic = error.diagnostic || null;
+  if (error.restoreState) report.retainedRestore = error.restoreState;
+  process.exitCode = 1;
 } finally {
   if (worker && worker.exitCode === null && worker.signalCode === null) { worker.kill('SIGTERM'); await workerClosed; }
   if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
-  report.gitBackendOutcomes = Object.fromEntries(server?.metrics.gitBackendOutcomes || []);
+  report.gitBackendOutcomes ||= Object.fromEntries(server?.metrics.gitBackendOutcomes || []);
   if (store) {
     if (report.status === 'passed') await store.pool.query(`DROP SCHEMA "${schema}" CASCADE`);
     else report.retainedSchema = schema;
     await store.closeAsync();
   }
+  else if (report.status !== 'passed') report.retainedSchema = schema;
   // Keep failed-run workspaces/journals for explicit recovery, never delete a
   // potentially live container's bind mount after a worker/runtime failure.
   if (report.status === 'passed') await rm(root, { recursive: true, force: true });
