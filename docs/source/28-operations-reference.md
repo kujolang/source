@@ -165,7 +165,15 @@ Backups are executable and verifiable: `npm run backup -- --output
 and emits checksums; `npm run backup:verify -- --backup <directory>` validates
 the result. Run `npm run backup:restore-drill -- --backup <directory>
 --database-url <postgresql-url>` to restore into temporary filesystem roots and a
-temporary Postgres database, verify Git objects, and remove the drill resources.
+temporary Postgres database and verify Git objects. The drill honors the manifest
+schema and verifies private snapshot checksums before extraction. Successful
+resources are removed; failed database/application restores are retained and
+reported for inspection. Only regular-file/directory archives are admitted.
+Stop/drain all writers before backup: the scripts do not freeze a live deployment.
+Configure the restored instance's data/Git roots with the canonical repository
+layout; stored historical absolute repository paths are no longer authoritative.
+See the [real-project restore evidence](../validation/real-project-restore.md)
+for application-level Git/evidence/promotion checks and remaining boundaries.
 See the deployment document for backup replication and recovery procedures.
 
 Git roots can be replicated to an independent peer with bounded, resumable

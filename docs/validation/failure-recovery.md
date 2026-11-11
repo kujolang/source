@@ -2,6 +2,23 @@
 
 This is increment evidence, not the full production-recovery gate.
 
+## Actual-project coordinated restore — 2026-11-10
+
+[Source's real-project restore](real-project-restore.md) now demonstrates a
+quiesced Git/PostgreSQL backup and isolated restoration with the original
+filesystem unavailable. A fresh process verifies candidate and landed refs,
+policy/acceptance/outcome agreement, immutable receipts and artifact hashes,
+completed jobs, private authenticated clone and idempotent promotion. The original
+offline state remains unchanged. The backup/restore portion measured 7,251 ms in
+this single local fixture; it is not a recovery SLO or primary-failover result.
+
+Regressions corrected unchecked combined-root Git, ignored checksum mismatch,
+hardcoded PostgreSQL schema, old absolute repository paths, and BusyBox hardlink
+listing behavior. Failed database/application restores remain inspectable.
+Details, exact revisions, commands, scoped test counts and raw evidence are in
+the linked report. Deployed primary/host loss, online coordination and recovery
+under sustained load remain open.
+
 | Fault or adversary | Reproducer | Proven boundary |
 | --- | --- | --- |
 | Two candidates race the same base | integration-broker.test.js, independent CLI processes | One Git target/landed-ref transaction wins; loser reports rejection without overwriting winner |

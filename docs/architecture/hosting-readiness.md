@@ -22,7 +22,7 @@ this branch. See [baseline](../validation/agent-native-baseline.md) and
 | Candidate verification | Policy-bound identities, trusted service receipts, immutable outputs and broker gates; dispatcher/broker tests | Seven tool gates and three context adapters are not ten live end-to-end tool certifications |
 | Isolated execution | Pinned OCI execution, actual Source component tests and managed worker-SIGKILL recovery demonstrated locally; optional Workcell adapter | Workcell success requires a compatible host; multi-service/browser staging and daemon/host-loss recovery remain unverified |
 | Secrets/artifacts | Existing secret broker, redaction and artifact stores; action/workflow tests | Integrated untrusted candidate execution and deployed secret lifecycle need validation |
-| Backup/restore | Archive/hash verification, PostgreSQL dump and restore-drill scripts; `tests/backup.test.js` | No consistent online Git/database snapshot established; quiesce writers for a coordinated backup |
+| Backup/restore | Verified archive snapshots, declared PostgreSQL schema and relocated Git roots; actual Source candidate/receipts/promotion restored and cloned in a fresh process | Quiesced local proof only; online snapshots, deployed primary loss and representative recovery load remain unverified |
 | Replication/recovery | Git replication, PostgreSQL replication checks and writer fencing; replication/failover scripts and tests | Current branch lacks full primary-loss and partial Git/database-loss deployment proof |
 | Import/export/mirroring | Git-compatible local refs and `source sync`; `tests/sync.test.js`; repeatable Git replication test | No automatic bidirectional sync, LFS data migration, issue/PR migration or provider metadata import |
 | Operations | Health/readiness, counters, audit, bounded queue and worker settings | Representative load, alerting/retention policy and independently reviewed deployment remain required |
@@ -75,8 +75,10 @@ Before changing the primary remote, demonstrate on that project:
 Source's own repository completed a [private development lifecycle](../validation/real-project-lifecycle.md)
 with real history, CLI submission, a separate PostgreSQL worker, isolated component
 tests, exact-evidence promotion and a fresh authenticated clone. No real-project
-migration is certified: project-specific checks, coordinated restore,
-restart/failover and human workflow gates above still apply.
+migration is certified. A [quiesced actual-project restore](../validation/real-project-restore.md)
+now preserves Git/evidence/promotion agreement with the original filesystem
+offline; project-specific checks, deployed restart/failover and human workflow
+gates above still apply.
 
 ## Cutover and rollback procedure
 

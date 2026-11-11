@@ -337,3 +337,15 @@ The operator dependency image uses immutable local IDs, locked npm dependencies
 and Git's HTTP backend. This advances the real-project normal-lifecycle milestone;
 multi-proposal project workflows, queue restart, coordinated restore, staging,
 production deployment and remaining load/migration gates are still open.
+
+## Actual-project coordinated restore — 2026-11-10
+
+The Source development lifecycle now includes a quiesced backup, verified private
+snapshot, relocated filesystem and temporary PostgreSQL database. With the
+original path offline, a fresh process confirms canonical/candidate/landed Git,
+policy acceptance and outcome, receipts/artifact hashes, completed jobs, private
+clone and idempotent promotion. See [restore evidence](../validation/real-project-restore.md).
+This closes the local coordinated-restore demonstration for this project; it does
+not close deployed failover, online consistency, partial storage loss or recovery
+under representative load. Queue-integrated OCI restart, staging, Workcell host
+compatibility and remaining scale/migration gates still require work.
