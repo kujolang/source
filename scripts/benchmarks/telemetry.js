@@ -52,3 +52,56 @@ export class StageTelemetry {
 export function processResources() {
   return { cpuMicros: process.cpuUsage(), peakRssBytes: process.resourceUsage().maxRSS * 1024, scope: 'this Node process lifetime only; excludes descendants' };
 }
+
+// Passive observers: no clientError/timeout server handler, body consumption,
+// socket writes, request replay or admission changes. Never retain URLs/headers.
+export class HttpTelemetry {
+  constructor(server) {
+    this.pending = new Set();
+    this.routes = Object.fromEntries(['git', 'submit', 'other'].map(route => [route,
+      { requests: 0, finished: 0, closedBeforeFinish: 0, abortedBodies: 0, statuses: {} }]));
+    this.sockets = { opened: 0, closed: 0, closedWithError: 0, active: 0, peakActive: 0, timeouts: 0, errors: {} };
+    this.failures = [];
+    server.on('connection', socket => {
+      this.sockets.opened++; this.sockets.active++;
+      this.sockets.peakActive = Math.max(this.sockets.peakActive, this.sockets.active);
+      socket.once('close', hadError => { this.sockets.closed++; this.sockets.active--; if (hadError) this.sockets.closedWithError++; });
+      socket.on('timeout', () => { this.sockets.timeouts++; });
+      socket.on('error', error => {
+        const code = ['ECONNRESET', 'EPIPE', 'ETIMEDOUT'].includes(error.code) ? error.code : 'other';
+        this.sockets.errors[code] = (this.sockets.errors[code] || 0) + 1;
+      });
+    });
+    server.prependListener('request', (req, res) => {
+      const route = req.url.startsWith('/git/') ? 'git' : /^\/api\/v1\/orgs\/[^/]+\/projects\/[^/]+\/submit(?:\?|$)/.test(req.url) ? 'submit' : 'other';
+      const counts = this.routes[route]; counts.requests++;
+      const entry = { route, req, res, started: performance.now() };
+      this.pending.add(entry);
+      req.once('aborted', () => { counts.abortedBodies++; });
+      res.once('finish', () => {
+        counts.finished++;
+        const status = String(res.statusCode);
+        counts.statuses[status] = (counts.statuses[status] || 0) + 1;
+        this.pending.delete(entry);
+      });
+      res.once('close', () => {
+        if (!res.writableFinished) {
+          counts.closedBeforeFinish++;
+          if (this.failures.length < 50) this.failures.push(this.describe(entry));
+        }
+        this.pending.delete(entry);
+      });
+    });
+  }
+
+  describe({ route, req, res, started }) {
+    return { route, elapsedMs: performance.now() - started, requestComplete: req.complete,
+      requestAborted: req.aborted, responseHeadersSent: res.headersSent, responseEnded: res.writableEnded };
+  }
+
+  snapshot() {
+    return structuredClone({ scope: 'passive server HTTP/socket observations; no raw URLs, headers, bodies or error text; at most 50 failed and pending samples',
+      sockets: this.sockets, routes: this.routes, pendingCount: this.pending.size,
+      pending: [...this.pending].slice(0, 50).map(entry => this.describe(entry)), failures: this.failures });
+  }
+}

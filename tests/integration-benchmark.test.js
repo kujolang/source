@@ -43,6 +43,12 @@ for (const profile of ['default', 'private-load']) test(`benchmark completes rea
   assert.equal(report.childResources.length, 4);
   assert.ok(report.childResources.every((c) => c.completed && c.resource.peakRssBytes > 0));
   assert.match(report.telemetrySha256, /^[a-f0-9]{64}$/);
+  assert.equal(report.httpBeforeCleanup.routes.submit.requests, 2);
+  assert.equal(report.httpBeforeCleanup.routes.submit.finished, 2);
+  assert.equal(report.httpBeforeCleanup.routes.submit.closedBeforeFinish, 0);
+  assert.equal(report.httpBeforeCleanup.pendingCount, 0);
+  assert.ok(report.httpBeforeCleanup.sockets.opened > 0);
+  assert.equal(report.httpAfterCleanup.pendingCount, 0);
   if (profile === 'private-load') {
     assert.equal(report.anonymousGitRejected, true);
     assert.deepEqual(report.admissionConfiguration, { gitPush: { limit: 1000, windowMs: 60000 }, submit: { limit: 1000, windowMs: 60000 } });

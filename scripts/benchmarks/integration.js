@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { authenticatedGit } from '../../src/remote.js';
-import { StageTelemetry, processResources } from './telemetry.js';
+import { StageTelemetry, HttpTelemetry, processResources } from './telemetry.js';
 const exec = promisify(execFile);
 const script = fileURLToPath(import.meta.url);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -99,7 +99,7 @@ async function main() {
   const { startServer } = await import('../../src/api.js');
   const root = await realpath(await mkdtemp(path.join(tmpdir(), 'source-lifecycle-bench-')));
   const schema = `source_bench_${process.pid}_${Date.now()}`;
-  let store, server; const children = [], sockets = []; const executions = [], workerErrors = [];
+  let store, server, httpTelemetry; const children = [], sockets = []; const executions = [], workerErrors = [];
   const cpuBefore = process.cpuUsage(); const began = Date.now();
   const report = { version: 2, status: 'running', phase: 'setup', httpStatuses: {}, date: new Date().toISOString(), agents, repositories: repos, concurrency: { agentProcesses: agents, workerProcesses: 2, workerConcurrency: 2 }, host: { platform: process.platform, arch: process.arch, node: process.version, cpuCount: cpus().length, memoryBytes: totalmem() }, fixture: 'compatible independent files; fixed host Git-content checker; no repository code execution', profile, rateLimits: privateProfile ? 'explicit private-load operator profile; not default capacity' : 'unchanged server defaults', admissionConfiguration: rateLimit, maxIntegrationProposals, stages: {}, raw: {}, limitations: ['loopback single host; no deployed TLS latency', 'fixed Git-content verification, not application CI or isolated staging', 'no induced worker crash in this measurement', 'maximum 1000 agents per harness run; operator batch bound recorded explicitly', privateProfile ? 'private repositories; explicit 1000/min push and submit limits per shared address; server queue/concurrency defaults unchanged' : 'default same-address submit/read/push rate limits apply'] };
   const telemetry = new StageTelemetry();
@@ -151,6 +151,7 @@ async function main() {
       records.push({ scope, repo, base, policy });
     }
     server = await startServer(source, { port: 0, host: '127.0.0.1', rateLimit });
+    httpTelemetry = new HttpTelemetry(server);
     report.httpTimeouts = { headersMs: server.headersTimeout, requestMs: server.requestTimeout, keepAliveMs: server.keepAliveTimeout };
     server.on('connection', (socket) => sockets.push(socket));
     server.prependListener('request', (_req, res) => res.once('finish', () => { report.httpStatuses[res.statusCode] = (report.httpStatuses[res.statusCode] || 0) + 1; }));
@@ -263,10 +264,12 @@ async function main() {
     report.status = 'passed'; report.phase = 'complete'; report.correctness = { allProposalsRetained: true, exactVerifiedPromotion: true, unverifiedAcceptanceRejected: true, duplicatePromotionIdempotent: true, baselineTreeEquality: true, conflicts: 0, humanInterventions: 0, acceptance: 'automated harness acting as configured human maintainer' };
   } catch (error) { report.status = 'failed'; report.error = error.message; report.failureDiagnostic = error.diagnostic ?? null; report.raw.completedClients = children.flatMap((entry) => entry.messages.filter((message) => message.type === 'result').map((message) => message.result)); process.exitCode = 1; }
   finally {
+    report.httpBeforeCleanup = httpTelemetry?.snapshot() || null;
     telemetry.begin('cleanup');
     for (const entry of children) if (entry.child.exitCode == null && entry.child.signalCode == null) entry.child.kill('SIGKILL');
     await Promise.all(children.map((entry) => entry.closed));
     if (server) { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
+    report.httpAfterCleanup = httpTelemetry?.snapshot() || null;
     if (store) { await store.pool.query(`DROP SCHEMA "${schema}" CASCADE`); await store.closeAsync(); }
     await rm(root, { recursive: true, force: true });
     report.telemetry = telemetry.stop();
