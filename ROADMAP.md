@@ -43,7 +43,21 @@ Evidence: [release notes](docs/RELEASE_0_1_0.md),
 [hardening audit](docs/audits/repository-hardening.md),
 [live Cloudflare record](docs/contest/CLOUDFLARE_LIVE.md).
 
-## Release sequence
+## Release status — 2026-11-10
+
+[Source 0.2.0](https://github.com/kujolang/source/releases/tag/v0.2.0) is published
+as an experimental feature release. It includes candidate integration, durable
+verification, secondary remotes and keyed PostgreSQL submission recovery. See
+[the changelog](CHANGELOG.md), [current hosting boundaries](docs/architecture/hosting-readiness.md)
+and [verified status/handoff](docs/HANDOFF.md).
+
+The version groups below are the original planning sequence, not a claim that
+every item assigned to a released version is complete. Unchecked requirements
+remain open until their stated proof exists; publishing 0.2.0 does not close
+synchronous-maintenance, arbitrary-handler cancellation, deployment or scale gates.
+Further 100/250/1000-agent capacity investigation is deferred by user direction.
+
+## Original release sequence
 
 | Target | Outcome | Depends on |
 | --- | --- | --- |
