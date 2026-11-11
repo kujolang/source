@@ -323,3 +323,17 @@ are demonstrated through the recovery CLI. This advances the worker-death gate
 for running managed containers; export/pre-launch ambiguity, reaper death, actual
 daemon/host loss, queue-integrated restart and production deployment drills remain
 open alongside the real-project, staging and load requirements.
+
+## Actual Source development lifecycle — 2026-11-10
+
+An isolated private instance now demonstrates actual Source history and feature
+commits through CLI sync/submit, HTTP planning and authorization, separate CLI
+PostgreSQL worker execution, 66 passing component tests plus syntax validation,
+evidence reuse, acceptance, idempotent promotion and a fresh clone matching the
+verified candidate. One nested Docker test is explicitly excluded from the
+container and tested separately on the host. See the
+[raw evidence and reproduction guide](../validation/real-project-lifecycle.md).
+The operator dependency image uses immutable local IDs, locked npm dependencies
+and Git's HTTP backend. This advances the real-project normal-lifecycle milestone;
+multi-proposal project workflows, queue restart, coordinated restore, staging,
+production deployment and remaining load/migration gates are still open.

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "revision": "d930346e07776e256d1e478bc6601f5b09939760",
+  "base": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216",
+  "image": "sha256:5b1de46af3c70e61be8e2bafc6d024de9022edece27d0be704073a0521fea574",
+  "toolVersions": {
+    "node": "v26.13.0",
+    "git": "git version 2.54.1",
+    "gitHttpBackendSha256": "12d3032889e206c7109e57c6094000e3dbeb42077d1e188a78a30d9b435ddd63",
+    "alpine": "3.24.4",
+    "pg": "8.23.0",
+    "yaml": "4.3.2"
+  },
+  "packageSha256": "15c3ba40fae1dbd1ba5f56076f83d7b9510f0780afab08fd0ca7d690ff629b07",
+  "lockSha256": "f14fe1019bd41024adcdf37d9f3f8ddea70364ec904094e27a01aa54f301965b",
+  "dockerfileSha256": "bd502d9ff596451d02b0df49bc6a7d74ead1c2bf71e09542eacb916cb1c7ff39",
+  "buildNetwork": true,
+  "installScripts": false,
+  "runtimeProbeNetwork": "none",
+  "reproducibility": "npm dependencies use the committed integrity lock; Alpine git resolves at build time. The resulting image ID pins the complete local image, not a reproducible future build or registry distribution."
+}

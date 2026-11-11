@@ -20,7 +20,7 @@ this branch. See [baseline](../validation/agent-native-baseline.md) and
 | Webhooks | Signed dispatch, bounded request handling, delivery IDs and event deduplication in `src/api.js` | External integration compatibility must be exercised per provider |
 | Workflow execution | PostgreSQL jobs, dependencies, retries, leases, cancellation, worker separation and logs; worker/queue tests | No distributed admission/cost certification at target agent counts |
 | Candidate verification | Policy-bound identities, trusted service receipts, immutable outputs and broker gates; dispatcher/broker tests | Seven tool gates and three context adapters are not ten live end-to-end tool certifications |
-| Isolated execution | Optional pinned-image OCI and Workcell executors with exact Git export and evidence binding; executor tests | Live OCI/Workcell runs unavailable locally; staging services/browser deployment and orphan recovery validation incomplete |
+| Isolated execution | Pinned OCI execution, actual Source component tests and managed worker-SIGKILL recovery demonstrated locally; optional Workcell adapter | Workcell success requires a compatible host; multi-service/browser staging and daemon/host-loss recovery remain unverified |
 | Secrets/artifacts | Existing secret broker, redaction and artifact stores; action/workflow tests | Integrated untrusted candidate execution and deployed secret lifecycle need validation |
 | Backup/restore | Archive/hash verification, PostgreSQL dump and restore-drill scripts; `tests/backup.test.js` | No consistent online Git/database snapshot established; quiesce writers for a coordinated backup |
 | Replication/recovery | Git replication, PostgreSQL replication checks and writer fencing; replication/failover scripts and tests | Current branch lacks full primary-loss and partial Git/database-loss deployment proof |
@@ -72,9 +72,11 @@ Before changing the primary remote, demonstrate on that project:
 - Required human workflows and integrations, documented operator access and an
   agreed rollback procedure.
 
-No real-project migration is certified by this document. Synthetic fixture
-lifecycles and process-crash tests are necessary evidence, but do not satisfy the
-real-project gate themselves.
+Source's own repository completed a [private development lifecycle](../validation/real-project-lifecycle.md)
+with real history, CLI submission, a separate PostgreSQL worker, isolated component
+tests, exact-evidence promotion and a fresh authenticated clone. No real-project
+migration is certified: project-specific checks, coordinated restore,
+restart/failover and human workflow gates above still apply.
 
 ## Cutover and rollback procedure
 
