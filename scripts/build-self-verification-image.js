@@ -20,7 +20,7 @@ try {
   const manifest = await git('show', `${revision}:package.json`);
   const lock = await git('show', `${revision}:package-lock.json`);
   const dockerfile = `FROM ${base}
-RUN apk add --no-cache git
+RUN apk add --no-cache git git-daemon
 WORKDIR /opt/source-deps
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund && mv node_modules /node_modules && npm cache clean --force
@@ -38,8 +38,10 @@ WORKDIR /workspace
   process.stderr.write(build.stderr);
   const image = (await readFile(iidfile, 'utf8')).trim();
   if (!/^sha256:[a-f0-9]{64}$/.test(image)) throw new Error('Docker did not return a full immutable image ID');
-  const probe = `const {execFileSync}=require('node:child_process');
-console.log(JSON.stringify({node:process.version,git:execFileSync('git',['--version'],{encoding:'utf8'}).trim(),alpine:require('node:fs').readFileSync('/etc/alpine-release','utf8').trim(),pg:require('/node_modules/pg/package.json').version,yaml:require('/node_modules/js-yaml/package.json').version}));`;
+  const probe = `const {execFileSync}=require('node:child_process'),fs=require('node:fs');
+const gitPath=execFileSync('git',['--exec-path'],{encoding:'utf8'}).trim();
+fs.accessSync(gitPath+'/git-http-backend',fs.constants.X_OK);
+console.log(JSON.stringify({node:process.version,git:execFileSync('git',['--version'],{encoding:'utf8'}).trim(),gitDaemon:execFileSync('apk',['info','-v','git-daemon'],{encoding:'utf8'}).trim(),alpine:fs.readFileSync('/etc/alpine-release','utf8').trim(),pg:require('/node_modules/pg/package.json').version,yaml:require('/node_modules/js-yaml/package.json').version}));`;
   const { stdout } = await exec('docker', ['run', '--rm', '--network=none', '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--user=65532:65532', '--memory=256m', '--cpus=1', '--pids-limit=64', '--entrypoint=node', image, '-e', probe], { timeout: 30000, maxBuffer: 65536 });
   console.log(JSON.stringify({ version: 1, revision, base, image, toolVersions: JSON.parse(stdout),
     packageSha256: sha256(manifest), lockSha256: sha256(lock), dockerfileSha256: sha256(dockerfile),
