@@ -20,8 +20,9 @@ const exec = promisify(execFile);
 const repository = fileURLToPath(new URL('..', import.meta.url));
 const cli = path.join(repository, 'bin/source.js');
 const [baseRef, headRef, imageReport, output, ...flags] = process.argv.slice(2);
-if (flags.some(flag => !['--restore', '--crash-worker'].includes(flag)) || new Set(flags).size !== flags.length) throw new Error('optional arguments: --restore --crash-worker');
+if (flags.some(flag => !['--restore', '--crash-worker', '--browser-staging'].includes(flag)) || new Set(flags).size !== flags.length) throw new Error('optional arguments: --restore --crash-worker --browser-staging');
 const restoreFlag = flags.includes('--restore'), crashWorker = flags.includes('--crash-worker');
+const browserStaging = flags.includes('--browser-staging');
 const dsn = process.env.SOURCE_TEST_DATABASE_URL;
 if (!dsn || !baseRef || !headRef || !imageReport || !path.isAbsolute(output || '')) throw new Error('SOURCE_TEST_DATABASE_URL=<disposable DB> node scripts/real-project-lifecycle.js BASE HEAD image-report.json /absolute/result.json');
 const env = { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' };
@@ -45,6 +46,7 @@ try {
   await git(repository, 'merge-base', '--is-ancestor', report.base, report.proposal);
   assert.notEqual(report.base, report.proposal);
   report.dependencyImage = JSON.parse(await readFile(imageReport, 'utf8'));
+  if (browserStaging) assert.ok(report.dependencyImage.browserBuild?.checkerSha256, 'browser staging requires the operator browser image');
   for (const [file, field] of [['package.json', 'packageSha256'], ['package-lock.json', 'lockSha256']]) {
     const contents = (await exec('git', ['--no-replace-objects', 'show', `${report.proposal}:${file}`], { cwd: repository })).stdout;
     assert.equal(hash(contents), report.dependencyImage[field], 'image manifests must match actual proposal');
@@ -95,9 +97,10 @@ try {
     { id: 'runtime', tier: 1, command: ['node', '--test', '--test-concurrency=1', '--test-reporter=tap', '--test-name-pattern=^(?!live container environment)', 'tests/action-runner.test.js', 'tests/candidate-executor.test.js', 'tests/execution-attempts.test.js', 'tests/github-actions.test.js'] },
     { id: 'git-api', tier: 2, command: ['node', '--test', '--test-concurrency=1', '--test-reporter=tap', 'tests/integration-api.test.js', 'tests/integration-broker.test.js', 'tests/submit.test.js', 'tests/sync.test.js', 'tests/git.test.js', 'tests/backup.test.js'] },
   ];
+  if (browserStaging) commands.push({ id: 'browser-staging', tier: 3, dependsOn: ['git-api'], command: ['node', '/opt/source-browser-staging.mjs'] });
   const policy = { version: crashWorker ? 'source-real-project-crash-v1' : 'source-real-project-v1', securityPolicyVersion: '1', checks: commands.map((check, index) => ({ ...check,
     ...(crashWorker && index ? { dependsOn: [commands[index - 1].id] } : {}),
-    version: '1', toolVersions: executor.profile.toolVersions, environment: executor.environment, inputs: {}, externalState: {}, deterministic: true, maxAgeMs: 3600000, maxAttempts: crashWorker ? 2 : 1, producers: [service.id] })) };
+    version: '1', toolVersions: executor.profile.toolVersions, environment: executor.environment, inputs: {}, externalState: {}, deterministic: check.id !== 'browser-staging', maxAgeMs: 3600000, maxAttempts: crashWorker ? 2 : 1, producers: [service.id] })) };
   await source.integration.configure({ ...scope, repoId: repo.id, principalId: human.id, policy });
   report.policy = policy;
   await git(cwd, 'checkout', '-b', 'real-project-proposal', report.proposal);
@@ -163,8 +166,17 @@ try {
     assert.equal(report.evaluation.checks.find(row => row.checkId === check.checkId).receiptId, check.receiptId, 'completed evidence must survive the worker crash unchanged');
   }
   assert.equal(report.evaluation.ok, true, JSON.stringify(report.evaluation));
-  report.reuse = await request(`${candidateUrl}/dispatch`);
-  assert.ok(report.reuse.checks.every(check => check.action === 'reused'));
+  if (browserStaging) {
+    const check = report.receipts.find(entry => entry.receipt.checkId === 'browser-staging');
+    const result = JSON.parse(check.output);
+    assert.equal(result.status, 'passed');
+    assert.equal(result.disposableApplicationRemoved, true);
+    for (const screenshot of result.screenshots) assert.equal(hash(Buffer.from(screenshot.base64, 'base64')), screenshot.sha256);
+    report.reuse = { notRequestedReason: 'browser staging is environment-dependent; redispatch requires a fresh run' };
+  } else {
+    report.reuse = await request(`${candidateUrl}/dispatch`);
+    assert.ok(report.reuse.checks.every(check => check.action === 'reused'));
+  }
   report.acceptance = await request(`${candidateUrl}/accept`);
   report.promotion = await request(`${candidateUrl}/promote`);
   assert.equal(report.promotion.state, 'landed');
@@ -175,7 +187,7 @@ try {
   assert.equal(await git(fresh, 'rev-parse', 'HEAD^{tree}'), plan.candidate.tree);
   await git(fresh, 'merge-base', '--is-ancestor', report.proposal, 'HEAD');
   assert.deepEqual(await readdir(workspaces), []);
-  report.assertions = { privateGitDenied: true, protectedPushDenied: true, unauthorizedPromotionDenied: true, unverifiedAcceptanceDenied: true, originAndUpstreamPreserved: true, actualCliSyncAndSubmit: true, separateCliWorker: true, coalesced: true, immutableArtifactsVerified: true, exactEvidenceReused: true, idempotentPromotion: true, freshCloneMatchesCandidate: true, proposalAncestryPreserved: true, workspacesEmpty: true };
+  report.assertions = { privateGitDenied: true, protectedPushDenied: true, unauthorizedPromotionDenied: true, unverifiedAcceptanceDenied: true, originAndUpstreamPreserved: true, actualCliSyncAndSubmit: true, separateCliWorker: true, coalesced: true, immutableArtifactsVerified: true, exactEvidenceReused: !browserStaging, idempotentPromotion: true, freshCloneMatchesCandidate: true, proposalAncestryPreserved: true, workspacesEmpty: true };
   if (restoreFlag) {
     report.limitations.push('quiesced local backup/restore, not online snapshots, power-loss or replicated-primary failover');
     const status = await source.integration.status(input);
