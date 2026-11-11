@@ -4,6 +4,27 @@ All notable changes to Source are recorded here.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-11-10
+
+Experimental agent-native integration and recovery release. Source remains a
+JavaScript/Node.js application, installed with Git and npm.
+
+- Assemble concurrent proposals with real Git merge semantics, dependency and conflict checks, preserved attribution, and deterministic candidate identity.
+- Bind verification, authorized acceptance and idempotent protected promotion to the exact candidate; reject stale or substituted evidence.
+- Add impact-aware verification policy, validity-bound reuse, durable PostgreSQL scheduling, coalescing and isolated worker execution.
+- Demonstrate actual Source lifecycle, OCI component tests, Lens browser staging, worker crash recovery and coordinated backup/restore with fresh-process checks.
+- Add authenticated PostgreSQL submission keys and read-only recovery after crashes or lost responses, without duplicate lifecycle creation or automatic uncertain POST replay.
+- Harden HTTP admission, bounded client retries, original Git-object handling, archive verification, artifact integrity, transaction lifetimes and cleanup ownership.
+- Record reproducible local concurrency and equivalent synthetic-checker comparisons, including failed runs and limits. Production/failover certification and 1000-agent end-to-end capacity remain unproven.
+
+Upgrade: back up and restore-test PostgreSQL and Git together, drain writers/workers,
+and review [hosting readiness](docs/architecture/hosting-readiness.md). Existing
+unkeyed clients retain their behavior; keyed recovery requires PostgreSQL and a
+current `submit_change` capability. Reassemble legacy candidates and redispatch
+checks under the current assembly contract rather than promoting old receipts.
+See [current status and deferred work](docs/HANDOFF.md).
+
+
 - Submit through a secondary Source remote while GitHub stays `origin`, with explicit or configured remote selection and a freshly fetched Source proposal base.
 - Add `source sync` for atomic, non-forced copying of local branches and tags, including remote setup, per-repository `--cwd`, and dry-run previews.
 - Keep client-only submit/sync commands independent of local server storage.

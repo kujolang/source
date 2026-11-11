@@ -1,6 +1,6 @@
 # Source
 
-[![Version](https://img.shields.io/badge/version-0.1.1-black)](package.json)
+[![Version](https://img.shields.io/badge/version-0.2.0-black)](package.json)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 [![built for Kujo](https://img.shields.io/badge/built%20for-Kujo-white.svg)](https://github.com/kujolang/kujo)
 [![Kujo ecosystem](https://img.shields.io/badge/Kujo-ecosystem-white.svg)](https://kujolang.ai/ecosystem/source/)
@@ -14,12 +14,15 @@ Source is part of the Kujo ecosystem. Its server and CLI run on Node.js; adapter
 read evidence from Kujo Eval, Spec and ShipCheck.
 
 [Documentation](https://docs.kujolang.ai/tools/source/) ·
-[Release](https://github.com/kujolang/source/releases/tag/v0.1.1) ·
+[Release](https://github.com/kujolang/source/releases/tag/v0.2.0) ·
 [Public MCP catalog](https://mcp.kujolang.ai/mcp)
 
 ## What Source does
 
 - Tracks a change from its task through review and promotion.
+- Assembles concurrent proposals and binds verification to the exact candidate.
+- Runs durable PostgreSQL verification workers with deduplication and evidence reuse.
+- Keeps GitHub as origin with secondary-remote sync and recoverable keyed submission.
 - Gives contributors scoped, expiring capabilities for API and Git access.
 - Checks required evidence before accepting a proposal.
 - Rejects stale proposals and preserves the record of revisions and conflicts.
@@ -33,8 +36,9 @@ Project → Work → Session → Change → Evidence → Decision → Canonical 
 
 ## Status
 
-Source is an experimental, self-hosted platform. [Version 0.1.1](https://github.com/kujolang/source/releases/tag/v0.1.1)
-is the first public release. It is suitable for local evaluation; it is not a
+Source is an experimental, self-hosted platform. [Version 0.2.0](https://github.com/kujolang/source/releases/tag/v0.2.0)
+adds candidate integration, durable verification and recoverable submissions.
+It is suitable for local evaluation and controlled integration; it is not a
 production-readiness certification.
 
 The three-client demo exercises real Git commits, concurrent proposals, approval
@@ -56,7 +60,7 @@ Use **Node.js 22.23.4+, 24.22.1+, or 26.12.1+ on the supported branches**, npm a
 Postgres database, Kujo checkout or model-provider key.
 
 ```bash
-git clone --branch v0.1.1 https://github.com/kujolang/source.git
+git clone --branch v0.2.0 https://github.com/kujolang/source.git
 cd source
 npm ci
 npm run demo:contest -- --trace
