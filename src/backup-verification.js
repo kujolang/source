@@ -29,12 +29,14 @@ export async function readBackupManifest(root) {
 }
 
 export async function inspectBackupArchive(archive, expectedRoot) {
-  const options = { timeout: 120000, maxBuffer: 16 * 1024 * 1024 };
+  const options = { timeout: 120000, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, LC_ALL: 'C' } };
   const { stdout } = await exec('tar', ['-tzf', archive], options);
   const entries = stdout.split('\n').filter(Boolean);
   if (!entries.length || entries.some(entry => entry.includes('\\') || entry.startsWith('/') || entry.split('/').includes('..') || entry.split('/')[0] !== expectedRoot)) throw new Error('unsafe or unexpected archive path');
   const verbose = (await exec('tar', ['-tvzf', archive], options)).stdout.split('\n').filter(Boolean);
-  if (verbose.length !== entries.length || verbose.some(line => !['-', 'd'].includes(line[0]))) throw new Error('backup archives permit only regular files and directories');
+  // BusyBox prints hardlinks with a regular-file mode and an arrow, unlike
+  // BSD/GNU tar's distinct type. Reject link annotations conservatively too.
+  if (verbose.length !== entries.length || verbose.some(line => !['-', 'd'].includes(line[0]) || line.includes(' -> ') || line.includes(' link to '))) throw new Error('backup archives permit only regular files and directories');
   return entries;
 }
 
