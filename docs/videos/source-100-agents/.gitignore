@@ -5,3 +5,5 @@ assets/*.mp3
 renders/
 .hyperframes/
 node_modules/
+.thumbnails/
+.waveform-cache/
