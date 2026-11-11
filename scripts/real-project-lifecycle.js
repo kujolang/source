@@ -14,12 +14,14 @@ import { startServer } from '../src/api.js';
 import { CandidateContainerExecutor } from '../src/candidate-executor.js';
 import { authenticatedGit } from '../src/remote.js';
 import { restoreDrill } from './restore-drill.js';
+import { crashAndRecover } from './real-project-worker-crash.js';
 
 const exec = promisify(execFile);
 const repository = fileURLToPath(new URL('..', import.meta.url));
 const cli = path.join(repository, 'bin/source.js');
-const [baseRef, headRef, imageReport, output, restoreFlag] = process.argv.slice(2);
-if (restoreFlag && restoreFlag !== '--restore') throw new Error('optional final argument must be --restore');
+const [baseRef, headRef, imageReport, output, ...flags] = process.argv.slice(2);
+if (flags.some(flag => !['--restore', '--crash-worker'].includes(flag)) || new Set(flags).size !== flags.length) throw new Error('optional arguments: --restore --crash-worker');
+const restoreFlag = flags.includes('--restore'), crashWorker = flags.includes('--crash-worker');
 const dsn = process.env.SOURCE_TEST_DATABASE_URL;
 if (!dsn || !baseRef || !headRef || !imageReport || !path.isAbsolute(output || '')) throw new Error('SOURCE_TEST_DATABASE_URL=<disposable DB> node scripts/real-project-lifecycle.js BASE HEAD image-report.json /absolute/result.json');
 const env = { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' };
@@ -29,7 +31,10 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const root = await mkdtemp(path.join(tmpdir(), 'source-real-project-'));
 const data = path.join(root, 'data'), cwd = path.join(root, 'clone'), workspaces = path.join(root, 'workspaces');
 const schema = `source_real_${process.pid}_${Date.now()}`;
-const report = { version: 1, status: 'running', startedAt: new Date().toISOString(), limitations: ['local disposable deployment, no TLS/SSH or production failover', 'scripted maintainer authorization, not an independent human review', 'targeted Source runtime and API/Git suites, not the full production acceptance suite', 'no Docker socket in verification; nested live-container test intentionally excluded', 'no backup/restore or worker-crash injection in this lifecycle'] };
+const report = { version: 1, status: 'running', startedAt: new Date().toISOString(), limitations: ['local disposable deployment, no TLS/SSH or production failover', 'scripted maintainer authorization, not an independent human review', 'targeted Source runtime and API/Git suites, not the full production acceptance suite', 'no Docker socket in verification; nested live-container test intentionally excluded'] };
+if (!restoreFlag) report.limitations.push('no backup/restore in this lifecycle');
+if (!crashWorker) report.limitations.push('no worker-crash injection in this lifecycle');
+else report.limitations.push('one local SIGKILL during Git/API verification, not host/daemon loss or sustained recovery load');
 let store, server, worker, workerClosed, workerOutput = '', workerError = '', workerFailure = '';
 try {
   report.sourceRevision = await git(repository, 'rev-parse', 'HEAD');
@@ -90,12 +95,14 @@ try {
     { id: 'runtime', tier: 1, command: ['node', '--test', '--test-concurrency=1', '--test-reporter=tap', '--test-name-pattern=^(?!live container environment)', 'tests/action-runner.test.js', 'tests/candidate-executor.test.js', 'tests/execution-attempts.test.js', 'tests/github-actions.test.js'] },
     { id: 'git-api', tier: 2, command: ['node', '--test', '--test-concurrency=1', '--test-reporter=tap', 'tests/integration-api.test.js', 'tests/integration-broker.test.js', 'tests/submit.test.js', 'tests/sync.test.js', 'tests/git.test.js', 'tests/backup.test.js'] },
   ];
-  const policy = { version: 'source-real-project-v1', securityPolicyVersion: '1', checks: commands.map(check => ({ ...check, version: '1', toolVersions: executor.profile.toolVersions, environment: executor.environment, inputs: {}, externalState: {}, deterministic: true, maxAgeMs: 3600000, maxAttempts: 1, producers: [service.id] })) };
+  const policy = { version: crashWorker ? 'source-real-project-crash-v1' : 'source-real-project-v1', securityPolicyVersion: '1', checks: commands.map((check, index) => ({ ...check,
+    ...(crashWorker && index ? { dependsOn: [commands[index - 1].id] } : {}),
+    version: '1', toolVersions: executor.profile.toolVersions, environment: executor.environment, inputs: {}, externalState: {}, deterministic: true, maxAgeMs: 3600000, maxAttempts: crashWorker ? 2 : 1, producers: [service.id] })) };
   await source.integration.configure({ ...scope, repoId: repo.id, principalId: human.id, policy });
   report.policy = policy;
-  await git(cwd, 'checkout', '-b', 'local-image-support', report.proposal);
+  await git(cwd, 'checkout', '-b', 'real-project-proposal', report.proposal);
   await assert.rejects(() => authenticatedGit(contributorCredential, remote, cwd)(['push', remote, `HEAD:refs/heads/${branch}`]), /Source Git push failed/);
-  report.submission = await client('submit', '--intent', 'Support full immutable local verification images and operator dependency builds');
+  report.submission = await client('submit', '--intent', `Verify actual Source development from ${report.base} to ${report.proposal}`);
   assert.equal(report.submission.change.headCommit, report.proposal);
   assert.equal(report.submission.change.baseCommit, report.base);
   assert.equal(report.submission.session.principal, contributor.id);
@@ -104,6 +111,7 @@ try {
   assert.deepEqual(plan.conflicts, []); assert.deepEqual(plan.rejected, []);
   report.candidate = plan.candidate;
   const candidateUrl = `${endpoint}/${plan.candidate.id}`;
+  const input = { ...scope, repoId: repo.id, candidateId: plan.candidate.id, principalId: human.id };
   await request(`${candidateUrl}/promote`, {}, contributorCredential, 403);
   const denied = await fetch(`${candidateUrl}/accept`, { method: 'POST', headers: { authorization: `Bearer ${maintainerCredential}` } });
   assert.ok(denied.status >= 400 && denied.status < 500); await denied.arrayBuffer();
@@ -113,14 +121,25 @@ try {
   assert.deepEqual(second.checks.map(check => check.jobId), report.dispatch.checks.map(check => check.jobId));
   const handlerPath = path.join(root, 'handler.mjs');
   await writeFile(handlerPath, `import { CandidateContainerExecutor } from ${JSON.stringify(pathToFileURL(path.join(repository, 'src/candidate-executor.js')).href)};\nimport { createVerificationHandler } from ${JSON.stringify(pathToFileURL(path.join(repository, 'src/verification-dispatcher.js')).href)};\nconst executor = new CandidateContainerExecutor(${JSON.stringify(config)});\nexport function createHandlers({ source }) { return { 'integration.verify': createVerificationHandler({ source, principalId: ${JSON.stringify(service.id)}, executor }) }; }\n`, { mode: 0o600 });
-  worker = spawn(process.execPath, [cli, '--store', 'postgres', '--schema', schema, 'worker', '--handler-module', handlerPath, '--worker-id', 'real-project', '--worker-concurrency', '1', '--worker-lease-ms', '60000', '--worker-poll-ms', '100', '--worker-max-poll-ms', '500'], { env: { ...env, SOURCE_DATA: data, SOURCE_DATABASE_URL: dsn, PGUSER: databaseUser }, stdio: ['ignore', 'pipe', 'pipe'] });
-  workerClosed = new Promise(resolve => worker.once('close', (code, signal) => resolve({ code, signal })));
-  worker.on('error', error => { workerFailure = error.message; });
-  worker.stdout.on('data', chunk => { workerOutput = (workerOutput + chunk).slice(-16384); });
-  worker.stderr.on('data', chunk => { workerError = (workerError + chunk).slice(-16384); });
+  const startWorker = () => {
+    workerOutput = ''; workerError = ''; workerFailure = '';
+    worker = spawn(process.execPath, [cli, '--store', 'postgres', '--schema', schema, 'worker', '--handler-module', handlerPath, '--worker-id', 'real-project', '--worker-concurrency', '1', '--worker-lease-ms', '60000', '--worker-poll-ms', '100', '--worker-max-poll-ms', '500'], { env: { ...env, SOURCE_DATA: data, SOURCE_DATABASE_URL: dsn, PGUSER: databaseUser }, stdio: ['ignore', 'pipe', 'pipe'] });
+    workerClosed = new Promise(resolve => worker.once('close', (code, signal) => resolve({ code, signal })));
+    worker.on('error', error => { workerFailure = error.message; });
+    worker.stdout.on('data', chunk => { workerOutput = (workerOutput + chunk).slice(-16384); });
+    worker.stderr.on('data', chunk => { workerError = (workerError + chunk).slice(-16384); });
+  };
+  const assertWorker = () => {
+    if (worker.exitCode !== null || worker.signalCode !== null || workerFailure || /worker real-project:/.test(workerError)) throw new Error(`worker unavailable: ${workerFailure || workerError}`);
+  };
+  startWorker();
+  if (crashWorker) {
+    report.workerCrash = await crashAndRecover({ source, store, schema, scope, input, workspaces, worker, closed: workerClosed, restart: startWorker, assertWorker });
+    report.workerCrash.helperSha256 = hash(await readFile(new URL('./real-project-worker-crash.js', import.meta.url)));
+  }
   const deadline = Date.now() + 600000;
   while (await source.jobs.count(scope)) {
-    if (worker.exitCode !== null || worker.signalCode !== null || workerFailure || /worker real-project:/.test(workerError)) throw new Error(`worker unavailable: ${workerFailure || workerError}`);
+    assertWorker();
     if (Date.now() > deadline) throw new Error('real-project verification deadline exceeded');
     await sleep(250);
   }
@@ -129,7 +148,6 @@ try {
   assert.equal(report.workerExit.code, 0);
   assert.match(workerOutput, /worker real-project started/);
   report.evaluation = await request(`${candidateUrl}/evaluate`);
-  const input = { ...scope, repoId: repo.id, candidateId: plan.candidate.id };
   const loaded = await source.integration.load(input);
   report.receipts = [];
   for (const check of report.evaluation.checks) {
@@ -140,7 +158,10 @@ try {
     report.receipts.push({ receipt, output: bytes.toString('utf8') });
   }
   assert.equal(report.jobs.length, commands.length);
-  assert.ok(report.jobs.every(job => job.status === 'completed' && job.attempts === 1), 'all real-project checks must complete on their first attempt');
+  assert.ok(report.jobs.every(job => job.status === 'completed' && job.attempts === (crashWorker && job.payload.checkId === 'git-api' ? 2 : 1)), 'only the interrupted check may require a second attempt');
+  if (crashWorker) for (const check of report.workerCrash.preservedReceipts) {
+    assert.equal(report.evaluation.checks.find(row => row.checkId === check.checkId).receiptId, check.receiptId, 'completed evidence must survive the worker crash unchanged');
+  }
   assert.equal(report.evaluation.ok, true, JSON.stringify(report.evaluation));
   report.reuse = await request(`${candidateUrl}/dispatch`);
   assert.ok(report.reuse.checks.every(check => check.action === 'reused'));
@@ -156,8 +177,7 @@ try {
   assert.deepEqual(await readdir(workspaces), []);
   report.assertions = { privateGitDenied: true, protectedPushDenied: true, unauthorizedPromotionDenied: true, unverifiedAcceptanceDenied: true, originAndUpstreamPreserved: true, actualCliSyncAndSubmit: true, separateCliWorker: true, coalesced: true, immutableArtifactsVerified: true, exactEvidenceReused: true, idempotentPromotion: true, freshCloneMatchesCandidate: true, proposalAncestryPreserved: true, workspacesEmpty: true };
   if (restoreFlag) {
-    report.limitations = report.limitations.filter(value => !value.startsWith('no backup/restore'));
-    report.limitations.push('quiesced local backup/restore, not online snapshots, power-loss or replicated-primary failover; no worker-crash injection');
+    report.limitations.push('quiesced local backup/restore, not online snapshots, power-loss or replicated-primary failover');
     const status = await source.integration.status(input);
     server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
     report.gitBackendOutcomes = Object.fromEntries(server.metrics.gitBackendOutcomes); server = null;
