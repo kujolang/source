@@ -663,8 +663,10 @@ implementation hashes and exact scope:
 - [Journaled lifecycle](container/journaled-cleanup.json)
 - [Focused regression record](container/worker-crash-regressions.json)
 
-The crash drill has no PostgreSQL queue; prior queue fencing/recovery evidence
-remains separate. This does not prove host/daemon loss, reaper crash recovery,
+That earlier crash drill has no PostgreSQL queue. The later
+[actual-project crash and restore drill](real-project-worker-crash.md) combines
+real CLI/OCI execution, natural PostgreSQL lease expiry, stale-token fencing,
+exact promotion and fresh-process restore. Neither proves host/daemon loss, reaper crash recovery,
 power-loss durability, orphan workspace cleanup before journaling, or resolution
 of an in-flight create request whose prepared resource is absent. Operator steps
 and remaining windows are documented in the execution guide.

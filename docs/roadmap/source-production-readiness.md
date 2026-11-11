@@ -349,3 +349,15 @@ This closes the local coordinated-restore demonstration for this project; it doe
 not close deployed failover, online consistency, partial storage loss or recovery
 under representative load. Queue-integrated OCI restart, staging, Workcell host
 compatibility and remaining scale/migration gates still require work.
+
+## Actual-project queue-integrated OCI restart — 2026-11-10
+
+At `bac2a46`, an actual CLI worker is killed during Source's real Git/API test
+suite. Ownership-based operator cleanup removes the running orphan; a fresh CLI
+worker naturally reclaims the PostgreSQL lease with a new token. Stale writes
+are rejected, completed evidence is preserved, only the interrupted check reruns,
+and exact promotion plus independent restore succeed. See
+[raw evidence and reproduction](../validation/real-project-worker-crash.md).
+This closes the single local queue-integrated crash demonstration. It does not
+close deployed failover, sustained recovery load, host/daemon loss, staging,
+Workcell host compatibility or the outstanding hot-repository/1,000-agent gates.

@@ -1,0 +1,41 @@
+Source revision: bac2a46
+Command: SOURCE_TEST_DATABASE_URL=<disposable PostgreSQL DSN> node --test --test-concurrency=1 tests/verification-dispatch-live.test.js tests/worker.test.js tests/execution-attempts.test.js
+Output: test result lines only; PostgreSQL bootstrap notices omitted.
+
+✔ journal precedes execution and live owners are never inspected or reaped (43.525676ms)
+✔ dead-owner recovery removes only the inspected immutable container ID and is repeatable (161.147932ms)
+✔ unknown runtime state, missing containers and ownership mismatches retain candidate bytes (740.118765ms)
+✔ confirmed-removal phase recovers interrupted workspace cleanup without another delete (138.980238ms)
+✔ foreign owners, invalid records and symlink substitution never authorize filesystem deletion (149.312768ms)
+✔ recovery lock excludes competing reapers and new admissions (125.022268ms)
+✔ legacy cleanup records remain visible for operator review without invented ownership (25.663429ms)
+✔ legacy assembly jobs cannot dispatch or execute but remain cancellable after upgrade (4077.771925ms)
+✔ concurrent dispatch coalesces exact checks, enforces dependencies and reuses deterministic receipts (6565.796342ms)
+✔ dispatch API requires explicit authority and cannot substitute client execution configuration (4108.438701ms)
+✔ cancelled execution cannot save evidence, forged jobs cannot run, and failed prerequisites rerun descendants (5061.601427ms)
+✔ candidate replacement atomically cancels old work, fences late evidence and never inherits acceptance (5752.792199ms)
+✔ candidate cancellation is terminal, audited, idempotent and authorized separately from dispatch (4628.399845ms)
+✔ promotion and retirement serialize across Source instances without undoing a landed ref (4550.299369ms)
+✔ real CLI worker death before receipt persistence recovers once across competing workers (11456.092914ms)
+✔ real CLI worker death after receipt persistence recovers once across competing workers (11299.667484ms)
+✔ worker bounds handler concurrency and stops gracefully (31.052023ms)
+✔ worker routes handler failures to retry/failure state (2.343657ms)
+✔ worker survives transient queue outages and reports errors (4.466393ms)
+✔ worker shutdown has a bounded drain and leaves hung leases recoverable (12.369224ms)
+✔ worker times out a hung handler and aborts its signal before retry routing (11.998797ms)
+✔ worker jitters idle polling and outage backoff to avoid fleet synchronization (0.316609ms)
+✔ worker caps idle polling backoff for large idle fleets and resets after work (4.680179ms)
+✔ worker uses queue wakeups when available and retains polling fallback semantics (0.523517ms)
+✔ worker shutdown interrupts an outstanding queue wakeup wait (3.26897ms)
+✔ shutdown cancels idle polling and outage backoff timers (1.044716ms)
+✔ lost or unreachable lease aborts the handler and cannot count as completion (11.798624ms)
+✔ completion rejection is visible and never counted as successful execution (0.77698ms)
+✔ a hanging heartbeat cannot extend execution beyond the local lease deadline (16.447685ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 59423.658333

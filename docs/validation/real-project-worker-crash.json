@@ -1,0 +1,1082 @@
+{
+  "version": 1,
+  "status": "passed",
+  "startedAt": "2026-11-11T00:53:55.286Z",
+  "limitations": [
+    "local disposable deployment, no TLS/SSH or production failover",
+    "scripted maintainer authorization, not an independent human review",
+    "targeted Source runtime and API/Git suites, not the full production acceptance suite",
+    "no Docker socket in verification; nested live-container test intentionally excluded",
+    "one local SIGKILL during Git/API verification, not host/daemon loss or sustained recovery load",
+    "quiesced local backup/restore, not online snapshots, power-loss or replicated-primary failover"
+  ],
+  "sourceRevision": "bac2a4603e3d50e80d2838ca8bdb797a8a9bef4f",
+  "hostGit": {
+    "version": "git version 2.50.1 (Apple Git-155)",
+    "execPath": "/Library/Developer/CommandLineTools/usr/libexec/git-core"
+  },
+  "harnessSha256": "86a9d945aea19d97a5a7f9bf6bf37ea0c141c4a8683f4ec51625f523423bcd31",
+  "base": "299ec609924fd419571a7ea4e81d5dc16e8d7e47",
+  "proposal": "bac2a4603e3d50e80d2838ca8bdb797a8a9bef4f",
+  "dependencyImage": {
+    "version": 1,
+    "revision": "d930346e07776e256d1e478bc6601f5b09939760",
+    "base": "node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216",
+    "image": "sha256:5b1de46af3c70e61be8e2bafc6d024de9022edece27d0be704073a0521fea574",
+    "toolVersions": {
+      "node": "v26.13.0",
+      "git": "git version 2.54.1",
+      "gitHttpBackendSha256": "12d3032889e206c7109e57c6094000e3dbeb42077d1e188a78a30d9b435ddd63",
+      "alpine": "3.24.4",
+      "pg": "8.23.0",
+      "yaml": "4.3.2"
+    },
+    "packageSha256": "15c3ba40fae1dbd1ba5f56076f83d7b9510f0780afab08fd0ca7d690ff629b07",
+    "lockSha256": "f14fe1019bd41024adcdf37d9f3f8ddea70364ec904094e27a01aa54f301965b",
+    "dockerfileSha256": "bd502d9ff596451d02b0df49bc6a7d74ead1c2bf71e09542eacb916cb1c7ff39",
+    "buildNetwork": true,
+    "installScripts": false,
+    "runtimeProbeNetwork": "none",
+    "reproducibility": "npm dependencies use the committed integrity lock; Alpine git resolves at build time. The resulting image ID pins the complete local image, not a reproducible future build or registry distribution."
+  },
+  "executorProfile": {
+    "version": 1,
+    "runtime": "docker",
+    "image": "sha256:5b1de46af3c70e61be8e2bafc6d024de9022edece27d0be704073a0521fea574",
+    "toolVersions": {
+      "node": "v26.13.0",
+      "git": "git version 2.54.1",
+      "gitHttpBackendSha256": "12d3032889e206c7109e57c6094000e3dbeb42077d1e188a78a30d9b435ddd63",
+      "alpine": "3.24.4",
+      "pg": "8.23.0",
+      "yaml": "4.3.2"
+    },
+    "timeoutMs": 180000,
+    "maxOutputBytes": 8388608,
+    "memory": "2g",
+    "cpus": 2,
+    "pidsLimit": 256,
+    "user": "501:20",
+    "network": "none",
+    "export": "git-blobs-regular-files-v1",
+    "cleanup": "journaled-removal-v2"
+  },
+  "http": [
+    {
+      "method": "GET",
+      "path": "/git/O1/P1/R1.git/info/refs?service=git-upload-pack",
+      "status": 401
+    },
+    {
+      "method": "GET",
+      "path": "/git/O1/P1/R1.git/info/refs?service=git-receive-pack",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/git/O1/P1/R1.git/git-receive-pack",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/git/O1/P1/R1.git/git-receive-pack",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/git/O1/P1/R1.git/info/refs?service=git-receive-pack",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/git/O1/P1/R1.git/git-receive-pack",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/git/O1/P1/R1.git/git-receive-pack",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/git/O1/P1/R1.git/info/refs?service=git-upload-pack",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/git/O1/P1/R1.git/git-upload-pack",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/git/O1/P1/R1.git/info/refs?service=git-upload-pack",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/git/O1/P1/R1.git/git-upload-pack",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/git/O1/P1/R1.git/info/refs?service=git-receive-pack",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/git/O1/P1/R1.git/git-receive-pack",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/git/O1/P1/R1.git/git-receive-pack",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/O1/projects/P1/submit",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/O1/projects/P1/repositories/R1/integration",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/O1/projects/P1/repositories/R1/integration/2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817/promote",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/O1/projects/P1/repositories/R1/integration/2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817/accept",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/O1/projects/P1/repositories/R1/integration/2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817/dispatch",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/O1/projects/P1/repositories/R1/integration/2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817/dispatch",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/O1/projects/P1/repositories/R1/integration/2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817/evaluate",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/O1/projects/P1/repositories/R1/integration/2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817/dispatch",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/O1/projects/P1/repositories/R1/integration/2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817/accept",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/O1/projects/P1/repositories/R1/integration/2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817/promote",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orgs/O1/projects/P1/repositories/R1/integration/2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817/promote",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/git/O1/P1/R1.git/info/refs?service=git-upload-pack",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/git/O1/P1/R1.git/git-upload-pack",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/git/O1/P1/R1.git/git-upload-pack",
+      "status": 200
+    }
+  ],
+  "sync": {
+    "ok": true,
+    "remote": "source",
+    "refs": [
+      "refs/heads/codex/agent-native-integration"
+    ],
+    "dryRun": false
+  },
+  "policy": {
+    "version": "source-real-project-crash-v1",
+    "securityPolicyVersion": "1",
+    "checks": [
+      {
+        "id": "preflight",
+        "tier": 0,
+        "command": [
+          "node",
+          "scripts/lint.js"
+        ],
+        "version": "1",
+        "toolVersions": {
+          "node": "v26.13.0",
+          "git": "git version 2.54.1",
+          "gitHttpBackendSha256": "12d3032889e206c7109e57c6094000e3dbeb42077d1e188a78a30d9b435ddd63",
+          "alpine": "3.24.4",
+          "pg": "8.23.0",
+          "yaml": "4.3.2"
+        },
+        "environment": "source-oci-v1:368399ec97838e1151d4ce287048aaf7a881716673048375740970e97858eaa3",
+        "inputs": {},
+        "externalState": {},
+        "deterministic": true,
+        "maxAgeMs": 3600000,
+        "maxAttempts": 2,
+        "producers": [
+          "U3"
+        ]
+      },
+      {
+        "id": "runtime",
+        "tier": 1,
+        "command": [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "--test-name-pattern=^(?!live container environment)",
+          "tests/action-runner.test.js",
+          "tests/candidate-executor.test.js",
+          "tests/execution-attempts.test.js",
+          "tests/github-actions.test.js"
+        ],
+        "dependsOn": [
+          "preflight"
+        ],
+        "version": "1",
+        "toolVersions": {
+          "node": "v26.13.0",
+          "git": "git version 2.54.1",
+          "gitHttpBackendSha256": "12d3032889e206c7109e57c6094000e3dbeb42077d1e188a78a30d9b435ddd63",
+          "alpine": "3.24.4",
+          "pg": "8.23.0",
+          "yaml": "4.3.2"
+        },
+        "environment": "source-oci-v1:368399ec97838e1151d4ce287048aaf7a881716673048375740970e97858eaa3",
+        "inputs": {},
+        "externalState": {},
+        "deterministic": true,
+        "maxAgeMs": 3600000,
+        "maxAttempts": 2,
+        "producers": [
+          "U3"
+        ]
+      },
+      {
+        "id": "git-api",
+        "tier": 2,
+        "command": [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "tests/integration-api.test.js",
+          "tests/integration-broker.test.js",
+          "tests/submit.test.js",
+          "tests/sync.test.js",
+          "tests/git.test.js",
+          "tests/backup.test.js"
+        ],
+        "dependsOn": [
+          "runtime"
+        ],
+        "version": "1",
+        "toolVersions": {
+          "node": "v26.13.0",
+          "git": "git version 2.54.1",
+          "gitHttpBackendSha256": "12d3032889e206c7109e57c6094000e3dbeb42077d1e188a78a30d9b435ddd63",
+          "alpine": "3.24.4",
+          "pg": "8.23.0",
+          "yaml": "4.3.2"
+        },
+        "environment": "source-oci-v1:368399ec97838e1151d4ce287048aaf7a881716673048375740970e97858eaa3",
+        "inputs": {},
+        "externalState": {},
+        "deterministic": true,
+        "maxAgeMs": 3600000,
+        "maxAttempts": 2,
+        "producers": [
+          "U3"
+        ]
+      }
+    ]
+  },
+  "submission": {
+    "work": {
+      "id": "W1",
+      "type": "contribution",
+      "intent": "Verify actual Source development from 299ec609924fd419571a7ea4e81d5dc16e8d7e47 to bac2a4603e3d50e80d2838ca8bdb797a8a9bef4f",
+      "requester": "U2",
+      "requirements": [],
+      "constraints": [],
+      "context": "",
+      "priority": "medium",
+      "dependencies": [],
+      "assignee": null,
+      "requiredEvidence": [],
+      "acceptanceConditions": [],
+      "status": "open",
+      "sessions": [],
+      "changes": [],
+      "decisions": [],
+      "createdAt": "2026-11-11T00:54:04.227Z"
+    },
+    "session": {
+      "id": "S1",
+      "workId": "W1",
+      "principal": "U2",
+      "environment": {},
+      "startedAt": "2026-11-11T00:54:04.235Z",
+      "endedAt": null,
+      "baseCommit": "299ec609924fd419571a7ea4e81d5dc16e8d7e47",
+      "tools": [],
+      "skills": [],
+      "workflow": null,
+      "model": null,
+      "events": [],
+      "artifacts": [],
+      "result": null,
+      "evidence": [],
+      "changes": []
+    },
+    "change": {
+      "id": "C1",
+      "workId": "W1",
+      "sessionId": "S1",
+      "baseCommit": "299ec609924fd419571a7ea4e81d5dc16e8d7e47",
+      "headCommit": "bac2a4603e3d50e80d2838ca8bdb797a8a9bef4f",
+      "repositories": [
+        "R1"
+      ],
+      "repositoryChanges": [
+        {
+          "repoId": "R1",
+          "baseCommit": "299ec609924fd419571a7ea4e81d5dc16e8d7e47",
+          "headCommit": "bac2a4603e3d50e80d2838ca8bdb797a8a9bef4f"
+        }
+      ],
+      "diffRef": null,
+      "evidence": [],
+      "reviewState": "pending",
+      "conflictState": "unknown",
+      "decisionState": "undecided",
+      "createdAt": "2026-11-11T00:54:04.240Z"
+    },
+    "evidence": {
+      "id": "E1",
+      "subject": "change footprint",
+      "claim": "change is non-empty",
+      "type": "test",
+      "producer": "U2",
+      "artifactRef": {
+        "hash": "065a93989b0f973ecf1f0313f20cff3e3fd662b916ad2131d35a414b2055a541",
+        "rel": "artifacts/06/065a93989b0f973ecf1f0313f20cff3e3fd662b916ad2131d35a414b2055a541"
+      },
+      "result": {
+        "status": "pass"
+      },
+      "provenance": {},
+      "environment": {},
+      "sourceRevision": null,
+      "validity": "valid",
+      "expiresAt": null,
+      "relationships": [],
+      "integrity": "065a93989b0f973ecf1f0313f20cff3e3fd662b916ad2131d35a414b2055a541",
+      "createdAt": "2026-11-11T00:54:04.281Z"
+    },
+    "securityEvidence": null,
+    "findings": [],
+    "evaluation": {
+      "satisfied": [],
+      "missing": [
+        {
+          "type": "test",
+          "claim": "tests pass"
+        },
+        {
+          "type": "eval",
+          "claim": "deterministic checks pass"
+        }
+      ],
+      "ok": false
+    },
+    "interpretation": [
+      "Not ready for review",
+      "Missing evidence: 2",
+      "- missing test: tests pass",
+      "- missing eval: deterministic checks pass"
+    ]
+  },
+  "candidate": {
+    "version": 1,
+    "assemblyContract": "original-git-objects-v1",
+    "context": {
+      "orgId": "O1",
+      "projectId": "P1",
+      "repoId": "R1",
+      "branch": "codex/agent-native-integration",
+      "policyHash": "5193099615cef0f8602379f35cc65d3f7effa437c0b875d7bd9859da821abd05"
+    },
+    "baseCommit": "299ec609924fd419571a7ea4e81d5dc16e8d7e47",
+    "headCommit": "804d2934461c1a9ed07e5a3b2748166299eedfae",
+    "tree": "2c1e0dc544c51fc52d9dbbe2cda5ec0ea873349d",
+    "proposals": [
+      {
+        "id": "C1",
+        "baseCommit": "299ec609924fd419571a7ea4e81d5dc16e8d7e47",
+        "headCommit": "bac2a4603e3d50e80d2838ca8bdb797a8a9bef4f",
+        "dependsOn": [],
+        "files": [
+          {
+            "status": "M",
+            "from": "scripts/real-project-lifecycle.js",
+            "to": "scripts/real-project-lifecycle.js"
+          },
+          {
+            "status": "A",
+            "from": "scripts/real-project-worker-crash.js",
+            "to": "scripts/real-project-worker-crash.js"
+          }
+        ]
+      }
+    ],
+    "requiredVerification": [
+      "preflight",
+      "integration"
+    ],
+    "state": "proposed",
+    "id": "2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817"
+  },
+  "dispatch": {
+    "version": 1,
+    "candidateId": "2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817",
+    "checks": [
+      {
+        "checkId": "preflight",
+        "identity": "411ee63aaf4bab736d6d5399138e04f42f544a28ca60c72a0c58ce1ca2245073",
+        "epoch": 1,
+        "jobId": "J1",
+        "action": "scheduled",
+        "reason": "no receipt for exact candidate, policy and inputs"
+      },
+      {
+        "checkId": "runtime",
+        "identity": "246e8045fe7137658c04bb54d1635bc4332c4294bf73471ff906361027a6d354",
+        "epoch": 1,
+        "jobId": "J2",
+        "action": "scheduled",
+        "reason": "prerequisite verification is being rerun"
+      },
+      {
+        "checkId": "git-api",
+        "identity": "50ba2931a9d79f3f04d37168fdcc0798e99e510cba44b832985f85a7f978ecbb",
+        "epoch": 1,
+        "jobId": "J3",
+        "action": "scheduled",
+        "reason": "prerequisite verification is being rerun"
+      }
+    ],
+    "plan": {
+      "version": 1,
+      "conservative": true,
+      "reason": "impact information absent or incomplete",
+      "paths": [],
+      "checks": [
+        {
+          "id": "preflight",
+          "tier": 0,
+          "reason": "impact information absent or incomplete"
+        },
+        {
+          "id": "runtime",
+          "tier": 1,
+          "reason": "impact information absent or incomplete"
+        },
+        {
+          "id": "git-api",
+          "tier": 2,
+          "reason": "impact information absent or incomplete"
+        }
+      ],
+      "omitted": []
+    },
+    "dispatchedAt": 1794358445157
+  },
+  "workerCrash": {
+    "injectedCheck": "git-api",
+    "jobId": "J3",
+    "killedWorkerPid": 59684,
+    "signal": "SIGKILL",
+    "containerId": "fb7407e512190195994dfe5fcab198c31d34af3ed802680be95fb4519137765b",
+    "journal": {
+      "version": 1,
+      "state": "prepared",
+      "containerName": "source-action-59684-1794358457298-942a5d2c9812",
+      "runtime": "docker",
+      "image": "sha256:5b1de46af3c70e61be8e2bafc6d024de9022edece27d0be704073a0521fea574",
+      "workspace": "/private/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-real-project-4NSlMB/workspaces/source-J3-8ZpKJG",
+      "ownerPid": 59684,
+      "ownerHost": "MacBook-Pro",
+      "ownerNamespace": "darwin-host",
+      "jobId": "J3",
+      "createdAt": "2026-11-11T00:54:17.298Z"
+    },
+    "actualTestOutputObserved": true,
+    "orphanWasRunning": true,
+    "leaseExpiredNaturally": true,
+    "oldLeaseExpiresAt": "2026-11-11T00:55:16.907Z",
+    "replacementObservedAt": "2026-11-11T00:55:17.393Z",
+    "recovery": {
+      "version": 1,
+      "results": [
+        {
+          "containerName": "source-action-59684-1794358457298-942a5d2c9812",
+          "jobId": "J3",
+          "ownerPid": 59684,
+          "state": "recovered"
+        }
+      ],
+      "durationMs": 197
+    },
+    "repeated": {
+      "version": 1,
+      "results": [],
+      "durationMs": 1
+    },
+    "staleCompletionRejected": true,
+    "staleHeartbeatRejected": true,
+    "staleFailureRejected": true,
+    "staleReceiptLeaseRejected": true,
+    "acceptanceDeniedWithoutReceipt": true,
+    "completedJobsUnchanged": true,
+    "preservedReceipts": [
+      {
+        "checkId": "preflight",
+        "receiptId": "3b5f977085a465ca4df425d8c2dfc4fc310b3c6a8f535532ec847b826c4a8233"
+      },
+      {
+        "checkId": "runtime",
+        "receiptId": "5101749997477af53df1ed3c83b4c93fbbe1e903b5aad821523d35b5d49679a2"
+      }
+    ],
+    "orphanRemovalMs": 547,
+    "reclaimMs": 59507,
+    "helperSha256": "28039640db6bb2b41874e59a1f4a7bc5911348ca6df348c9b59a0f00101b1c8f"
+  },
+  "jobs": [
+    {
+      "id": "J1",
+      "kind": "integration.verify",
+      "payload": {
+        "epoch": 1,
+        "repoId": "R1",
+        "checkId": "preflight",
+        "identity": "411ee63aaf4bab736d6d5399138e04f42f544a28ca60c72a0c58ce1ca2245073",
+        "candidateId": "2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817"
+      },
+      "org_id": "O1",
+      "project_id": "P1",
+      "work_id": null,
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 2,
+      "dependsOn": [],
+      "dedupeKey": "verification:7c4cc907376ab4b54443f0325f9a2c8a664028210f33c444241ac0c92b654ecc",
+      "priority": 0,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "available_at": "2026-11-10T19:54:05.147-05:00",
+      "leased_until": null,
+      "worker_id": null,
+      "result": {
+        "checkId": "preflight",
+        "receiptId": "3b5f977085a465ca4df425d8c2dfc4fc310b3c6a8f535532ec847b826c4a8233",
+        "durationMs": 5882,
+        "candidateId": "2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817"
+      },
+      "last_error": null,
+      "created_at": "2026-11-10T19:54:04.983455-05:00",
+      "updated_at": "2026-11-10T19:54:13.207836-05:00"
+    },
+    {
+      "id": "J2",
+      "kind": "integration.verify",
+      "payload": {
+        "epoch": 1,
+        "repoId": "R1",
+        "checkId": "runtime",
+        "identity": "246e8045fe7137658c04bb54d1635bc4332c4294bf73471ff906361027a6d354",
+        "candidateId": "2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817"
+      },
+      "org_id": "O1",
+      "project_id": "P1",
+      "work_id": null,
+      "status": "completed",
+      "attempts": 1,
+      "max_attempts": 2,
+      "dependsOn": [
+        "J1"
+      ],
+      "dedupeKey": "verification:914d469a297843f009f18b408a042c0fee3243eb9138dd2c59bfb693f0dcb5f4",
+      "priority": 0,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "available_at": "2026-11-10T19:54:05.153-05:00",
+      "leased_until": null,
+      "worker_id": null,
+      "result": {
+        "checkId": "runtime",
+        "receiptId": "5101749997477af53df1ed3c83b4c93fbbe1e903b5aad821523d35b5d49679a2",
+        "durationMs": 3434,
+        "candidateId": "2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817"
+      },
+      "last_error": null,
+      "created_at": "2026-11-10T19:54:04.983455-05:00",
+      "updated_at": "2026-11-10T19:54:16.906617-05:00"
+    },
+    {
+      "id": "J3",
+      "kind": "integration.verify",
+      "payload": {
+        "epoch": 1,
+        "repoId": "R1",
+        "checkId": "git-api",
+        "identity": "50ba2931a9d79f3f04d37168fdcc0798e99e510cba44b832985f85a7f978ecbb",
+        "candidateId": "2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817"
+      },
+      "org_id": "O1",
+      "project_id": "P1",
+      "work_id": null,
+      "status": "completed",
+      "attempts": 2,
+      "max_attempts": 2,
+      "dependsOn": [
+        "J2"
+      ],
+      "dedupeKey": "verification:ac714839a046aaec694ddc2096b0eb9fb728260aa6639c223c504629a68f0a28",
+      "priority": 0,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "available_at": "2026-11-10T19:54:05.155-05:00",
+      "leased_until": null,
+      "worker_id": null,
+      "result": {
+        "checkId": "git-api",
+        "receiptId": "2c5121bd4adc017ca7a90b320c7ddeaf8893be9ebb6df498390579c5b4767062",
+        "durationMs": 61955,
+        "candidateId": "2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817"
+      },
+      "last_error": null,
+      "created_at": "2026-11-10T19:54:04.983455-05:00",
+      "updated_at": "2026-11-10T19:56:19.643564-05:00"
+    }
+  ],
+  "workerExit": {
+    "code": 0,
+    "signal": null
+  },
+  "evaluation": {
+    "ok": true,
+    "checks": [
+      {
+        "checkId": "preflight",
+        "satisfied": true,
+        "reason": "exact candidate verified",
+        "receiptId": "3b5f977085a465ca4df425d8c2dfc4fc310b3c6a8f535532ec847b826c4a8233"
+      },
+      {
+        "checkId": "runtime",
+        "satisfied": true,
+        "reason": "exact candidate verified",
+        "receiptId": "5101749997477af53df1ed3c83b4c93fbbe1e903b5aad821523d35b5d49679a2"
+      },
+      {
+        "checkId": "git-api",
+        "satisfied": true,
+        "reason": "exact candidate verified",
+        "receiptId": "2c5121bd4adc017ca7a90b320c7ddeaf8893be9ebb6df498390579c5b4767062"
+      }
+    ],
+    "plan": {
+      "version": 1,
+      "conservative": true,
+      "reason": "impact information absent or incomplete",
+      "paths": [],
+      "checks": [
+        {
+          "id": "preflight",
+          "tier": 0,
+          "reason": "impact information absent or incomplete"
+        },
+        {
+          "id": "runtime",
+          "tier": 1,
+          "reason": "impact information absent or incomplete"
+        },
+        {
+          "id": "git-api",
+          "tier": 2,
+          "reason": "impact information absent or incomplete"
+        }
+      ],
+      "omitted": []
+    }
+  },
+  "receipts": [
+    {
+      "receipt": {
+        "id": "3b5f977085a465ca4df425d8c2dfc4fc310b3c6a8f535532ec847b826c4a8233",
+        "tree": "2c1e0dc544c51fc52d9dbbe2cda5ec0ea873349d",
+        "commit": "804d2934461c1a9ed07e5a3b2748166299eedfae",
+        "jobRef": {
+          "id": "J1",
+          "epoch": 1
+        },
+        "checkId": "preflight",
+        "version": 1,
+        "identity": "411ee63aaf4bab736d6d5399138e04f42f544a28ca60c72a0c58ce1ca2245073",
+        "producer": "U3",
+        "execution": {
+          "tree": "2c1e0dc544c51fc52d9dbbe2cda5ec0ea873349d",
+          "commit": "804d2934461c1a9ed07e5a3b2748166299eedfae",
+          "export": {
+            "tree": "2c1e0dc544c51fc52d9dbbe2cda5ec0ea873349d",
+            "bytes": 2820815,
+            "files": 285,
+            "commit": "804d2934461c1a9ed07e5a3b2748166299eedfae"
+          },
+          "inputs": {},
+          "status": "pass",
+          "stderr": "",
+          "command": [
+            "node",
+            "scripts/lint.js"
+          ],
+          "exitCode": 0,
+          "identity": "411ee63aaf4bab736d6d5399138e04f42f544a28ca60c72a0c58ce1ca2245073",
+          "startedAt": 1794358447246,
+          "durationMs": 5882,
+          "finishedAt": 1794358453128,
+          "environment": "source-oci-v1:368399ec97838e1151d4ce287048aaf7a881716673048375740970e97858eaa3",
+          "toolVersions": {
+            "pg": "8.23.0",
+            "git": "git version 2.54.1",
+            "node": "v26.13.0",
+            "yaml": "4.3.2",
+            "alpine": "3.24.4",
+            "gitHttpBackendSha256": "12d3032889e206c7109e57c6094000e3dbeb42077d1e188a78a30d9b435ddd63"
+          },
+          "externalState": {},
+          "runtimeSignal": null,
+          "cleanupConfirmed": true,
+          "workspaceRemoved": true
+        },
+        "expiresAt": 1794362047246,
+        "policyHash": "780a65cd81d4e36a3e515654a074d5c6c6398e0d634f4e0bf39e04adda14f89c",
+        "provenance": "authorized-service-attestation",
+        "recordedAt": 1794358453199,
+        "artifactRef": {
+          "hash": "2e9b7dbc6661b4d71d8ed52cc3cd4a736847a317a5b29ca02ab7fb3ef4ab3e21"
+        },
+        "candidateId": "2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817"
+      },
+      "output": "lint: syntax checked 121 JavaScript files\n"
+    },
+    {
+      "receipt": {
+        "id": "5101749997477af53df1ed3c83b4c93fbbe1e903b5aad821523d35b5d49679a2",
+        "tree": "2c1e0dc544c51fc52d9dbbe2cda5ec0ea873349d",
+        "commit": "804d2934461c1a9ed07e5a3b2748166299eedfae",
+        "jobRef": {
+          "id": "J2",
+          "epoch": 1
+        },
+        "checkId": "runtime",
+        "version": 1,
+        "identity": "246e8045fe7137658c04bb54d1635bc4332c4294bf73471ff906361027a6d354",
+        "producer": "U3",
+        "execution": {
+          "tree": "2c1e0dc544c51fc52d9dbbe2cda5ec0ea873349d",
+          "commit": "804d2934461c1a9ed07e5a3b2748166299eedfae",
+          "export": {
+            "tree": "2c1e0dc544c51fc52d9dbbe2cda5ec0ea873349d",
+            "bytes": 2820815,
+            "files": 285,
+            "commit": "804d2934461c1a9ed07e5a3b2748166299eedfae"
+          },
+          "inputs": {},
+          "status": "pass",
+          "stderr": "",
+          "command": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "--test-reporter=tap",
+            "--test-name-pattern=^(?!live container environment)",
+            "tests/action-runner.test.js",
+            "tests/candidate-executor.test.js",
+            "tests/execution-attempts.test.js",
+            "tests/github-actions.test.js"
+          ],
+          "exitCode": 0,
+          "identity": "246e8045fe7137658c04bb54d1635bc4332c4294bf73471ff906361027a6d354",
+          "startedAt": 1794358453379,
+          "durationMs": 3434,
+          "finishedAt": 1794358456813,
+          "environment": "source-oci-v1:368399ec97838e1151d4ce287048aaf7a881716673048375740970e97858eaa3",
+          "toolVersions": {
+            "pg": "8.23.0",
+            "git": "git version 2.54.1",
+            "node": "v26.13.0",
+            "yaml": "4.3.2",
+            "alpine": "3.24.4",
+            "gitHttpBackendSha256": "12d3032889e206c7109e57c6094000e3dbeb42077d1e188a78a30d9b435ddd63"
+          },
+          "externalState": {},
+          "runtimeSignal": null,
+          "cleanupConfirmed": true,
+          "workspaceRemoved": true
+        },
+        "expiresAt": 1794362053379,
+        "policyHash": "780a65cd81d4e36a3e515654a074d5c6c6398e0d634f4e0bf39e04adda14f89c",
+        "provenance": "authorized-service-attestation",
+        "recordedAt": 1794358456898,
+        "artifactRef": {
+          "hash": "dfb0f350daf74be6c0ef1beb1bb612c0c2a0524afae30ac1402e33ea6ecca98b"
+        },
+        "candidateId": "2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817"
+      },
+      "output": "TAP version 13\n# Subtest: isolated runner builds a bounded no-network container command\nok 1 - isolated runner builds a bounded no-network container command\n  ---\n  duration_ms: 3.753468\n  type: 'test'\n  ...\n# Subtest: isolated runner requires resolved actions and rejects workspace escapes\nok 2 - isolated runner requires resolved actions and rejects workspace escapes\n  ---\n  duration_ms: 1.466745\n  type: 'test'\n  ...\n# Subtest: isolated runner expands only bounded operator-configured uses actions\nok 3 - isolated runner expands only bounded operator-configured uses actions\n  ---\n  duration_ms: 2.757253\n  type: 'test'\n  ...\n# Subtest: static action registry requires immutable allowlisted references\nok 4 - static action registry requires immutable allowlisted references\n  ---\n  duration_ms: 1.848756\n  type: 'test'\n  ...\n# Subtest: signed action manifests require valid Ed25519 signatures and expiry\nok 5 - signed action manifests require valid Ed25519 signatures and expiry\n  ---\n  duration_ms: 8.739411\n  type: 'test'\n  ...\n# Subtest: signed action registry loader selects keys from a rotatable keyring\nok 6 - signed action registry loader selects keys from a rotatable keyring\n  ---\n  duration_ms: 16.74321\n  type: 'test'\n  ...\n# Subtest: action keyring loader bounds and validates deployment key files\nok 7 - action keyring loader bounds and validates deployment key files\n  ---\n  duration_ms: 3.564023\n  type: 'test'\n  ...\n# Subtest: isolated runner bounds container admission independently of workspaces\nok 8 - isolated runner bounds container admission independently of workspaces\n  ---\n  duration_ms: 2.640644\n  type: 'test'\n  ...\n# Subtest: isolated runner releases admission after a runtime exits\nok 9 - isolated runner releases admission after a runtime exits\n  ---\n  duration_ms: 3.417026\n  type: 'test'\n  ...\n# Subtest: GitHub handler resolves an isolated workspace and passes brokered secrets by name\nok 10 - GitHub handler resolves an isolated workspace and passes brokered secrets by name\n  ---\n  duration_ms: 1.777739\n  type: 'test'\n  ...\n# Subtest: GitHub handler redacts brokered secrets from runner output\nok 11 - GitHub handler redacts brokered secrets from runner output\n  ---\n  duration_ms: 1.533164\n  type: 'test'\n  ...\n# Subtest: secret lease broker binds identity, avoids caching, and audits without values\nok 12 - secret lease broker binds identity, avoids caching, and audits without values\n  ---\n  duration_ms: 2.069604\n  type: 'test'\n  ...\n# Subtest: secret provider module loader enforces the production adapter contract\nok 13 - secret provider module loader enforces the production adapter contract\n  ---\n  duration_ms: 10.835462\n  type: 'test'\n  ...\n# Subtest: HTTPS secret provider adapter rotates auth and enforces bounded lease responses\nok 14 - HTTPS secret provider adapter rotates auth and enforces bounded lease responses\n  ---\n  duration_ms: 55.328497\n  type: 'test'\n  ...\n# Subtest: ephemeral workspace manager bounds and cleans action workspaces\nok 15 - ephemeral workspace manager bounds and cleans action workspaces\n  ---\n  duration_ms: 3.753619\n  type: 'test'\n  ...\n# Subtest: GitHub handler releases managed workspaces after runner failure\nok 16 - GitHub handler releases managed workspaces after runner failure\n  ---\n  duration_ms: 2.065394\n  type: 'test'\n  ...\n# Subtest: revocation failure still releases the action workspace\nok 17 - revocation failure still releases the action workspace\n  ---\n  duration_ms: 0.522566\n  type: 'test'\n  ...\n# Subtest: secret provider stops reading oversized bodies\nok 18 - secret provider stops reading oversized bodies\n  ---\n  duration_ms: 1.892456\n  type: 'test'\n  ...\n# Subtest: secret provider timeout covers a stalled response body\nok 19 - secret provider timeout covers a stalled response body\n  ---\n  duration_ms: 1010.773915\n  type: 'test'\n  ...\n# Subtest: rejected runner environment does not consume execution capacity\nok 20 - rejected runner environment does not consume execution capacity\n  ---\n  duration_ms: 0.561803\n  type: 'test'\n  ...\n# Subtest: cancellation propagates to isolated runtime and rejects before spawning when already aborted\nok 21 - cancellation propagates to isolated runtime and rejects before spawning when already aborted\n  ---\n  duration_ms: 13.963869\n  type: 'test'\n  ...\n# Subtest: workflow handler forwards cancellation through its workspace and secret cleanup boundary\nok 22 - workflow handler forwards cancellation through its workspace and secret cleanup boundary\n  ---\n  duration_ms: 0.826625\n  type: 'test'\n  ...\n# Subtest: old attempt cleanup cannot remove a reclaimed job workspace\nok 23 - old attempt cleanup cannot remove a reclaimed job workspace\n  ---\n  duration_ms: 11.174827\n  type: 'test'\n  ...\n# Subtest: runtime cleanup distinguishes confirmed absence from an unreachable daemon\nok 24 - runtime cleanup distinguishes confirmed absence from an unreachable daemon\n  ---\n  duration_ms: 0.759948\n  type: 'test'\n  ...\n# Subtest: a successful runtime exit cannot report success when cleanup is unconfirmed\nok 25 - a successful runtime exit cannot report success when cleanup is unconfirmed\n  ---\n  duration_ms: 6.479935\n  type: 'test'\n  ...\n# Subtest: workflow handler preserves uncertain workspaces while revoking its secret lease\nok 26 - workflow handler preserves uncertain workspaces while revoking its secret lease\n  ---\n  duration_ms: 0.609118\n  type: 'test'\n  ...\n# Subtest: workload environment cannot redirect the host runtime but reaches the container unchanged\nok 27 - workload environment cannot redirect the host runtime but reaches the container unchanged\n  ---\n  duration_ms: 6.729605\n  type: 'test'\n  ...\n# Subtest: live container environment stays separate from host runtime configuration\nok 28 - live container environment stays separate from host runtime configuration # SKIP\n  ---\n  duration_ms: 0.220092\n  type: 'test'\n  ...\n# Subtest: local full image IDs bind verification to immutable operator-built dependencies\nok 29 - local full image IDs bind verification to immutable operator-built dependencies\n  ---\n  duration_ms: 49.941776\n  type: 'test'\n  ...\n# Subtest: unconfirmed container cleanup preserves the workspace and a durable recovery record\nok 30 - unconfirmed container cleanup preserves the workspace and a durable recovery record\n  ---\n  duration_ms: 65.448017\n  type: 'test'\n  ...\n# Subtest: candidate export preserves raw Git bytes and executable mode without working files, archive attributes or .git\nok 31 - candidate export preserves raw Git bytes and executable mode without working files, archive attributes or .git\n  ---\n  duration_ms: 45.659252\n  type: 'test'\n  ...\n# Subtest: candidate export rejects symlinks and oversized trees before writing files\nok 32 - candidate export rejects symlinks and oversized trees before writing files\n  ---\n  duration_ms: 68.88898\n  type: 'test'\n  ...\n# Subtest: candidate export rejects filesystem aliases and corrupted blob bytes\nok 33 - candidate export rejects filesystem aliases and corrupted blob bytes\n  ---\n  duration_ms: 53.223104\n  type: 'test'\n  ...\n# Subtest: container executor pins its environment, quotes argv and cleans its exact workspace after success or runtime failure\nok 34 - container executor pins its environment, quotes argv and cleans its exact workspace after success or runtime failure\n  ---\n  duration_ms: 66.907464\n  type: 'test'\n  ...\n# Subtest: journal precedes execution and live owners are never inspected or reaped\nok 35 - journal precedes execution and live owners are never inspected or reaped\n  ---\n  duration_ms: 29.368116\n  type: 'test'\n  ...\n# Subtest: dead-owner recovery removes only the inspected immutable container ID and is repeatable\nok 36 - dead-owner recovery removes only the inspected immutable container ID and is repeatable\n  ---\n  duration_ms: 69.906301\n  type: 'test'\n  ...\n# Subtest: unknown runtime state, missing containers and ownership mismatches retain candidate bytes\nok 37 - unknown runtime state, missing containers and ownership mismatches retain candidate bytes\n  ---\n  duration_ms: 333.646421\n  type: 'test'\n  ...\n# Subtest: confirmed-removal phase recovers interrupted workspace cleanup without another delete\nok 38 - confirmed-removal phase recovers interrupted workspace cleanup without another delete\n  ---\n  duration_ms: 55.552452\n  type: 'test'\n  ...\n# Subtest: foreign owners, invalid records and symlink substitution never authorize filesystem deletion\nok 39 - foreign owners, invalid records and symlink substitution never authorize filesystem deletion\n  ---\n  duration_ms: 60.517547\n  type: 'test'\n  ...\n# Subtest: recovery lock excludes competing reapers and new admissions\nok 40 - recovery lock excludes competing reapers and new admissions\n  ---\n  duration_ms: 53.43012\n  type: 'test'\n  ...\n# Subtest: legacy cleanup records remain visible for operator review without invented ownership\nok 41 - legacy cleanup records remain visible for operator review without invented ownership\n  ---\n  duration_ms: 10.312869\n  type: 'test'\n  ...\n# Subtest: GitHub Actions translation preserves bounded step data without executing it\nok 42 - GitHub Actions translation preserves bounded step data without executing it\n  ---\n  duration_ms: 7.587956\n  type: 'test'\n  ...\n# Subtest: GitHub Actions translation rejects unsupported or oversized workflows\nok 43 - GitHub Actions translation rejects unsupported or oversized workflows\n  ---\n  duration_ms: 5.009866\n  type: 'test'\n  ...\n# Subtest: workflow import resolves repositories through project membership\nok 44 - workflow import resolves repositories through project membership\n  ---\n  duration_ms: 57.26806\n  type: 'test'\n  ...\n1..44\n# tests 44\n# suites 0\n# pass 43\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n# duration_ms 2742.799518\n"
+    },
+    {
+      "receipt": {
+        "id": "2c5121bd4adc017ca7a90b320c7ddeaf8893be9ebb6df498390579c5b4767062",
+        "tree": "2c1e0dc544c51fc52d9dbbe2cda5ec0ea873349d",
+        "commit": "804d2934461c1a9ed07e5a3b2748166299eedfae",
+        "jobRef": {
+          "id": "J3",
+          "epoch": 1
+        },
+        "checkId": "git-api",
+        "version": 1,
+        "identity": "50ba2931a9d79f3f04d37168fdcc0798e99e510cba44b832985f85a7f978ecbb",
+        "producer": "U3",
+        "execution": {
+          "tree": "2c1e0dc544c51fc52d9dbbe2cda5ec0ea873349d",
+          "commit": "804d2934461c1a9ed07e5a3b2748166299eedfae",
+          "export": {
+            "tree": "2c1e0dc544c51fc52d9dbbe2cda5ec0ea873349d",
+            "bytes": 2820815,
+            "files": 285,
+            "commit": "804d2934461c1a9ed07e5a3b2748166299eedfae"
+          },
+          "inputs": {},
+          "status": "pass",
+          "stderr": "",
+          "command": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "--test-reporter=tap",
+            "tests/integration-api.test.js",
+            "tests/integration-broker.test.js",
+            "tests/submit.test.js",
+            "tests/sync.test.js",
+            "tests/git.test.js",
+            "tests/backup.test.js"
+          ],
+          "exitCode": 0,
+          "identity": "50ba2931a9d79f3f04d37168fdcc0798e99e510cba44b832985f85a7f978ecbb",
+          "startedAt": 1794358517597,
+          "durationMs": 61955,
+          "finishedAt": 1794358579552,
+          "environment": "source-oci-v1:368399ec97838e1151d4ce287048aaf7a881716673048375740970e97858eaa3",
+          "toolVersions": {
+            "pg": "8.23.0",
+            "git": "git version 2.54.1",
+            "node": "v26.13.0",
+            "yaml": "4.3.2",
+            "alpine": "3.24.4",
+            "gitHttpBackendSha256": "12d3032889e206c7109e57c6094000e3dbeb42077d1e188a78a30d9b435ddd63"
+          },
+          "externalState": {},
+          "runtimeSignal": null,
+          "cleanupConfirmed": true,
+          "workspaceRemoved": true
+        },
+        "expiresAt": 1794362117597,
+        "policyHash": "780a65cd81d4e36a3e515654a074d5c6c6398e0d634f4e0bf39e04adda14f89c",
+        "provenance": "authorized-service-attestation",
+        "recordedAt": 1794358579636,
+        "artifactRef": {
+          "hash": "897d7a221fc35832411ccd066f39e7b88e1fdd8c554fffcf0cdbcd016af19ef5"
+        },
+        "candidateId": "2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817"
+      },
+      "output": "TAP version 13\n# Subtest: failed database dumps do not publish backups or print the database credential\nok 1 - failed database dumps do not publish backups or print the database credential\n  ---\n  duration_ms: 106.471908\n  type: 'test'\n  ...\n# Subtest: backup workflow archives and verifies a Git root\nok 2 - backup workflow archives and verifies a Git root\n  ---\n  duration_ms: 326.898984\n  type: 'test'\n  ...\n# Subtest: restore refuses symlink archive entries\nok 3 - restore refuses symlink archive entries\n  ---\n  duration_ms: 135.716793\n  type: 'test'\n  ...\n# Subtest: restore refuses hardlink archive entries\nok 4 - restore refuses hardlink archive entries\n  ---\n  duration_ms: 117.422847\n  type: 'test'\n  ...\n# Subtest: backup and restore use the declared PostgreSQL schema and separate Git root\nok 5 - backup and restore use the declared PostgreSQL schema and separate Git root # SKIP\n  ---\n  duration_ms: 0.353952\n  type: 'test'\n  ...\n# Subtest: restore refuses a checksum mismatch before extraction or database work\nok 6 - restore refuses a checksum mismatch before extraction or database work\n  ---\n  duration_ms: 190.495476\n  type: 'test'\n  ...\n# To /tmp/source-test-CcpmBD/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# To /tmp/source-test-iNoicG/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# Cloning into '/tmp/source-clone-hcKFCJ'...\n# done.\n# To /tmp/source-test-dJLaeJ/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# To /tmp/source-test-dJLaeJ/orgs/O1/projects/P1/repos/R1.git\n#    f924584..62282c8  main -> main\n# Cloning into '/tmp/source-fetch-bEiIFN'...\n# done.\n# To /tmp/source-test-OOLmEO/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# To /tmp/source-test-OOLmEO/orgs/O1/projects/P1/repos/R1.git\n#    2ccd500..2996953  main -> main\n# To /tmp/source-test-EokNab/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: relocated metadata resolves Git only beneath the configured restored root\nok 7 - relocated metadata resolves Git only beneath the configured restored root\n  ---\n  duration_ms: 111.287765\n  type: 'test'\n  ...\n# Subtest: Git repositories can live on a separate shared root\nok 8 - Git repositories can live on a separate shared root\n  ---\n  duration_ms: 5.877625\n  type: 'test'\n  ...\n# Subtest: git clone works against a Source bare repository\nok 9 - git clone works against a Source bare repository\n  ---\n  duration_ms: 5102.349912\n  type: 'test'\n  ...\n# Subtest: git fetch works\nok 10 - git fetch works\n  ---\n  duration_ms: 5151.206392\n  type: 'test'\n  ...\n# Subtest: git push works (contribution transport)\nok 11 - git push works (contribution transport)\n  ---\n  duration_ms: 112.745221\n  type: 'test'\n  ...\n# To /tmp/source-test-gFINhg/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# To /tmp/source-test-gFINhg/orgs/O1/projects/P1/repos/R1.git\n#    597e4a1..4f82056  main -> main\n# Subtest: revision inputs cannot inject Git options or create output files\nok 12 - revision inputs cannot inject Git options or create output files\n  ---\n  duration_ms: 101.340821\n  type: 'test'\n  ...\n# To /tmp/source-test-hcFEpj/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# To /tmp/source-test-hcFEpj/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      HEAD -> original\n# To /tmp/source-test-hcFEpj/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      HEAD -> replacement\n# Subtest: repository file reads preserve exact UTF-8 whitespace\nok 13 - repository file reads preserve exact UTF-8 whitespace\n  ---\n  duration_ms: 108.446982\n  type: 'test'\n  ...\n# Subtest: replacement refs cannot hide committed credentials from contribution evidence or repository reads\nok 14 - replacement refs cannot hide committed credentials from contribution evidence or repository reads\n  ---\n  duration_ms: 198.920797\n  type: 'test'\n  ...\n# To /tmp/source-test-efJmAH/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# To /tmp/source-test-efJmAH/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      HEAD -> feature\n# To /tmp/source-test-HBMiak/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: integration API scopes planning, uses persisted proposal heads, retains inspectable snapshots\nok 15 - integration API scopes planning, uses persisted proposal heads, retains inspectable snapshots\n  ---\n  duration_ms: 580.573101\n  type: 'test'\n  ...\n# Subtest: operator batch bound rejects excess before reading changes and cannot be overridden by requests\nok 16 - operator batch bound rejects excess before reading changes and cannot be overridden by requests\n  ---\n  duration_ms: 104.636045\n  type: 'test'\n  ...\n# To /tmp/source-test-EHoidE/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# HEAD is now at 777cd6f change\n# To /tmp/source-test-EHoidE/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      HEAD -> legacy\n# To /tmp/source-test-FHAMAP/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: legacy assembly candidates remain inspectable but cannot reuse evidence or authorize promotion\nok 17 - legacy assembly candidates remain inspectable but cannot reuse evidence or authorize promotion\n  ---\n  duration_ms: 348.322288\n  type: 'test'\n  ...\n# HEAD is now at 777cd6f change\n# To /tmp/source-test-FHAMAP/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      HEAD -> feature\n# To /tmp/source-test-nfnadl/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: broker requires exact evidence and maintainer acceptance; atomic landed receipt makes repeats idempotent\nok 18 - broker requires exact evidence and maintainer acceptance; atomic landed receipt makes repeats idempotent\n  ---\n  duration_ms: 348.928859\n  type: 'test'\n  ...\n# HEAD is now at ed22492 change\n# To /tmp/source-test-nfnadl/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      HEAD -> a\n# Previous HEAD position was 232e325 a\n# HEAD is now at ed22492 change\n# To /tmp/source-test-nfnadl/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      HEAD -> b\n# To /tmp/source-test-iPBalG/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: competing candidates and stale evidence never overwrite the protected target\nok 19 - competing candidates and stale evidence never overwrite the protected target\n  ---\n  duration_ms: 377.376199\n  type: 'test'\n  ...\n# HEAD is now at ed22492 change\n# To /tmp/source-test-iPBalG/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      HEAD -> recovery\n# To /tmp/source-test-mbCbgO/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: Git success followed by lost database acknowledgment reconciles without another update\nok 20 - Git success followed by lost database acknowledgment reconciles without another update\n  ---\n  duration_ms: 262.330972\n  type: 'test'\n  ...\n# HEAD is now at ed22492 change\n# To /tmp/source-test-mbCbgO/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      HEAD -> http\n# To /tmp/source-test-MLdPlo/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: HTTP capabilities cannot forge service identity or bypass a protected branch\nok 21 - HTTP capabilities cannot forge service identity or bypass a protected branch\n  ---\n  duration_ms: 5468.894302\n  type: 'test'\n  ...\n# HEAD is now at 8b199e3 change\n# To /tmp/source-test-MLdPlo/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      HEAD -> policy\n# To /tmp/source-test-fNnncF/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: changed verification policy creates a new immutable candidate identity\nok 22 - changed verification policy creates a new immutable candidate identity\n  ---\n  duration_ms: 225.603785\n  type: 'test'\n  ...\n# HEAD is now at 8b199e3 change\n# To /tmp/source-test-fNnncF/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      HEAD -> process-a\n# Previous HEAD position was d753942 process-a\n# HEAD is now at 8b199e3 change\n# To /tmp/source-test-fNnncF/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      HEAD -> process-b\n# To /tmp/source-test-EFKGbh/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: independent CLI processes race two verified candidates through Git compare-and-swap\nok 23 - independent CLI processes race two verified candidates through Git compare-and-swap\n  ---\n  duration_ms: 528.459994\n  type: 'test'\n  ...\n# HEAD is now at ee48ad0 change\n# To /tmp/source-test-EFKGbh/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      HEAD -> crash\n# To /tmp/source-test-cGJLcH/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: a promoter process exits after Git commit and a fresh process reconciles the durable result\nok 24 - a promoter process exits after Git commit and a fresh process reconciles the durable result\n  ---\n  duration_ms: 537.87897\n  type: 'test'\n  ...\n# HEAD is now at ee48ad0 change\n# To /tmp/source-test-cGJLcH/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      HEAD -> split-a\n# Previous HEAD position was 29e0099 split-a\n# HEAD is now at ee48ad0 change\n# To /tmp/source-test-cGJLcH/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      HEAD -> split-b\n# To /tmp/source-test-DlhDmh/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: failed integration checks split a batch without transferring evidence or acceptance\nok 25 - failed integration checks split a batch without transferring evidence or acceptance\n  ---\n  duration_ms: 473.244782\n  type: 'test'\n  ...\n# HEAD is now at 0a0c413 change\n# To /tmp/source-test-DlhDmh/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      HEAD -> adapter\n# Subtest: tool gate parses original artifacts; context-only checks and contradictory green claims are denied\nok 26 - tool gate parses original artifacts; context-only checks and contradictory green claims are denied\n  ---\n  duration_ms: 203.162693\n  type: 'test'\n  ...\n# To /tmp/source-test-KMOGjG/orgs/O1/projects/P2/repos/R1.git\n#  * [new branch]      main -> main\n# To /tmp/source-test-nIcLbc/orgs/O1/projects/P2/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: source submit: a Git-only developer contributes without knowing Source\nok 27 - source submit: a Git-only developer contributes without knowing Source\n  ---\n  duration_ms: 5394.275558\n  type: 'test'\n  ...\n# To /tmp/source-test-ODgjao/orgs/O1/projects/P2/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: source submit: a contribution can be completed end-to-end by a maintainer\nok 28 - source submit: a contribution can be completed end-to-end by a maintainer\n  ---\n  duration_ms: 5328.249158\n  type: 'test'\n  ...\n# To /tmp/source-test-kgodPF/orgs/O1/projects/P2/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: source submit: empty change is rejected\nok 29 - source submit: empty change is rejected\n  ---\n  duration_ms: 5233.694415\n  type: 'test'\n  ...\n# To /tmp/source-test-cjcPaa/orgs/O1/projects/P2/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: secondary remote submit uses fresh Source history even when GitHub origin already has HEAD\nok 30 - secondary remote submit uses fresh Source history even when GitHub origin already has HEAD\n  ---\n  duration_ms: 10369.578047\n  type: 'test'\n  ...\n# To /tmp/source-test-BlcipA/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: explicit and configured remote selection supports a nonstandard default branch\nok 31 - explicit and configured remote selection supports a nonstandard default branch\n  ---\n  duration_ms: 10479.00789\n  type: 'test'\n  ...\n# To /tmp/source-test-OPndlM/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: private secondary-remote submit authenticates API using argument credential\nok 32 - private secondary-remote submit authenticates API using argument credential\n  ---\n  duration_ms: 398.502324\n  type: 'test'\n  ...\n# To /tmp/source-test-mcpanl/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: private secondary-remote submit authenticates API using environment credential\nok 33 - private secondary-remote submit authenticates API using environment credential\n  ---\n  duration_ms: 431.125364\n  type: 'test'\n  ...\n# Subtest: authenticated submit refuses a different API origin before pushing\nok 34 - authenticated submit refuses a different API origin before pushing\n  ---\n  duration_ms: 113.316524\n  type: 'test'\n  ...\n# To /tmp/source-test-GfLJnH/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# To /tmp/source-test-eODJkf/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: sync adds Source remote, copies branches/tags and leaves origin/upstream untouched\nok 35 - sync adds Source remote, copies branches/tags and leaves origin/upstream untouched\n  ---\n  duration_ms: 466.709135\n  type: 'test'\n  ...\n# To /tmp/source-test-HAKJep/orgs/O1/projects/P1/repos/R1.git\n#  * [new branch]      main -> main\n# Subtest: sync dry run leaves refs unchanged; divergent push is atomic and never deletes remote branches\nok 36 - sync dry run leaves refs unchanged; divergent push is atomic and never deletes remote branches\n  ---\n  duration_ms: 255.45037\n  type: 'test'\n  ...\n# Subtest: sync rejects missing credentials on private repos and invalid destinations\nok 37 - sync rejects missing credentials on private repos and invalid destinations\n  ---\n  duration_ms: 143.760019\n  type: 'test'\n  ...\n1..37\n# tests 37\n# suites 0\n# pass 36\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n# duration_ms 61046.264348\n"
+    }
+  ],
+  "reuse": {
+    "version": 1,
+    "candidateId": "2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817",
+    "checks": [
+      {
+        "checkId": "preflight",
+        "identity": "411ee63aaf4bab736d6d5399138e04f42f544a28ca60c72a0c58ce1ca2245073",
+        "epoch": 1,
+        "action": "reused",
+        "receiptId": "3b5f977085a465ca4df425d8c2dfc4fc310b3c6a8f535532ec847b826c4a8233",
+        "reason": "identical deterministic verification identity remains valid"
+      },
+      {
+        "checkId": "runtime",
+        "identity": "246e8045fe7137658c04bb54d1635bc4332c4294bf73471ff906361027a6d354",
+        "epoch": 1,
+        "action": "reused",
+        "receiptId": "5101749997477af53df1ed3c83b4c93fbbe1e903b5aad821523d35b5d49679a2",
+        "reason": "identical deterministic verification identity remains valid"
+      },
+      {
+        "checkId": "git-api",
+        "identity": "50ba2931a9d79f3f04d37168fdcc0798e99e510cba44b832985f85a7f978ecbb",
+        "epoch": 1,
+        "action": "reused",
+        "receiptId": "2c5121bd4adc017ca7a90b320c7ddeaf8893be9ebb6df498390579c5b4767062",
+        "reason": "identical deterministic verification identity remains valid"
+      }
+    ],
+    "plan": {
+      "version": 1,
+      "conservative": true,
+      "reason": "impact information absent or incomplete",
+      "paths": [],
+      "checks": [
+        {
+          "id": "preflight",
+          "tier": 0,
+          "reason": "impact information absent or incomplete"
+        },
+        {
+          "id": "runtime",
+          "tier": 1,
+          "reason": "impact information absent or incomplete"
+        },
+        {
+          "id": "git-api",
+          "tier": 2,
+          "reason": "impact information absent or incomplete"
+        }
+      ],
+      "omitted": []
+    },
+    "dispatchedAt": 1794358580286
+  },
+  "acceptance": {
+    "candidateId": "2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817",
+    "headCommit": "804d2934461c1a9ed07e5a3b2748166299eedfae",
+    "policyHash": "5193099615cef0f8602379f35cc65d3f7effa437c0b875d7bd9859da821abd05",
+    "principalId": "U1",
+    "receipts": [
+      "3b5f977085a465ca4df425d8c2dfc4fc310b3c6a8f535532ec847b826c4a8233",
+      "5101749997477af53df1ed3c83b4c93fbbe1e903b5aad821523d35b5d49679a2",
+      "2c5121bd4adc017ca7a90b320c7ddeaf8893be9ebb6df498390579c5b4767062"
+    ],
+    "acceptedAt": 1794358580452
+  },
+  "promotion": {
+    "state": "landed",
+    "candidateId": "2130b381c503e82ef885df608258019b84783d6826b14a85f407c47fe0e2d817",
+    "headCommit": "804d2934461c1a9ed07e5a3b2748166299eedfae",
+    "recovered": false
+  },
+  "assertions": {
+    "privateGitDenied": true,
+    "protectedPushDenied": true,
+    "unauthorizedPromotionDenied": true,
+    "unverifiedAcceptanceDenied": true,
+    "originAndUpstreamPreserved": true,
+    "actualCliSyncAndSubmit": true,
+    "separateCliWorker": true,
+    "coalesced": true,
+    "immutableArtifactsVerified": true,
+    "exactEvidenceReused": true,
+    "idempotentPromotion": true,
+    "freshCloneMatchesCandidate": true,
+    "proposalAncestryPreserved": true,
+    "workspacesEmpty": true
+  },
+  "gitBackendOutcomes": {
+    "exit_0": 16
+  },
+  "backupRestore": {
+    "quiesced": true,
+    "workerStopped": true,
+    "apiStopped": true,
+    "originalPoolClosed": true,
+    "manifest": {
+      "format": "source-backup-v1",
+      "createdAt": "2026-11-11T00:56:22.846Z",
+      "dataRoot": "/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-real-project-4NSlMB/data",
+      "gitRoot": "/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-real-project-4NSlMB/data",
+      "database": {
+        "format": "postgres-custom",
+        "schema": "source_real_59249_1794358435286"
+      },
+      "files": [
+        {
+          "name": "data.tar.gz",
+          "bytes": 2434626,
+          "sha256": "24269184e022da721833b2526abfdb5786ab71713f9093c936efb1ccd20967e1"
+        },
+        {
+          "name": "database.dump",
+          "bytes": 70606,
+          "sha256": "31381124214e053fd520d35570358bba62f9aac9e1214678244af98cb4cca048"
+        }
+      ]
+    },
+    "restore": {
+      "status": "restored",
+      "backup": "/var/folders/wb/0cck3lgd08n55g_8ly9qmf_00000gn/T/source-real-project-4NSlMB/backups/source-backup-20261111005621",
+      "filesVerified": 2,
+      "gitRepositories": 1,
+      "database": "source_restore_59249_mwberrmh",
+      "schema": "source_real_59249_1794358435286",
+      "application": {
+        "status": "passed",
+        "freshProcess": true,
+        "originalFilesystemOffline": true,
+        "relocatedRepository": true,
+        "exactCandidate": true,
+        "landedMarker": true,
+        "policyAcceptanceOutcomeMatch": true,
+        "receipts": 3,
+        "originalArtifactHashesVerified": true,
+        "completedJobsPreserved": true,
+        "authenticatedClone": true,
+        "anonymousRejected": true,
+        "proposalAncestryPreserved": true,
+        "idempotentPromotion": true
+      }
+    },
+    "originalStateUnchanged": true,
+    "elapsedMs": 6729,
+    "checkerSha256": "65e6694d07c18ee1e51f830f384128d227db9baf8a4e0ee7968386710190a03a"
+  },
+  "finishedAt": "2026-11-11T00:56:28.792Z"
+}
