@@ -1,5 +1,16 @@
 # Source platform handoff — 2026-11-10
 
+## Video checkpoint — 2026-11-11
+
+The user separately requested a real-time recording of 100 contributors changing
+the same files for a HyperFrames release film. That bounded recording is complete:
+one shared-file run passed through exact verification/promotion and tree equality;
+the first heavier-recording attempt failed and remains preserved. See the
+[video handoff](videos/source-100-agents/README.md) for artifacts, reproducibility,
+voice provenance and limitations. Benchmark extension: `08b20ee`. Source v0.2.0
+was previously published at `e1230df`; the video does not change that tag.
+The full platform mission and wider capacity campaign remain paused.
+
 ## User direction and current state
 
 The user asked to pause this work, avoid spending more time on 100/250/1000-agent

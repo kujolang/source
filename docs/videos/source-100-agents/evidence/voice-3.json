@@ -1,0 +1,14 @@
+{
+  "cue": 3,
+  "text": "Source brings those changes into one candidate. It won't accept that candidate before the required verification passes.",
+  "provider": "ElevenLabs",
+  "model": "eleven_v4",
+  "voice": "Siren",
+  "voice_id": "eXpIbVcVbLo8ZJQDlDnl",
+  "generation_tier": "creator",
+  "duration": 6.96,
+  "request_id": "ftox4jg67o8BDADahuua",
+  "request_sha256": "a11fe30435cbd041f4703ad4da16c12f5c0a2de706aca3e3d8bf1f0346d195ca",
+  "audio_sha256": "c57c9827b38c8fa5f7b11a0c991cfc00a2f3edc0b49792f76a6d2d67b10556b8",
+  "generated_at": "2026-11-11T15:15:15Z"
+}

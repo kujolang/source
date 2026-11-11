@@ -1,0 +1,14 @@
+{
+  "cue": 2,
+  "text": "Watch the edits arrive. Each submission keeps its own commit and identity.",
+  "provider": "ElevenLabs",
+  "model": "eleven_v4",
+  "voice": "Siren",
+  "voice_id": "eXpIbVcVbLo8ZJQDlDnl",
+  "generation_tier": "creator",
+  "duration": 4.8,
+  "request_id": "p0q8rVlxEUVhXdTnwz1A",
+  "request_sha256": "c7f02831f31f3d61d18e398f1f15eb4db9c13f32309de6c2d27f7ed1497e3dc1",
+  "audio_sha256": "c6dc8bc13e79444280e4f8d9ce65a29c80080e58a921d3fdbc4ef1945e49916a",
+  "generated_at": "2026-11-11T15:15:12Z"
+}

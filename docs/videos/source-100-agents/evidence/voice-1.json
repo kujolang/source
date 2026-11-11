@@ -1,0 +1,14 @@
+{
+  "cue": 1,
+  "text": "This is a real local test of Source, with a hundred scripted agent processes running together. Each works in its own clone and changes a different section of the file.",
+  "provider": "ElevenLabs",
+  "model": "eleven_v4",
+  "voice": "Siren",
+  "voice_id": "eXpIbVcVbLo8ZJQDlDnl",
+  "generation_tier": "creator",
+  "duration": 9.76,
+  "request_id": "AfQxlO7qWVHiYTW3AjOg",
+  "request_sha256": "736a4604c77d2b56d8f45cb78ab3b53ff4958dea87961a8f28cb756cfd5117f4",
+  "audio_sha256": "b7dffae2f9b932ad60b049a1d247bccaef29caa87c02fb8e8d6ddd87b2104c8e",
+  "generated_at": "2026-11-11T15:15:10Z"
+}

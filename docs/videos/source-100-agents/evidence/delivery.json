@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "durationSeconds": 55.733333,
+  "resolution": "1920x1080",
+  "fps": 30,
+  "audioPresent": true,
+  "fullDecodePassed": true,
+  "decodedFramesReviewed": [
+    0,
+    11,
+    26,
+    36,
+    54
+  ],
+  "audioAuditioned": false,
+  "sha256": "ba4806182170beb4db9c3b189ab0da2e85fda1df31a728978898d9b3c10c918a",
+  "bytes": 5866309,
+  "testSummary": "5 integration benchmark tests passed; syntax lint 125 files; HyperFrames no errors; 100-contributor same-file run passed",
+  "renderSeconds": 367.3
+}

@@ -1,0 +1,65 @@
+{
+  "duration": 55.73333333333333,
+  "starts": [
+    0,
+    6.366666666666666,
+    16.733333333333334,
+    22.133333333333333,
+    29.7,
+    41.9,
+    48.83333333333333
+  ],
+  "durations": [
+    6.366666666666666,
+    10.366666666666667,
+    5.4,
+    7.566666666666666,
+    12.2,
+    6.933333333333334,
+    6.9
+  ],
+  "clips": [
+    {
+      "scene": 0,
+      "file": "assets/shot-0.mp4",
+      "start": 2,
+      "duration": 4.366666666666666,
+      "sourceStart": 75
+    },
+    {
+      "scene": 1,
+      "file": "assets/shot-1.mp4",
+      "start": 0,
+      "duration": 10.366666666666667,
+      "sourceStart": 18
+    },
+    {
+      "scene": 2,
+      "file": "assets/shot-2.mp4",
+      "start": 0,
+      "duration": 5.4,
+      "sourceStart": 104
+    },
+    {
+      "scene": 3,
+      "file": "assets/shot-3.mp4",
+      "start": 0,
+      "duration": 7.566666666666666,
+      "sourceStart": 152.5
+    },
+    {
+      "scene": 4,
+      "file": "assets/shot-4.mp4",
+      "start": 0,
+      "duration": 4,
+      "sourceStart": 170
+    },
+    {
+      "scene": 4,
+      "file": "assets/shot-5.mp4",
+      "start": 4,
+      "duration": 8.2,
+      "sourceStart": 242
+    }
+  ]
+}

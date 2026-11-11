@@ -1,0 +1,14 @@
+{
+  "cue": 0,
+  "text": "A hundred contributors. One repository. And they're all changing the same file.",
+  "provider": "ElevenLabs",
+  "model": "eleven_v4",
+  "voice": "Siren",
+  "voice_id": "eXpIbVcVbLo8ZJQDlDnl",
+  "generation_tier": "creator",
+  "duration": 5.76,
+  "request_id": "2uEDIVgWaNAA1Gjx78vb",
+  "request_sha256": "496df9a0dcce4a0468cf5767483782f70728a1d8c1873820cd5739239e2c04f2",
+  "audio_sha256": "dcba06a5b6c12387bba71f4bd1807aadfaaded0125525accee12efdb3d9ba92c",
+  "generated_at": "2026-11-11T15:15:06Z"
+}

@@ -1,0 +1,14 @@
+{
+  "cue": 6,
+  "text": "Source, version zero point two. Try it alongside the setup you already use.",
+  "provider": "ElevenLabs",
+  "model": "eleven_v4",
+  "voice": "Siren",
+  "voice_id": "eXpIbVcVbLo8ZJQDlDnl",
+  "generation_tier": "creator",
+  "duration": 5.28,
+  "request_id": "nDTdWV3Z6gqsNaj7DDpp",
+  "request_sha256": "4d4caec6be9b2d46f72766b41fa9f4cbff14485b045c837e8df8b93890089550",
+  "audio_sha256": "abd1b8046fd792cfb49ccb1f0b61961b738ba2a4c529c908c95fc921e07342b0",
+  "generated_at": "2026-11-11T15:15:26Z"
+}

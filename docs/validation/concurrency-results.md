@@ -4,6 +4,25 @@ Measured 2026-11-10 on local macOS x64: 12 logical CPUs, 16 GiB RAM,
 Node v26.12.1, Git 2.42.0, local PostgreSQL 14.20. This bounded synthetic
 correctness/measurement workload is not production capacity certification.
 
+## Recorded shared-file run — 2026-11-11
+
+For the requested release video, a fresh **100-process / one-repository** run
+passed with all contributors changing separate sections of `shared.txt`.
+Submission, combined verification, exact promotion, contributor ancestry and
+sequential-merge tree equality passed. This uses scripted contributors and a
+fixed Git-content checker, not 100 LLM sessions or same-line conflict resolution.
+The private-load profile and keyed submissions were enabled; server deadlines
+were unchanged. Total runtime including the baseline and cleanup: 240.318s.
+
+The first attempt with a higher-overhead Retina recorder failed during submission
+with ECONNRESET and native HTTP header timeouts. The lower-overhead recording
+passed; the cause was not isolated, and this is not a repeatability claim.
+[Video, scope and reproduction](../videos/source-100-agents/README.md),
+[successful report](../videos/source-100-agents/evidence/run.json),
+[failed attempt](../videos/source-100-agents/evidence/attempt-1/run.json).
+The user authorized this specific recording; the broader 250/1000 campaign remains
+paused. No additional capacity run is implied by this result.
+
 ## Reproduce
 
 Use a disposable PostgreSQL database and a nonexistent absolute output path.

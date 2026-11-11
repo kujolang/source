@@ -1,0 +1,2192 @@
+{
+  "version": 2,
+  "status": "failed",
+  "phase": "submission",
+  "httpStatuses": {
+    "200": 900,
+    "201": 25,
+    "401": 1,
+    "404": 2
+  },
+  "date": "2026-11-11T15:05:24.414Z",
+  "agents": 100,
+  "repositories": 1,
+  "concurrency": {
+    "agentProcesses": 100,
+    "workerProcesses": 2,
+    "workerConcurrency": 2
+  },
+  "host": {
+    "platform": "darwin",
+    "arch": "x64",
+    "node": "v26.12.1",
+    "cpuCount": 12,
+    "memoryBytes": 17179869184,
+    "git": "git version 2.50.1 (Apple Git-155)"
+  },
+  "fixture": "compatible separate sections in shared.txt; fixed host Git-content checker; no repository code execution",
+  "profile": "private-load",
+  "keyedSubmissions": true,
+  "submissionRecovery": {
+    "injectedAgent": null,
+    "responsesDropped": 0,
+    "recovered": 0,
+    "strategy": "one read-only lookup after unknown HTTP outcome; no POST replay"
+  },
+  "rateLimits": "explicit private-load operator profile; not default capacity",
+  "admissionConfiguration": {
+    "gitPush": {
+      "limit": 1000,
+      "windowMs": 60000
+    },
+    "submit": {
+      "limit": 1000,
+      "windowMs": 60000
+    }
+  },
+  "maxIntegrationProposals": 100,
+  "stages": {},
+  "raw": {
+    "completedClients": [
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 7,
+        "repoIndex": 0,
+        "changeId": "C15",
+        "workId": "W15",
+        "sessionId": "S15",
+        "evidenceId": "E15",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "5c80d79cd84a2a92566d2a57aba1835b8ac25e1d",
+        "cloneMs": 5567.283236999999,
+        "submitMs": 73792.737052,
+        "totalMs": 80930.153047
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 8,
+        "repoIndex": 0,
+        "changeId": "C7",
+        "workId": "W7",
+        "sessionId": "S7",
+        "evidenceId": "E7",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "3889775995b2e5dea9ccae030edaa515c07ea325",
+        "cloneMs": 5272.723235,
+        "submitMs": 66027.08092400001,
+        "totalMs": 72863.922099
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 9,
+        "repoIndex": 0,
+        "changeId": "C4",
+        "workId": "W4",
+        "sessionId": "S4",
+        "evidenceId": "E4",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "ea1f0d4fa5ab41860651d81944098db7367d3167",
+        "cloneMs": 5256.060858,
+        "submitMs": 62872.771329,
+        "totalMs": 69906.094175
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 13,
+        "repoIndex": 0,
+        "changeId": "C13",
+        "workId": "W13",
+        "sessionId": "S13",
+        "evidenceId": "E13",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "d1a244dda36cc752f99c55279890d58225cb508b",
+        "cloneMs": 9720.070451000001,
+        "submitMs": 67227.14313000001,
+        "totalMs": 78803.84929999999
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 16,
+        "repoIndex": 0,
+        "changeId": "C8",
+        "workId": "W8",
+        "sessionId": "S8",
+        "evidenceId": "E8",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "a6f42ff8f98a84de1c5c5b93dd1056f75a16f3bf",
+        "cloneMs": 8651.714674,
+        "submitMs": 64307.134567999994,
+        "totalMs": 74257.76606000001
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 18,
+        "repoIndex": 0,
+        "changeId": "C25",
+        "workId": "W25",
+        "sessionId": "S25",
+        "evidenceId": "E25",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "213df6a5a62654b0b9307e81226a5e19b9dc9081",
+        "cloneMs": 12569.615001999999,
+        "submitMs": 74470.397998,
+        "totalMs": 88882.31685999999
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 20,
+        "repoIndex": 0,
+        "changeId": "C9",
+        "workId": "W9",
+        "sessionId": "S9",
+        "evidenceId": "E9",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "8eefbb5e1c36d00050e60594e8da70fffbfcb714",
+        "cloneMs": 11398.953300000001,
+        "submitMs": 62114.390959,
+        "totalMs": 75395.146022
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 22,
+        "repoIndex": 0,
+        "changeId": "C16",
+        "workId": "W16",
+        "sessionId": "S16",
+        "evidenceId": "E16",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "ffb9b1c8e4b3d7e8515797c85fe58256dc452910",
+        "cloneMs": 9755.703966000001,
+        "submitMs": 70499.65613,
+        "totalMs": 81649.857625
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 34,
+        "repoIndex": 0,
+        "changeId": "C2",
+        "workId": "W2",
+        "sessionId": "S2",
+        "evidenceId": "E2",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "204b0137196bc8212245fa3b342e5777135975ff",
+        "cloneMs": 4492.580471,
+        "submitMs": 61056.645554999996,
+        "totalMs": 67411.67653900001
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 37,
+        "repoIndex": 0,
+        "changeId": "C6",
+        "workId": "W6",
+        "sessionId": "S6",
+        "evidenceId": "E6",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "c19c67c2ce2359ab3315a2ebb263b69298d8a3cb",
+        "cloneMs": 9389.228909999998,
+        "submitMs": 60880.146247,
+        "totalMs": 71723.23028199999
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 41,
+        "repoIndex": 0,
+        "changeId": "C5",
+        "workId": "W5",
+        "sessionId": "S5",
+        "evidenceId": "E5",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "10171c16171271634cacbbb5e5a830d44e9e7a61",
+        "cloneMs": 4669.951263999999,
+        "submitMs": 64290.858877,
+        "totalMs": 70608.31699600001
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 45,
+        "repoIndex": 0,
+        "changeId": "C24",
+        "workId": "W24",
+        "sessionId": "S24",
+        "evidenceId": "E24",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "9a30d72a2b32474f2875687e885fe9f013a62b65",
+        "cloneMs": 12936.941026,
+        "submitMs": 73492.418397,
+        "totalMs": 88331.719778
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 48,
+        "repoIndex": 0,
+        "changeId": "C22",
+        "workId": "W22",
+        "sessionId": "S22",
+        "evidenceId": "E22",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "e8c70ce731d843ca4a20a2a58d912483109fbebd",
+        "cloneMs": 14739.896228000001,
+        "submitMs": 69589.12413299999,
+        "totalMs": 86740.19366
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 56,
+        "repoIndex": 0,
+        "changeId": "C11",
+        "workId": "W11",
+        "sessionId": "S11",
+        "evidenceId": "E11",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "f50e1c5912b2eca8fa191224f23bb47990854615",
+        "cloneMs": 9670.334556999998,
+        "submitMs": 66196.83203800001,
+        "totalMs": 77310.730838
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 60,
+        "repoIndex": 0,
+        "changeId": "C3",
+        "workId": "W3",
+        "sessionId": "S3",
+        "evidenceId": "E3",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "f441db01d8c57c80c5783285a88ce7586c8639fa",
+        "cloneMs": 4612.657879,
+        "submitMs": 62737.263721,
+        "totalMs": 68772.996254
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 65,
+        "repoIndex": 0,
+        "changeId": "C20",
+        "workId": "W20",
+        "sessionId": "S20",
+        "evidenceId": "E20",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "56d9e544347bdafb613edc775098e0ef15bf7175",
+        "cloneMs": 14233.801854000001,
+        "submitMs": 68800.559237,
+        "totalMs": 85381.110669
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 66,
+        "repoIndex": 0,
+        "changeId": "C17",
+        "workId": "W17",
+        "sessionId": "S17",
+        "evidenceId": "E17",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "7dca03b32b87a51d26c429ec9bc82e7f46192ed4",
+        "cloneMs": 7838.945524,
+        "submitMs": 73455.928886,
+        "totalMs": 82825.886212
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 68,
+        "repoIndex": 0,
+        "changeId": "C19",
+        "workId": "W19",
+        "sessionId": "S19",
+        "evidenceId": "E19",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "a73145bd060811885f07ba925753db2e2e2c7cf2",
+        "cloneMs": 15642.290218,
+        "submitMs": 67056.49848000001,
+        "totalMs": 84668.412499
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 70,
+        "repoIndex": 0,
+        "changeId": "C10",
+        "workId": "W10",
+        "sessionId": "S10",
+        "evidenceId": "E10",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "94477d70295fd372cda8a45880da409c70d8a28c",
+        "cloneMs": 5827.674792000001,
+        "submitMs": 68710.45774299999,
+        "totalMs": 76419.73344499999
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 71,
+        "repoIndex": 0,
+        "changeId": "C21",
+        "workId": "W21",
+        "sessionId": "S21",
+        "evidenceId": "E21",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "57837cf00d1f21b7ab88b85834c6e7fd396ae7db",
+        "cloneMs": 10475.917064000001,
+        "submitMs": 73933.000759,
+        "totalMs": 86219.17536
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 73,
+        "repoIndex": 0,
+        "changeId": "C14",
+        "workId": "W14",
+        "sessionId": "S14",
+        "evidenceId": "E14",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "a72a0cad5d3e45a98ebad61ff549fcbe4dcbf9c0",
+        "cloneMs": 9480.877179000001,
+        "submitMs": 69066.152127,
+        "totalMs": 80082.962883
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 76,
+        "repoIndex": 0,
+        "changeId": "C12",
+        "workId": "W12",
+        "sessionId": "S12",
+        "evidenceId": "E12",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "a614dbaac41b2f12ba12e53378d5a30fb2fccc39",
+        "cloneMs": 10990.257436,
+        "submitMs": 65530.785694,
+        "totalMs": 78306.905346
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 77,
+        "repoIndex": 0,
+        "changeId": "C23",
+        "workId": "W23",
+        "sessionId": "S23",
+        "evidenceId": "E23",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "5b312f2c1250b57f0b31b8a69f1c4f993f0b4c25",
+        "cloneMs": 12866.007555,
+        "submitMs": 72843.100605,
+        "totalMs": 87758.360201
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 80,
+        "repoIndex": 0,
+        "changeId": "C18",
+        "workId": "W18",
+        "sessionId": "S18",
+        "evidenceId": "E18",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "79a34d558924939beee25b1adae84407a284d013",
+        "cloneMs": 11576.900055999999,
+        "submitMs": 70363.502253,
+        "totalMs": 83796.107013
+      },
+      {
+        "recovered": false,
+        "submissionFailure": null,
+        "recoveryMs": null,
+        "index": 84,
+        "repoIndex": 0,
+        "changeId": "C1",
+        "workId": "W1",
+        "sessionId": "S1",
+        "evidenceId": "E1",
+        "baseCommit": "305d4633718b6132228bcb2a0464f9ad630fda94",
+        "headCommit": "a33bca9317637f46ce5359a6594a912c49c6e642",
+        "cloneMs": 4737.210828,
+        "submitMs": 60335.237934000004,
+        "totalMs": 66499.467426
+      }
+    ]
+  },
+  "limitations": [
+    "loopback single host; no deployed TLS latency",
+    "fixed Git-content verification, not application CI or isolated staging",
+    "no induced worker crash in this measurement",
+    "maximum 1000 agents per harness run; operator batch bound recorded explicitly",
+    "private repositories; explicit 1000/min push and submit limits per shared address; server queue/concurrency defaults unchanged"
+  ],
+  "sourceRevision": "022d3036072a443727987389c673e0e5a1257880",
+  "harnessSha256": "f3d9a2bba1b78bfe7db091db37066df821106c4bb464e5e0781bbb45ed24e49a",
+  "telemetrySha256": "acd659092128cf9f029080777399738bef242ef934b92aca5577711b8b1e7309",
+  "httpTimeouts": {
+    "headersMs": 15000,
+    "requestMs": 120000,
+    "keepAliveMs": 5000
+  },
+  "anonymousGitRejected": true,
+  "error": "Source submit transport failed; outcome unknown; inspect before retrying",
+  "failureDiagnostic": {
+    "operation": "submit",
+    "kind": "transport",
+    "code": "ECONNRESET",
+    "timedOut": false,
+    "responseReceived": false,
+    "outcomeUnknown": true
+  },
+  "httpBeforeCleanup": {
+    "scope": "passive server HTTP/socket observations; no raw URLs, headers, bodies or error text; at most 50 failed and pending samples",
+    "sockets": {
+      "opened": 503,
+      "closed": 430,
+      "closedWithError": 2,
+      "active": 73,
+      "peakActive": 100,
+      "timeouts": 0,
+      "errors": {
+        "ERR_HTTP_REQUEST_TIMEOUT": 2
+      }
+    },
+    "routes": {
+      "git": {
+        "requests": 901,
+        "finished": 901,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {
+          "200": 900,
+          "401": 1
+        }
+      },
+      "submit": {
+        "requests": 79,
+        "finished": 25,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {
+          "201": 25
+        }
+      },
+      "other": {
+        "requests": 2,
+        "finished": 2,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {
+          "404": 2
+        }
+      }
+    },
+    "pendingCount": 54,
+    "pending": [
+      {
+        "route": "submit",
+        "elapsedMs": 12319.591551999998,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 11965.182541999995,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 11670.241074000005,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 11430.123097000003,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 10549.611298999997,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 10224.843894999998,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 10064.733840999994,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 9922.75505800001,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 9693.356822999995,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 9582.440595000007,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 9360.85067,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 9061.297697000002,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 8727.132283999992,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 8467.733397999997,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 8121.470927000002,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 7826.539137,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 7471.905924999999,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 6885.878658000001,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 6660.1331640000135,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 6249.864895999999,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 6018.850265000001,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 5837.411848000003,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 5528.988136999993,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 5385.86262,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 5219.59264599999,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 5038.764118000006,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 4840.232105999996,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 4678.320588999995,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 4519.955666999987,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 4274.144343000007,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 4052.7791859999998,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 3883.0794730000052,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 3744.039960000009,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 3521.955092000004,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 3299.4170319999976,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 3172.200893000001,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 3010.109494999997,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 2773.567704000001,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 2549.333151999992,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 2420.2228019999893,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 2250.9667950000003,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 2021.5796899999987,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 1877.1056970000063,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 1697.5170170000056,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 1496.8985220000031,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 1255.0616449999943,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 1083.9428099999932,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 933.295100000003,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 775.4905720000097,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 612.3738960000046,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      }
+    ],
+    "failures": [],
+    "socketFailures": [
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15452.767496999993,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15268.99373799999,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      }
+    ]
+  },
+  "httpAfterCleanup": {
+    "scope": "passive server HTTP/socket observations; no raw URLs, headers, bodies or error text; at most 50 failed and pending samples",
+    "sockets": {
+      "opened": 503,
+      "closed": 503,
+      "closedWithError": 2,
+      "active": 0,
+      "peakActive": 100,
+      "timeouts": 0,
+      "errors": {
+        "ERR_HTTP_REQUEST_TIMEOUT": 2
+      }
+    },
+    "routes": {
+      "git": {
+        "requests": 901,
+        "finished": 901,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {
+          "200": 900,
+          "401": 1
+        }
+      },
+      "submit": {
+        "requests": 79,
+        "finished": 25,
+        "closedBeforeFinish": 54,
+        "abortedBodies": 0,
+        "statuses": {
+          "201": 25
+        }
+      },
+      "other": {
+        "requests": 2,
+        "finished": 2,
+        "closedBeforeFinish": 0,
+        "abortedBodies": 0,
+        "statuses": {
+          "404": 2
+        }
+      }
+    },
+    "pendingCount": 0,
+    "pending": [],
+    "failures": [
+      {
+        "route": "submit",
+        "elapsedMs": 9932.534841999994,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 1323.3690769999957,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 6899.68153300001,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 4122.646175000002,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 8966.803300999993,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 10162.536592999997,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 3249.846485000002,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 262.8444759999984,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 2490.787624999997,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 1015.4136930000095,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 3984.105865999998,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 852.4686130000046,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 10789.909188999998,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 10465.213000000003,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 575.4955310000078,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 7126.259904000006,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 9601.298762000006,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 7712.382912999994,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 1173.7739490000095,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 9823.114862000002,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 2660.860658999998,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 5279.483961999998,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 1737.6630110000115,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 6490.732428999996,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 4919.242981000003,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 8708.708530000004,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 389.5640540000022,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 8362.537484999993,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 6078.516690000004,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 1496.1504599999898,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 8067.729674999995,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 3014.7796900000103,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 12206.580659999992,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 5460.89566699999,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 3540.777430000002,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 5770.407146999991,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 3413.6257040000055,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 4515.620458000005,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 4761.474587999997,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 2790.901736,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 9302.937126000004,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 5627.514804999999,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 1939.1740590000118,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 696.306288000007,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 3763.733276999992,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 2263.396949999995,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 10306.724516000002,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 5082.157431999993,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 4294.743778000004,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      },
+      {
+        "route": "submit",
+        "elapsedMs": 11912.366332000005,
+        "requestComplete": true,
+        "requestAborted": false,
+        "responseHeadersSent": false,
+        "responseEnded": false
+      }
+    ],
+    "socketFailures": [
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15452.767496999993,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      },
+      {
+        "code": "ERR_HTTP_REQUEST_TIMEOUT",
+        "elapsedMs": 15268.99373799999,
+        "requestsObserved": 0,
+        "bytesRead": 0,
+        "bytesWritten": 51
+      }
+    ]
+  },
+  "telemetry": {
+    "scope": "API/harness process per stage; host free bytes include all activity, not memory available or attributable usage; sampled RSS can miss peaks",
+    "sampleIntervalMs": 1000,
+    "eventLoopResolutionMs": 20,
+    "stages": [
+      {
+        "phase": "setup",
+        "wallMs": 22306.729453,
+        "parentCpuMicros": {
+          "user": 1127932,
+          "system": 390828
+        },
+        "parentEventLoop": {
+          "idle": 12418.202908,
+          "active": 9888.43505800001,
+          "utilization": 0.443295626757921
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 642,
+          "p50": 20.545535,
+          "p95": 24.575999,
+          "p99": 140.509183,
+          "max": 203.423743
+        },
+        "samples": 18,
+        "parentSampledPeakRssBytes": 78880768,
+        "hostMinimumFreeBytes": 36782080
+      },
+      {
+        "phase": "submission",
+        "wallMs": 89540.524827,
+        "parentCpuMicros": {
+          "user": 7152946,
+          "system": 2857779
+        },
+        "parentEventLoop": {
+          "idle": 43270.50965000001,
+          "active": 46270.10681199971,
+          "utilization": 0.5167499246739757
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 2681,
+          "p50": 20.889599,
+          "p95": 119.275519,
+          "p99": 216.793087,
+          "max": 591.921151
+        },
+        "samples": 89,
+        "parentSampledPeakRssBytes": 137166848,
+        "hostMinimumFreeBytes": 11198464
+      },
+      {
+        "phase": "cleanup",
+        "wallMs": 2611.623596000005,
+        "parentCpuMicros": {
+          "user": 650333,
+          "system": 3299552
+        },
+        "parentEventLoop": {
+          "idle": 1053.7254990000001,
+          "active": 1557.9411830002718,
+          "utilization": 0.5965314003267242
+        },
+        "parentEventLoopDelayMs": {
+          "samples": 106,
+          "p50": 20.070399,
+          "p95": 29.474815,
+          "p99": 77.791231,
+          "max": 80.412671
+        },
+        "samples": 4,
+        "parentSampledPeakRssBytes": 146255872,
+        "hostMinimumFreeBytes": 347410432
+      }
+    ]
+  },
+  "childResources": [
+    {
+      "role": "worker",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "worker",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 371745,
+          "system": 141817
+        },
+        "peakRssBytes": 54751232,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 393480,
+          "system": 157519
+        },
+        "peakRssBytes": 54411264,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 376096,
+          "system": 137652
+        },
+        "peakRssBytes": 54611968,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 373556,
+          "system": 127543
+        },
+        "peakRssBytes": 54640640,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": {
+        "cpuMicros": {
+          "user": 373482,
+          "system": 132623
+        },
+        "peakRssBytes": 54734848,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 380706,
+          "system": 128738
+        },
+        "peakRssBytes": 54747136,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 365583,
+          "system": 122865
+        },
+        "peakRssBytes": 54865920,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 369954,
+          "system": 126860
+        },
+        "peakRssBytes": 54415360,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 377101,
+          "system": 119021
+        },
+        "peakRssBytes": 54665216,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 365625,
+          "system": 137366
+        },
+        "peakRssBytes": 54697984,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 352586,
+          "system": 123908
+        },
+        "peakRssBytes": 54681600,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 368575,
+          "system": 140281
+        },
+        "peakRssBytes": 54730752,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 354055,
+          "system": 113344
+        },
+        "peakRssBytes": 54697984,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 356906,
+          "system": 118829
+        },
+        "peakRssBytes": 54857728,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 357864,
+          "system": 127795
+        },
+        "peakRssBytes": 54333440,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 363164,
+          "system": 133126
+        },
+        "peakRssBytes": 54657024,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 360881,
+          "system": 121100
+        },
+        "peakRssBytes": 54616064,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 368848,
+          "system": 140029
+        },
+        "peakRssBytes": 54722560,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 351095,
+          "system": 107175
+        },
+        "peakRssBytes": 54538240,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 361770,
+          "system": 124383
+        },
+        "peakRssBytes": 54571008,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 352962,
+          "system": 113891
+        },
+        "peakRssBytes": 54702080,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 360645,
+          "system": 116265
+        },
+        "peakRssBytes": 54620160,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": {
+        "cpuMicros": {
+          "user": 369108,
+          "system": 111499
+        },
+        "peakRssBytes": 54697984,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 352157,
+          "system": 119688
+        },
+        "peakRssBytes": 54902784,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 358154,
+          "system": 113041
+        },
+        "peakRssBytes": 54861824,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 352730,
+          "system": 120439
+        },
+        "peakRssBytes": 55017472,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": true,
+      "resource": {
+        "cpuMicros": {
+          "user": 357724,
+          "system": 124095
+        },
+        "peakRssBytes": 55140352,
+        "scope": "this Node process lifetime only; excludes descendants"
+      }
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    },
+    {
+      "role": "agent",
+      "completed": false,
+      "resource": null
+    }
+  ],
+  "gitBackendOutcomes": {
+    "exit_0": 900
+  },
+  "elapsedMs": 114461,
+  "parentCpuMicros": {
+    "user": 8934847,
+    "system": 6550091
+  },
+  "parentPeakRssBytes": 146276352
+}

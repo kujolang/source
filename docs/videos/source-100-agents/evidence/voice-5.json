@@ -1,0 +1,14 @@
+{
+  "cue": 5,
+  "text": "This tests compatible edits to one file. Conflicting edits to the same lines are a different case.",
+  "provider": "ElevenLabs",
+  "model": "eleven_v4",
+  "voice": "Siren",
+  "voice_id": "eXpIbVcVbLo8ZJQDlDnl",
+  "generation_tier": "creator",
+  "duration": 6.32,
+  "request_id": "pm4kRlFMffJqtkajSuT2",
+  "request_sha256": "9c15c09ee9a88390058e91fbed9bc6a93a5b333b805b7153d8ca0b22fd230ee4",
+  "audio_sha256": "df55283d74ae1f34381787fbeaf5f0aa5356cb035bcb825176fc1d5e7b40c5e7",
+  "generated_at": "2026-11-11T15:15:23Z"
+}

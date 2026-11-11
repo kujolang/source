@@ -1,0 +1,13 @@
+{
+  "verified": true,
+  "simultaneouslyReadyProcesses": 100,
+  "distinctSharedFileDiffs": 100,
+  "contributions": 100,
+  "completedVerificationJobs": 1,
+  "exactPromotion": true,
+  "ancestryAndSequentialTreeEquality": true,
+  "harnessMatchesCommittedExtension": "08b20ee",
+  "benchmarkElapsedMs": 240318,
+  "recordingSource": "actual live browser console",
+  "limits": "scripted contributors; separate sections; local fixed-content checker; explicit private-load profile; one successful recorded run, one failed attempt retained"
+}

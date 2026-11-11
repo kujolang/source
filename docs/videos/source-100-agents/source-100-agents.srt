@@ -1,0 +1,67 @@
+1
+00:00:00,150 --> 00:00:04,230
+A hundred contributors. One repository. And they're all
+
+2
+00:00:04,230 --> 00:00:05,990
+changing the same file.
+
+3
+00:00:06,517 --> 00:00:10,277
+This is a real local test of Source, with a hundred scripted
+
+4
+00:00:10,277 --> 00:00:13,637
+agent processes running together. Each works in its own
+
+5
+00:00:13,637 --> 00:00:16,357
+clone and changes a different section of the file.
+
+6
+00:00:16,883 --> 00:00:20,763
+Watch the edits arrive. Each submission keeps its own commit
+
+7
+00:00:20,763 --> 00:00:21,763
+and identity.
+
+8
+00:00:22,283 --> 00:00:25,723
+Source brings those changes into one candidate. It won't
+
+9
+00:00:25,723 --> 00:00:29,323
+accept that candidate before the required verification passes.
+
+10
+00:00:29,850 --> 00:00:33,530
+Then the verified commit lands on main. All one hundred
+
+11
+00:00:33,530 --> 00:00:36,890
+contributions are still there. We checked the contents and
+
+12
+00:00:36,890 --> 00:00:39,850
+the history, and compared the final tree with a sequential
+
+13
+00:00:39,850 --> 00:00:41,530
+merge of the same changes.
+
+14
+00:00:42,050 --> 00:00:46,050
+This tests compatible edits to one file. Conflicting edits
+
+15
+00:00:46,050 --> 00:00:48,450
+to the same lines are a different case.
+
+16
+00:00:48,983 --> 00:00:53,143
+Source, version zero point two. Try it alongside the setup
+
+17
+00:00:53,143 --> 00:00:54,263
+you already use.

@@ -1,0 +1,14 @@
+{
+  "cue": 4,
+  "text": "Then the verified commit lands on main. All one hundred contributions are still there. We checked the contents and the history, and compared the final tree with a sequential merge of the same changes.",
+  "provider": "ElevenLabs",
+  "model": "eleven_v4",
+  "voice": "Siren",
+  "voice_id": "eXpIbVcVbLo8ZJQDlDnl",
+  "generation_tier": "creator",
+  "duration": 11.6,
+  "request_id": "RetQXieg23i95gkYeSA2",
+  "request_sha256": "9a3ea7700c3ed2795c913e5a7020c0a2ebdd3b524b4b66ea16fc72ce4c1438c1",
+  "audio_sha256": "37b766f8895d75b3558aeb41d79a5d7990bfff232e5bbaae1e7535e75b2c6551",
+  "generated_at": "2026-11-11T15:15:20Z"
+}
