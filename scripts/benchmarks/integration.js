@@ -24,6 +24,23 @@ const stats = (values) => {
 
 async function verify(repository, commit, expected) {
   const names = (await git(repository, 'ls-tree', '-r', '--name-only', commit)).split('\n');
+  if (names.includes('shared.txt')) {
+    assert.deepEqual(names, ['README.md', 'shared.txt'], 'no unexpected files');
+    const content = await git(repository, 'show', `${commit}:shared.txt`);
+    const lines = content.split('\n');
+    let retained = 0;
+    assert.equal(lines.length % 9, 0, 'complete shared sections');
+    for (let i = 0; i < lines.length / 9; i++) {
+      assert.equal(lines[i * 9], `section ${i}`);
+      assert.ok([`agent ${i}: pending`, `agent ${i}: complete`].includes(lines[i * 9 + 1]), 'exact shared contribution');
+      if (lines[i * 9 + 1].endsWith('complete')) retained++;
+      for (let j = 2; j < 9; j++) assert.equal(lines[i * 9 + j], `context ${i}.${j}`, 'unchanged context');
+    }
+    assert.equal(retained, expected, 'exact expected contributor count');
+    assert.equal(await git(repository, 'show', `${commit}:README.md`), 'Source integration benchmark fixture');
+    process.stdout.write(JSON.stringify({ verified: true, commit, features: retained, sharedFile: true }));
+    return;
+  }
   const features = names.filter((name) => /^features\/agent-[0-9]+\.txt$/.test(name));
   assert.equal(features.length, expected, 'exact expected contributor count');
   assert.equal(names.length, features.length + 1, 'no unexpected files');
@@ -43,9 +60,18 @@ async function agent(config) {
   await git(config.cwd, 'config', 'user.email', `agent-${config.index}@fixture.invalid`);
   await git(config.cwd, 'remote', 'rename', 'origin', 'source');
   await git(config.cwd, 'remote', 'add', 'origin', 'git@github.com:fixture/unchanged.git');
+  if (config.sameFile) {
+    const file = path.join(config.cwd, 'shared.txt');
+    const before = await readFile(file, 'utf8');
+    const marker = `agent ${config.index}: pending`;
+    assert.ok(before.includes(marker));
+    await writeFile(file, before.replace(marker, `agent ${config.index}: complete`));
+  } else {
   await mkdir(path.join(config.cwd, 'features'), { recursive: true });
   await writeFile(path.join(config.cwd, 'features', `agent-${config.index}.txt`), `${config.index}\n`);
+  }
   await git(config.cwd, 'add', '.'); await git(config.cwd, 'commit', '-m', `agent ${config.index}`);
+  if (config.sameFile) process.send({ type: 'diff', index: config.index, diff: await git(config.cwd, 'show', '--format=short', '--no-color', 'HEAD', '--', 'shared.txt') });
   const submitStarted = performance.now();
   let result, recovered = false, submissionFailure = null, recoveryMs = null;
   const input = { cwd: config.cwd, credential: config.credential, submissionKey: config.submissionKey };
@@ -95,13 +121,17 @@ async function worker(config) {
 
 async function main() {
   const args = process.argv.slice(2); const flag = (name, fallback) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
-  if (args.includes('--help')) { console.log('SOURCE_TEST_DATABASE_URL=<disposable database> node scripts/benchmarks/integration.js --agents 10 --repos 1 --profile default|private-load [--keyed-submissions] [--lose-submit-response INDEX] --output /absolute/report.json'); return; }
+  if (args.includes('--help')) { console.log('SOURCE_TEST_DATABASE_URL=<disposable database> node scripts/benchmarks/integration.js --agents 10 --repos 1 --profile default|private-load [--same-file] [--progress] [--keyed-submissions] [--lose-submit-response INDEX] --output /absolute/report.json'); return; }
   const agents = Number(flag('--agents', 10)), repos = Number(flag('--repos', 1));
   if (![agents, repos].every(Number.isSafeInteger) || agents < 1 || agents > 1000 || repos < 1 || repos > agents) throw new Error('harness supports 1-1000 agents and 1..agents repositories');
   const maxIntegrationProposals = Math.max(100, Math.ceil(agents / repos));
   const profile = flag('--profile', 'default');
   if (!['default', 'private-load'].includes(profile)) throw new Error('unknown benchmark profile');
   const privateProfile = profile === 'private-load';
+  const sameFile = args.includes('--same-file');
+  if (sameFile && repos !== 1) throw new Error('--same-file requires one repository');
+  const progress = args.includes('--progress');
+  const emit = (event, data = {}) => { if (progress) console.log(JSON.stringify({ event, at: new Date().toISOString(), ...data })); };
   const keyedSubmissions = args.includes('--keyed-submissions');
   const loseSubmitResponse = args.includes('--lose-submit-response') ? Number(flag('--lose-submit-response')) : null;
   if (loseSubmitResponse !== null && (!keyedSubmissions || !Number.isSafeInteger(loseSubmitResponse) || loseSubmitResponse < 0 || loseSubmitResponse >= agents)) throw new Error('response-loss injection requires keyed submissions and an existing agent index');
@@ -116,9 +146,9 @@ async function main() {
   const schema = `source_bench_${process.pid}_${Date.now()}`;
   let store, server, httpTelemetry; const children = [], sockets = [], socketClosures = []; const executions = [], workerErrors = [];
   const cpuBefore = process.cpuUsage(); const began = Date.now();
-  const report = { version: 2, status: 'running', phase: 'setup', httpStatuses: {}, date: new Date().toISOString(), agents, repositories: repos, concurrency: { agentProcesses: agents, workerProcesses: 2, workerConcurrency: 2 }, host: { platform: process.platform, arch: process.arch, node: process.version, cpuCount: cpus().length, memoryBytes: totalmem() }, fixture: 'compatible independent files; fixed host Git-content checker; no repository code execution', profile, keyedSubmissions, submissionRecovery: { injectedAgent: loseSubmitResponse, responsesDropped: 0, recovered: 0, strategy: 'one read-only lookup after unknown HTTP outcome; no POST replay' }, rateLimits: privateProfile ? 'explicit private-load operator profile; not default capacity' : 'unchanged server defaults', admissionConfiguration: rateLimit, maxIntegrationProposals, stages: {}, raw: {}, limitations: ['loopback single host; no deployed TLS latency', 'fixed Git-content verification, not application CI or isolated staging', 'no induced worker crash in this measurement', 'maximum 1000 agents per harness run; operator batch bound recorded explicitly', privateProfile ? 'private repositories; explicit 1000/min push and submit limits per shared address; server queue/concurrency defaults unchanged' : 'default same-address submit/read/push rate limits apply'] };
+  const report = { version: 2, status: 'running', phase: 'setup', httpStatuses: {}, date: new Date().toISOString(), agents, repositories: repos, concurrency: { agentProcesses: agents, workerProcesses: 2, workerConcurrency: 2 }, host: { platform: process.platform, arch: process.arch, node: process.version, cpuCount: cpus().length, memoryBytes: totalmem() }, fixture: sameFile ? 'compatible separate sections in shared.txt; fixed host Git-content checker; no repository code execution' : 'compatible independent files; fixed host Git-content checker; no repository code execution', profile, keyedSubmissions, submissionRecovery: { injectedAgent: loseSubmitResponse, responsesDropped: 0, recovered: 0, strategy: 'one read-only lookup after unknown HTTP outcome; no POST replay' }, rateLimits: privateProfile ? 'explicit private-load operator profile; not default capacity' : 'unchanged server defaults', admissionConfiguration: rateLimit, maxIntegrationProposals, stages: {}, raw: {}, limitations: ['loopback single host; no deployed TLS latency', 'fixed Git-content verification, not application CI or isolated staging', 'no induced worker crash in this measurement', 'maximum 1000 agents per harness run; operator batch bound recorded explicitly', privateProfile ? 'private repositories; explicit 1000/min push and submit limits per shared address; server queue/concurrency defaults unchanged' : 'default same-address submit/read/push rate limits apply'] };
   const telemetry = new StageTelemetry();
-  const phase = (name) => { telemetry.begin(name); report.phase = name; };
+  const phase = (name) => { telemetry.begin(name); report.phase = name; emit('phase', { phase: name }); };
   phase('setup');
   const spawnRole = (role, config) => {
     const child = fork(script, [`--${role}`], { stdio: ['ignore', 'pipe', 'pipe', 'ipc'], env: { ...env(), ...(role === 'worker' ? { PGUSER: config.databaseUser } : {}) } });
@@ -126,7 +156,7 @@ async function main() {
     const entry = { role, child, messages: [], error: null, closed: null };
     entry.closed = new Promise((resolve) => child.once('close', (code, signal) => { if (code !== 0) entry.error ||= new Error(`${role} exited ${code ?? signal}`); resolve(); }));
     child.on('error', (error) => { entry.error = error; });
-    child.on('message', (message) => { entry.messages.push(message); if (message.type === 'execution') executions.push(message.value); if (message.type === 'workerError') workerErrors.push(message.error); if (message.type === 'error') entry.error = Object.assign(new Error(message.error), { diagnostic: message.diagnostic }); });
+    child.on('message', (message) => { entry.messages.push(message); if (message.type === 'diff') emit('diff', { index: message.index, diff: message.diff }); if (message.type === 'result') emit('submitted', { index: message.result.index, headCommit: message.result.headCommit, changeId: message.result.changeId }); if (message.type === 'execution') executions.push(message.value); if (message.type === 'workerError') workerErrors.push(message.error); if (message.type === 'error') entry.error = Object.assign(new Error(message.error), { diagnostic: message.diagnostic }); });
     children.push(entry); child.send({ type: 'config', config });
     entry.wait = async (type, timeout = 180000) => {
       const deadline = Date.now() + timeout;
@@ -159,6 +189,7 @@ async function main() {
       const cwd = path.join(root, `seed${i}`); await mkdir(cwd);
       await git(cwd, 'init', '-b', 'main'); await git(cwd, 'config', 'user.name', 'Fixture'); await git(cwd, 'config', 'user.email', 'fixture@example.invalid');
       await writeFile(path.join(cwd, 'README.md'), 'Source integration benchmark fixture\n');
+      if (sameFile) await writeFile(path.join(cwd, 'shared.txt'), Array.from({ length: agents }, (_, n) => [`section ${n}`, `agent ${n}: pending`, ...Array.from({ length: 7 }, (_, j) => `context ${n}.${j + 2}`)].join('\n')).join('\n') + '\n');
       await git(cwd, 'add', '.'); await git(cwd, 'commit', '-m', 'base'); await git(cwd, 'push', repo.barePath, 'main');
       const base = await git(cwd, 'rev-parse', 'HEAD');
       const policy = { version: '1', securityPolicyVersion: '1', checks: [{ id: 'combined', version: report.harnessSha256, command: [process.execPath, script, '--verify'], toolVersions: { node: process.version, git: report.host.git, checker: report.harnessSha256 }, environment: 'controlled-local-git-fixture-v1', inputs: {}, externalState: {}, deterministic: true, maxAgeMs: 3600000, producers: [service.id], tier: 2 }] };
@@ -203,10 +234,11 @@ async function main() {
       const principal = await source.createPrincipalAsync({ type: 'service', name: `agent-${i}` });
       const cap = await source.capabilities.issueAsync({ principalId: principal.id, allowed: ['read_source', 'git_push', ...(privateProfile || keyedSubmissions ? ['submit_change'] : [])], scope: { org: record.scope.orgId, project: record.scope.projectId } });
       if (i === loseSubmitResponse) faultPrincipal = principal.id;
-      const config = { submissionKey: keyedSubmissions ? `benchmark-${i}` : null, root, cwd: path.join(root, `agent${i}`), index: i, repoIndex: i % repos, url: `${baseUrl}/git/${org.id}/${record.scope.projectId}/${record.repo.id}.git`, credential: cap.credential, principalId: principal.id, privateProfile };
+      const config = { sameFile, submissionKey: keyedSubmissions ? `benchmark-${i}` : null, root, cwd: path.join(root, `agent${i}`), index: i, repoIndex: i % repos, url: `${baseUrl}/git/${org.id}/${record.scope.projectId}/${record.repo.id}.git`, credential: cap.credential, principalId: principal.id, privateProfile };
       clientConfigs.push(config); clients.push(spawnRole('agent', config));
     }
     await Promise.all(clients.map((entry) => entry.wait('ready')));
+    emit('ready', { agents: clients.length, pids: clients.map(c => c.child.pid), file: sameFile ? 'shared.txt' : 'independent files' });
     phase('submission');
     const submittedAt = performance.now(); clients.forEach((entry) => entry.child.send({ type: 'go' }));
     const proposals = (await Promise.all(clients.map((entry) => entry.wait('result', 660000)))).map((message) => message.result);
@@ -242,6 +274,7 @@ async function main() {
       assert.equal(await git(record.repo.barePath, 'rev-parse', 'main'), record.base);
       const input = { ...record.scope, repoId: record.repo.id, candidateId: plan.candidate.id, principalId: human.id };
       await assert.rejects(() => source.integration.accept(input), /verification requirements/);
+      emit('candidate', { commit: plan.candidate.headCommit, proposals: selected.length, unverifiedAcceptanceRejected: true });
       candidates.push({ record, plan, input, selected });
     }
     report.raw.assemblyMs = assembly; report.stages.assemblyMs = stats(assembly);
@@ -267,6 +300,7 @@ async function main() {
     assert.equal(jobs.length, repos); assert.ok(jobs.every((job) => job.status === 'completed' && job.attempts === 1));
     report.raw.executions = executions;
     report.stages.verification = { wallMs: performance.now() - verificationStart, queueMs: stats(executions.map((e) => e.queueMs)), executionMs: stats(executions.map((e) => e.executionMs)), completed: jobs.length, failed: 0, abandoned: 0, recoveryMs: null };
+    emit('verified', { jobs: jobs.length });
     phase('promotion');
     const promotion = [], fetch = [];
     for (const { record, plan, input, selected } of candidates) {
@@ -287,6 +321,7 @@ async function main() {
     }
     report.raw.promotionMs = promotion; report.raw.fetchMs = fetch; report.stages.promotionMs = stats(promotion); report.stages.fetchMs = stats(fetch);
     report.stages.reuse = { requests: repos, hits: repos, coalescedRequests: repos, assertions: 'same job ID while active; same exact candidate receipts reused after completion' };
+    emit('promoted', { retained: proposals.length, commit: candidates[0].plan.candidate.headCommit, sameFile });
     // Conservative conventional baseline: verify each cumulative merge once,
     // without assuming speculative per-PR checks or stale-result retries.
     phase('baseline');
@@ -309,6 +344,7 @@ async function main() {
     report.comparison = { checksAvoided: baselineChecks.length - executions.length, sourceChecks: executions.length, baselineChecks: baselineChecks.length, sourceVerificationMs: executions.reduce((sum, e) => sum + e.executionMs, 0), baselineVerificationMs: baselineChecks.reduce((sum, n) => sum + n, 0) };
     report.storage = { filesystemAllocatedBytes: Number((await exec('du', ['-sk', root])).stdout.split(/\s/)[0]) * 1024, postgresRelationBytes: Number((await store.pool.query('SELECT COALESCE(SUM(pg_total_relation_size(c.oid)),0) AS bytes FROM pg_class c JOIN pg_namespace n ON c.relnamespace=n.oid WHERE n.nspname=$1 AND c.relkind=\'r\'', [schema])).rows[0].bytes) };
     report.network = { serverReceivedBytes: sockets.reduce((sum, s) => sum + s.bytesRead, 0), serverSentBytes: sockets.reduce((sum, s) => sum + s.bytesWritten, 0), scope: 'all loopback HTTP/Git during run' };
+    emit('passed', { agents, finalTreesEqual: true });
     report.status = 'passed'; report.phase = 'complete'; report.correctness = { allProposalsRetained: true, exactVerifiedPromotion: true, unverifiedAcceptanceRejected: true, duplicatePromotionIdempotent: true, baselineTreeEquality: true, conflicts: 0, humanInterventions: 0, acceptance: 'automated harness acting as configured human maintainer' };
   } catch (error) { report.status = 'failed'; report.error = error.message; report.failureDiagnostic = error.diagnostic ?? null; report.raw.completedClients = children.flatMap((entry) => entry.messages.filter((message) => message.type === 'result').map((message) => message.result)); process.exitCode = 1; }
   finally {

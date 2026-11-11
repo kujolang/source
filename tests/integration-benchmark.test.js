@@ -83,3 +83,17 @@ test('keyed benchmark reconciles a lost committed response and promotes every pr
   assert.equal(report.baseline.finalTreesEqual, true);
   assert.equal(report.httpAfterCleanup.sockets.active, 0);
 });
+
+test('same-file contributions survive submission, exact verification and promotion', { skip: !process.env.SOURCE_TEST_DATABASE_URL, timeout: 90000 }, async (t) => {
+  const root = await mkdtemp(path.join(tmpdir(), 'source-bench-shared-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const output = path.join(root, 'report.json');
+  await exec(process.execPath, [script, '--agents', '3', '--repos', '1', '--same-file', '--keyed-submissions', '--output', output], { env: process.env, timeout: 80000 });
+  const report = JSON.parse(await readFile(output, 'utf8'));
+  assert.equal(report.status, 'passed');
+  assert.match(report.fixture, /shared.txt/);
+  assert.equal(report.raw.proposals.length, 3);
+  assert.equal(report.correctness.allProposalsRetained, true);
+  assert.equal(report.correctness.exactVerifiedPromotion, true);
+  assert.equal(report.baseline.finalTreesEqual, true);
+});
