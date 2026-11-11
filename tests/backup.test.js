@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, rm, readFile, writeFile, symlink, link } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, readFile, writeFile, symlink, link, readdir } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -9,6 +9,23 @@ import { createHash } from 'node:crypto';
 import { restoreDrill } from '../scripts/restore-drill.js';
 
 const execFileAsync = promisify(execFile);
+
+test('failed database dumps do not publish backups or print the database credential', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'source-backup-error-'));
+  try {
+    const data = path.join(root, 'data'), bin = path.join(root, 'bin'), output = path.join(root, 'backups');
+    await mkdir(data); await mkdir(bin);
+    await writeFile(path.join(bin, 'pg_dump'), '#!/bin/sh\nexit 1\n', { mode: 0o700 });
+    const secret = 'fixture-only-database-password';
+    await assert.rejects(() => execFileAsync(process.execPath, ['scripts/backup.js', '--data-root', data, '--output', output], {
+      env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, SOURCE_DATABASE_URL: `postgresql://fixture:${secret}@invalid/database` },
+    }), error => {
+      assert.equal(error.stderr.includes(secret), false, 'database credential must not appear in failure output');
+      assert.match(error.stderr, /pg_dump failed/); return true;
+    });
+    assert.deepEqual(await readdir(output), []);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
 
 test('backup workflow archives and verifies a Git root', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'source-backup-test-'));

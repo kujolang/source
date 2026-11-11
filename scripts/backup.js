@@ -96,7 +96,12 @@ async function main() {
     if (gitRoot !== dataRoot) files.push(await archiveRoot(gitRoot, staging, 'git'));
     if (dsn) {
       const database = path.join(staging, 'database.dump');
-      await execFileAsync('pg_dump', ['--format=custom', '--no-owner', '--no-privileges', '--schema', schema, '--file', database, '--dbname', dsn], { maxBuffer: 4 * 1024 * 1024 });
+      try {
+        await execFileAsync('pg_dump', ['--format=custom', '--no-owner', '--no-privileges', '--schema', schema, '--file', database, '--dbname', dsn], { maxBuffer: 4 * 1024 * 1024, timeout: 120000 });
+      } catch {
+        // execFile errors include argv, which may contain database credentials.
+        throw new Error('pg_dump failed; no backup was published');
+      }
       files.push(database);
     }
     const manifest = {
