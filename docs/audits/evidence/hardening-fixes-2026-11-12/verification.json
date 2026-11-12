@@ -1,0 +1,82 @@
+{
+  "full-final.log": {
+    "sha256": "f6993e20a495b0f828174d33f5264fcaa817db5e457406938b81cd67bb12c6fc",
+    "bytes": 51917,
+    "summary": [
+      "\u2139 tests 411",
+      "\u2139 suites 0",
+      "\u2139 pass 374",
+      "\u2139 fail 0",
+      "\u2139 cancelled 0",
+      "\u2139 skipped 37",
+      "\u2139 todo 0",
+      "\u2139 duration_ms 374383.742938"
+    ]
+  },
+  "worker-final.log": {
+    "sha256": "f1cf4d62a6a90fca15e8434fa75563d1dab04953b19baeeceb0403680169f917",
+    "bytes": 1493,
+    "summary": [
+      "\u2139 tests 16",
+      "\u2139 suites 0",
+      "\u2139 pass 16",
+      "\u2139 fail 0",
+      "\u2139 cancelled 0",
+      "\u2139 skipped 0",
+      "\u2139 todo 0",
+      "\u2139 duration_ms 352.321718"
+    ]
+  },
+  "live-final.log": {
+    "sha256": "509fbbf6bedefd9f8a8e400ef8437645b7d452d3ab615fec8cea8d1cc6934dad",
+    "bytes": 84282,
+    "summary": [
+      "# tests 25",
+      "# pass 25",
+      "# fail 0",
+      "# cancelled 0",
+      "# skipped 0",
+      "# duration_ms 343121.403863"
+    ]
+  },
+  "postgres.log": {
+    "sha256": "c4ba1eb40435d57e5bfe4a29af4e460647ed4276d888b83830274a985929a2e0",
+    "bytes": 21241,
+    "summary": [
+      "\u2139 tests 23",
+      "\u2139 suites 0",
+      "\u2139 pass 23",
+      "\u2139 fail 0",
+      "\u2139 cancelled 0",
+      "\u2139 skipped 0",
+      "\u2139 todo 0",
+      "\u2139 duration_ms 80167.373304"
+    ]
+  },
+  "cloudflare.log": {
+    "sha256": "9064dab4cdb76c265056cc8c1cf81a0268042cfa30795a924238e8a2dd1c24f2",
+    "bytes": 1230,
+    "summary": [
+      "\u2139 tests 6",
+      "\u2139 suites 0",
+      "\u2139 pass 6",
+      "\u2139 fail 0",
+      "\u2139 cancelled 0",
+      "\u2139 skipped 0",
+      "\u2139 todo 0",
+      "\u2139 duration_ms 212.684439"
+    ]
+  },
+  "lint.log": {
+    "sha256": "2244ed7672847ec922622de785f36f950ad4fe7971b292b129dacefd8c731d60",
+    "bytes": 234,
+    "summary": [
+      "lint: syntax checked 128 JavaScript files"
+    ]
+  },
+  "missing-dsn-final.log": {
+    "sha256": "8e0967f6892aaa6a17f68736a47f2aa97666e8397686e5f3398147962b8260bb",
+    "bytes": 96,
+    "summary": []
+  }
+}

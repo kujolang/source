@@ -1,5 +1,15 @@
 # Source platform handoff — 2026-11-10
 
+## Hardening fixes complete — 2026-11-12
+
+User-authorized fixes H12-1–3 are implemented: worker free-slot refill and finite
+configuration validation (`61219eb`), mandatory non-skipping live CI gate
+(`824c68b`). Final full suite 374 pass/37 skip, live integration 25 pass,
+PostgreSQL 23 pass, Cloudflare 6 pass, lint pass; zero failures.
+See [fix receipt](audits/repository-hardening-fixes-2026-11-12.md).
+The review checkpoint below is historical; its three confirmed issues are fixed.
+H12-4 remains unmeasured; broader capacity work remains paused.
+
 ## Hardening review checkpoint — 2026-11-12
 
 Review-only pass at `34b11f6` found worker batch-barrier underutilization, missing live integration suites in CI, and nonfinite worker constructor settings; artifact verification read amplification needs measurement. Implementation unchanged. Full suite: 371 pass / 37 skip / zero fail; focused PostgreSQL checks: 25 pass; OCI semantic tests unavailable. See [report and reproducible probes](audits/repository-hardening-2026-11-12.md) before implementing fixes. Wider capacity campaign remains paused.
