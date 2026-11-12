@@ -1,0 +1,152 @@
+{
+  "node": "v26.12.1",
+  "platform": "darwin",
+  "backend": "local JSON/filesystem",
+  "warmupEvaluations": 1,
+  "samplesPerCase": 7,
+  "revision": "0d38f8edd68f538b4672cd92ecc950505e0c459d",
+  "brokerSha256": "02bf8fff627a193a9905fd9d5248964a5f03c945c7fb0339d74918a502c6bcfb",
+  "results": [
+    {
+      "name": "single",
+      "receipts": 1,
+      "uniqueArtifacts": 1,
+      "artifactBytes": 1048576,
+      "equivalentEvaluations": true,
+      "samples": [
+        {
+          "elapsedMs": 67.9662199999998,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 71.32526800000005,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 66.05242499999986,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 65.61797700000011,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 62.81846799999994,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 64.44564699999978,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 68.89609000000019,
+          "reads": 1,
+          "bytes": 1048576
+        }
+      ],
+      "medianMs": 66.05242499999986,
+      "minMs": 62.81846799999994,
+      "maxMs": 71.32526800000005
+    },
+    {
+      "name": "repeated",
+      "receipts": 32,
+      "uniqueArtifacts": 1,
+      "artifactBytes": 1048576,
+      "equivalentEvaluations": true,
+      "samples": [
+        {
+          "elapsedMs": 67.61028299999998,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 65.97043500000018,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 74.06598600000052,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 76.08360600000015,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 78.46907199999987,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 72.77778500000022,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 70.96042600000055,
+          "reads": 1,
+          "bytes": 1048576
+        }
+      ],
+      "medianMs": 72.77778500000022,
+      "minMs": 65.97043500000018,
+      "maxMs": 78.46907199999987
+    },
+    {
+      "name": "unique",
+      "receipts": 32,
+      "uniqueArtifacts": 32,
+      "artifactBytes": 1048576,
+      "equivalentEvaluations": true,
+      "samples": [
+        {
+          "elapsedMs": 151.2198840000001,
+          "reads": 32,
+          "bytes": 33554432
+        },
+        {
+          "elapsedMs": 163.85454400000162,
+          "reads": 32,
+          "bytes": 33554432
+        },
+        {
+          "elapsedMs": 162.58314200000132,
+          "reads": 32,
+          "bytes": 33554432
+        },
+        {
+          "elapsedMs": 161.2260810000007,
+          "reads": 32,
+          "bytes": 33554432
+        },
+        {
+          "elapsedMs": 162.92730799999845,
+          "reads": 32,
+          "bytes": 33554432
+        },
+        {
+          "elapsedMs": 171.85414000000128,
+          "reads": 32,
+          "bytes": 33554432
+        },
+        {
+          "elapsedMs": 172.06557599999906,
+          "reads": 32,
+          "bytes": 33554432
+        }
+      ],
+      "medianMs": 162.92730799999845,
+      "minMs": 151.2198840000001,
+      "maxMs": 172.06557599999906
+    }
+  ]
+}

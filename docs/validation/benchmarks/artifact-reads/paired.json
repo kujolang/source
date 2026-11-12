@@ -1,0 +1,280 @@
+{
+  "baselineRevision": "0d38f8e",
+  "pairedOrder": "alternating baseline-first and current-first on identical fixture",
+  "node": "v26.12.1",
+  "platform": "darwin",
+  "backend": "local JSON/filesystem",
+  "warmupEvaluations": 1,
+  "samplesPerCase": 7,
+  "revision": "0d38f8edd68f538b4672cd92ecc950505e0c459d",
+  "brokerSha256": "02bf8fff627a193a9905fd9d5248964a5f03c945c7fb0339d74918a502c6bcfb",
+  "results": [
+    {
+      "name": "single",
+      "receipts": 1,
+      "uniqueArtifacts": 1,
+      "artifactBytes": 1048576,
+      "equivalentEvaluations": true,
+      "samples": [
+        {
+          "elapsedMs": 71.33183099999997,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 76.50606599999992,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 74.22424300000011,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 69.66176599999972,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 108.61439500000006,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 106.93021799999997,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 138.770035,
+          "reads": 1,
+          "bytes": 1048576
+        }
+      ],
+      "medianMs": 76.50606599999992,
+      "minMs": 69.66176599999972,
+      "maxMs": 138.770035,
+      "baseline": {
+        "samples": [
+          {
+            "elapsedMs": 73.03979299999992,
+            "reads": 1,
+            "bytes": 1048576
+          },
+          {
+            "elapsedMs": 80.24554399999988,
+            "reads": 1,
+            "bytes": 1048576
+          },
+          {
+            "elapsedMs": 78.9716619999997,
+            "reads": 1,
+            "bytes": 1048576
+          },
+          {
+            "elapsedMs": 71.24302099999977,
+            "reads": 1,
+            "bytes": 1048576
+          },
+          {
+            "elapsedMs": 72.3201939999999,
+            "reads": 1,
+            "bytes": 1048576
+          },
+          {
+            "elapsedMs": 101.34513400000014,
+            "reads": 1,
+            "bytes": 1048576
+          },
+          {
+            "elapsedMs": 122.88148499999988,
+            "reads": 1,
+            "bytes": 1048576
+          }
+        ],
+        "medianMs": 78.9716619999997,
+        "minMs": 71.24302099999977,
+        "maxMs": 122.88148499999988
+      }
+    },
+    {
+      "name": "repeated",
+      "receipts": 32,
+      "uniqueArtifacts": 1,
+      "artifactBytes": 1048576,
+      "equivalentEvaluations": true,
+      "samples": [
+        {
+          "elapsedMs": 126.0593600000011,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 91.84503399999994,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 90.24832400000014,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 95.32686399999875,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 82.05406399999993,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 79.11617300000034,
+          "reads": 1,
+          "bytes": 1048576
+        },
+        {
+          "elapsedMs": 76.97680000000037,
+          "reads": 1,
+          "bytes": 1048576
+        }
+      ],
+      "medianMs": 90.24832400000014,
+      "minMs": 76.97680000000037,
+      "maxMs": 126.0593600000011,
+      "baseline": {
+        "samples": [
+          {
+            "elapsedMs": 387.24937300000056,
+            "reads": 32,
+            "bytes": 33554432
+          },
+          {
+            "elapsedMs": 206.5222900000008,
+            "reads": 32,
+            "bytes": 33554432
+          },
+          {
+            "elapsedMs": 244.84169999999904,
+            "reads": 32,
+            "bytes": 33554432
+          },
+          {
+            "elapsedMs": 189.84751799999867,
+            "reads": 32,
+            "bytes": 33554432
+          },
+          {
+            "elapsedMs": 198.13514000000032,
+            "reads": 32,
+            "bytes": 33554432
+          },
+          {
+            "elapsedMs": 156.31937199999993,
+            "reads": 32,
+            "bytes": 33554432
+          },
+          {
+            "elapsedMs": 184.60969300000033,
+            "reads": 32,
+            "bytes": 33554432
+          }
+        ],
+        "medianMs": 198.13514000000032,
+        "minMs": 156.31937199999993,
+        "maxMs": 387.24937300000056
+      }
+    },
+    {
+      "name": "unique",
+      "receipts": 32,
+      "uniqueArtifacts": 32,
+      "artifactBytes": 1048576,
+      "equivalentEvaluations": true,
+      "samples": [
+        {
+          "elapsedMs": 219.97902700000122,
+          "reads": 32,
+          "bytes": 33554432
+        },
+        {
+          "elapsedMs": 205.9062329999997,
+          "reads": 32,
+          "bytes": 33554432
+        },
+        {
+          "elapsedMs": 182.81226500000048,
+          "reads": 32,
+          "bytes": 33554432
+        },
+        {
+          "elapsedMs": 170.8126169999996,
+          "reads": 32,
+          "bytes": 33554432
+        },
+        {
+          "elapsedMs": 173.550986000002,
+          "reads": 32,
+          "bytes": 33554432
+        },
+        {
+          "elapsedMs": 168.1305149999971,
+          "reads": 32,
+          "bytes": 33554432
+        },
+        {
+          "elapsedMs": 163.94232000000193,
+          "reads": 32,
+          "bytes": 33554432
+        }
+      ],
+      "medianMs": 173.550986000002,
+      "minMs": 163.94232000000193,
+      "maxMs": 219.97902700000122,
+      "baseline": {
+        "samples": [
+          {
+            "elapsedMs": 234.6720210000003,
+            "reads": 32,
+            "bytes": 33554432
+          },
+          {
+            "elapsedMs": 219.5908419999996,
+            "reads": 32,
+            "bytes": 33554432
+          },
+          {
+            "elapsedMs": 205.03330600000118,
+            "reads": 32,
+            "bytes": 33554432
+          },
+          {
+            "elapsedMs": 176.18000799999936,
+            "reads": 32,
+            "bytes": 33554432
+          },
+          {
+            "elapsedMs": 168.23851300000024,
+            "reads": 32,
+            "bytes": 33554432
+          },
+          {
+            "elapsedMs": 169.57668399999966,
+            "reads": 32,
+            "bytes": 33554432
+          },
+          {
+            "elapsedMs": 154.26079000000027,
+            "reads": 32,
+            "bytes": 33554432
+          }
+        ],
+        "medianMs": 176.18000799999936,
+        "minMs": 154.26079000000027,
+        "maxMs": 234.6720210000003
+      }
+    }
+  ]
+}

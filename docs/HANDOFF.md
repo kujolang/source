@@ -1,5 +1,16 @@
 # Source platform handoff — 2026-11-10
 
+## Artifact-read measurement and fix — 2026-11-12
+
+H12-4 measured and resolved for duplicate content-addressed logs (`57032c6`).
+Per-evaluation hash deduplication preserves fresh cross-call integrity checks and
+checks every distinct historical artifact. Paired local JSON-store benchmark:
+32 receipts sharing 1 MiB log, 32 reads → 1; median 198.135ms → 90.248ms
+(54.45% reduction). Unique/single controls changed only 1.49–3.12%; not a
+production latency claim. Full suite 376 pass/37 skip and live integration
+25 pass, zero failures; lint pass. [Method, raw data and handoff](validation/benchmarks/artifact-reads/README.md).
+Older H12-4-unmeasured checkpoints below are historical. Wider capacity remains paused.
+
 ## Hardening fixes complete — 2026-11-12
 
 User-authorized fixes H12-1–3 are implemented: worker free-slot refill and finite

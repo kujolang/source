@@ -1,0 +1,63 @@
+{
+  "regression-before.log": {
+    "sha256": "39e4a588be7e95bfcd828d3c46b3fe3d0bfddd65914bf39f7837d34137d8888e",
+    "bytes": 2323,
+    "summary": [
+      "\u2139 tests 2",
+      "\u2139 suites 0",
+      "\u2139 pass 0",
+      "\u2139 fail 2",
+      "\u2139 cancelled 0",
+      "\u2139 skipped 0",
+      "\u2139 todo 0",
+      "\u2139 duration_ms 5773.118385"
+    ]
+  },
+  "focused.log": {
+    "sha256": "e1581b387c2163ac1adcd0909016fcdd5ce05f09b5c4cab80ce0f4144b764439",
+    "bytes": 5737,
+    "summary": [
+      "\u2139 tests 12",
+      "\u2139 suites 0",
+      "\u2139 pass 12",
+      "\u2139 fail 0",
+      "\u2139 cancelled 0",
+      "\u2139 skipped 0",
+      "\u2139 todo 0",
+      "\u2139 duration_ms 54708.442329"
+    ]
+  },
+  "full.log": {
+    "sha256": "88d6d71710c8ca397a6b97eb39214ff7ade0898dc0b420c5d187aacff7825437",
+    "bytes": 52772,
+    "summary": [
+      "\u2139 tests 413",
+      "\u2139 suites 0",
+      "\u2139 pass 376",
+      "\u2139 fail 0",
+      "\u2139 cancelled 0",
+      "\u2139 skipped 37",
+      "\u2139 todo 0",
+      "\u2139 duration_ms 399325.978475"
+    ]
+  },
+  "live.log": {
+    "sha256": "e9ce53b1836a14a6fef5d444df36dfa11e882d3b3165880e8ee8079c1c465432",
+    "bytes": 84284,
+    "summary": [
+      "# tests 25",
+      "# pass 25",
+      "# fail 0",
+      "# cancelled 0",
+      "# skipped 0",
+      "# duration_ms 326548.674775"
+    ]
+  },
+  "lint.log": {
+    "sha256": "5708f7cd5f3715a14c5121664fac499afb4590486e769498eb33ccbb3b32d4eb",
+    "bytes": 234,
+    "summary": [
+      "lint: syntax checked 129 JavaScript files"
+    ]
+  }
+}
