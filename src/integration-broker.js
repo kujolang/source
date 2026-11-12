@@ -125,11 +125,17 @@ export class IntegrationBroker {
     const ids = store.listJsonAsync ? await store.listJsonAsync(rel, { limit: 1001 }) : store.listJson(rel, { limit: 1001 });
     if (ids.length > 1000) throw new Error('candidate receipt limit exceeded');
     const receipts = await Promise.all(ids.map((id) => this.read(`${rel}/${id}.json`)));
+    // Request-local identities only: retain no artifact bytes and never reuse a
+    // successful integrity check across evaluations. Historical receipts still
+    // participate, even when dispatch selection later excludes them.
+    const verifiedArtifacts = new Set();
     for (const receipt of receipts) {
+      if (verifiedArtifacts.has(receipt.artifactRef.hash)) continue;
       const bytes = store.getArtifactAsync ? await store.getArtifactAsync(receipt.artifactRef.hash) : store.getArtifact(receipt.artifactRef.hash);
       if (!bytes) throw new Error('verification artifact missing');
-      // The store verifies content addresses on read; evaluation also checks bytes.
+      // Verify bytes here; not all store backends validate content on read.
       if (createHash('sha256').update(bytes).digest('hex') !== receipt.artifactRef.hash) throw new Error('verification artifact integrity mismatch');
+      verifiedArtifacts.add(receipt.artifactRef.hash);
     }
     const dispatch = await this.read(`${root}/${input.candidateId}/dispatch.json`);
     const currentReceipts = receipts.filter((receipt) => {

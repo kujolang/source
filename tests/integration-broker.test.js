@@ -233,3 +233,37 @@ test('tool gate parses original artifacts; context-only checks and contradictory
   f.policy.checks[0].adapter = 'casefile';
   await assert.rejects(() => f.src.integration.configure({ ...f.scope, policy: f.policy }), /context-only/);
 });
+
+for (const mode of ['async', 'sync']) test(`evaluation reads each distinct artifact once without caching across calls (${mode})`, async t => {
+  const f = await setup(t); const item = await f.propose(`artifact-${mode}`);
+  const start = Date.now() - 1000;
+  const receipts = [];
+  for (let i = 0; i < 3; i++) {
+    receipts.push(await f.src.integration.record({ ...item.input, principalId: f.service.id, checkId: 'integration',
+      execution: { ...f.execution(item.report), startedAt: start + i, finishedAt: start + i + 10 },
+      output: i < 2 ? 'repeated log' : 'distinct historical log' }));
+  }
+  const store = f.src.store;
+  const original = store.getArtifact.bind(store);
+  let reads = 0, corrupt = null, missing = null;
+  const read = hash => { reads++; return hash === corrupt ? Buffer.from('tampered') : hash === missing ? null : original(hash); };
+  store.getArtifact = read;
+  store.getArtifactAsync = mode === 'async' ? async hash => read(hash) : undefined;
+  const first = await f.src.integration.evaluate(item.input);
+  assert.equal(first.ok, true);
+  assert.equal(reads, 2, 'shared bytes read once, distinct bytes still checked');
+  reads = 0;
+  assert.deepEqual(await f.src.integration.evaluate(item.input), first);
+  assert.equal(reads, 2, 'fresh integrity reads on every evaluation');
+  corrupt = receipts[0].artifactRef.hash;
+  await assert.rejects(f.src.integration.evaluate(item.input), /integrity mismatch/);
+  corrupt = null; missing = receipts[0].artifactRef.hash;
+  await assert.rejects(f.src.integration.evaluate(item.input), /artifact missing/);
+  missing = null;
+  // Even receipts omitted by dispatch selection retain their integrity checks.
+  await f.src._asyncWrite(`${f.src.integration.scope(item.input)}/${item.input.candidateId}/dispatch.json`, {
+    checks: [{ checkId: 'integration', action: 'scheduled', jobId: 'new-job', epoch: 9 }],
+  });
+  corrupt = receipts[2].artifactRef.hash;
+  await assert.rejects(f.src.integration.evaluate(item.input), /integrity mismatch/);
+});
