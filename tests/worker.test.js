@@ -279,3 +279,54 @@ test('a hanging heartbeat cannot extend execution beyond the local lease deadlin
   assert.equal(signal.aborted, true);
   assert.match(worker.lastError.message, /deadline exceeded/);
 });
+
+test('worker refills a freed slot while a slow peer remains active', async t => {
+  let release;
+  const slow = new Promise(resolve => { release = resolve; });
+  const pending = ['slow', 'fast', 'next'].map(id => ({ id, kind: 'work' }));
+  const started = [];
+  const worker = new SourceWorker({ workerId: 'refill', concurrency: 2, pollMs: 1, queue: {
+    claim: async ({ limit }) => pending.splice(0, limit),
+    complete: async () => true, fail: async () => assert.fail('unexpected failure'), extend: async () => true,
+  }, handlers: { work: async (_, job) => { started.push(job.id); if (job.id === 'slow') await slow; } } });
+  t.after(async () => { release(); await worker.stop(); });
+  worker.start();
+  await waitFor(() => started.includes('next'));
+  assert.equal(worker.metrics().completed >= 1, true);
+  assert.equal(started.filter(id => id === 'slow').length, 1);
+  assert.equal(worker.activeJobs >= 1, true);
+});
+
+test('worker rejects nonfinite settings and preserves finite coercion and zero semantics', async () => {
+  const base = { queue: {}, workerId: 'bounds' };
+  for (const name of ['concurrency', 'leaseMs', 'pollMs', 'maxPollMs', 'retryDelayMs', 'maxAttempts', 'projectBurst', 'errorBackoffMs', 'jitterRatio', 'handlerTimeoutMs', 'shutdownTimeoutMs']) {
+    for (const value of [NaN, Infinity, -Infinity, 'invalid', '', ' ', null, true, {}]) {
+      assert.throws(() => new SourceWorker({ ...base, [name]: value }), new RegExp(name));
+    }
+  }
+  const worker = new SourceWorker({ ...base, concurrency: '2.9', handlerTimeoutMs: 0, shutdownTimeoutMs: 0, retryDelayMs: 0, jitterRatio: 0 });
+  assert.equal(worker.concurrency, 2);
+  assert.equal(worker.handlerTimeoutMs, 0);
+  assert.equal(worker.shutdownTimeoutMs, 0);
+  await assert.rejects(worker.stop({ timeoutMs: NaN }), /timeoutMs/);
+  assert.equal(worker.stopping, false);
+});
+
+test('shutdown drains an in-flight claim without making another claim', async () => {
+  let deliver;
+  let calls = 0;
+  let completed = 0;
+  const claim = new Promise(resolve => { deliver = resolve; });
+  const worker = new SourceWorker({ workerId: 'claim-stop', concurrency: 1, queue: {
+    claim: async () => { calls++; return claim; },
+    complete: async () => { completed++; return true; },
+    fail: async () => assert.fail('unexpected failure'),
+  }, handlers: { work: async () => 'done' } });
+  worker.start();
+  const stopped = worker.stop();
+  deliver([{ id: 'claimed', kind: 'work' }]);
+  assert.equal(await stopped, true);
+  assert.equal(calls, 1);
+  assert.equal(completed, 1);
+  assert.equal(worker.activeJobs, 0);
+});

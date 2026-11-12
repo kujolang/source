@@ -4,6 +4,10 @@ export class SourceWorker {
   constructor({ queue, handlers = {}, workerId, concurrency = 8, leaseMs = 30_000, pollMs = 1_000, maxPollMs = 10_000, retryDelayMs = 1_000, maxAttempts = 5, projectBurst = 8, errorBackoffMs = 1_000, jitterRatio = 0.2, random = Math.random, handlerTimeoutMs = 15 * 60_000, shutdownTimeoutMs = 30_000, onError = null } = {}) {
     if (!queue) throw new Error('queue is required');
     if (!workerId) throw new Error('workerId is required');
+    // Preserve finite numeric coercion/clamping, but never let NaN disable bounds.
+    for (const [name, value] of Object.entries({ concurrency, leaseMs, pollMs, maxPollMs, retryDelayMs, maxAttempts, projectBurst, errorBackoffMs, jitterRatio, handlerTimeoutMs, shutdownTimeoutMs })) {
+      if ((typeof value !== 'number' && typeof value !== 'string') || (typeof value === 'string' && !value.trim()) || !Number.isFinite(Number(value))) throw new TypeError(`${name} must be a finite number`);
+    }
     this.queue = queue;
     this.handlers = handlers;
     this.workerId = workerId;
@@ -37,6 +41,7 @@ export class SourceWorker {
   }
 
   async stop({ timeoutMs = this.shutdownTimeoutMs } = {}) {
+    if ((typeof timeoutMs !== 'number' && typeof timeoutMs !== 'string') || (typeof timeoutMs === 'string' && !timeoutMs.trim()) || !Number.isFinite(Number(timeoutMs))) throw new TypeError('timeoutMs must be a finite number');
     this.stopping = true;
     for (const wake of this._idleWaiters) wake();
     this._idleWaiters.clear();
@@ -68,37 +73,57 @@ export class SourceWorker {
   async _loop() {
     let failures = 0;
     let idlePollMs = this.pollMs;
-    while (!this.stopping) {
-      let jobs;
-      try {
-        jobs = await this.queue.claim({ workerId: this.workerId, limit: this.concurrency, leaseMs: this.leaseMs, projectBurst: this.projectBurst });
-        failures = 0;
-      } catch (error) {
-        failures += 1;
-        this.counters.errors += 1;
-        this._reportError(error);
-        await this._wait(this._jitteredDelay(Math.min(60_000, this.errorBackoffMs * (2 ** Math.min(failures - 1, 6)))));
-        continue;
-      }
-      if (!jobs.length) {
-        const delay = this._jitteredDelay(idlePollMs);
-        if (typeof this.queue.waitForWork === 'function') {
-          let wakeStopWait;
-          const stopWait = new Promise((resolve) => {
-            wakeStopWait = () => resolve();
-            this._idleWaiters.add(wakeStopWait);
-          });
-          await Promise.race([this.queue.waitForWork({ timeoutMs: delay }), stopWait]).catch(() => {});
-          this._idleWaiters.delete(wakeStopWait);
-        } else {
-          await this._wait(delay);
+    const active = new Set();
+    let slotAvailable;
+    try {
+      while (!this.stopping) {
+        if (active.size >= this.concurrency) {
+          // Wake on one free slot or shutdown, without waiting for the slowest job.
+          let wake;
+          const stopped = new Promise(resolve => { wake = resolve; this._idleWaiters.add(wake); });
+          slotAvailable = wake;
+          try { await stopped; }
+          finally { slotAvailable = null; this._idleWaiters.delete(wake); }
+          continue;
         }
-        idlePollMs = Math.min(this.maxPollMs, idlePollMs * 2);
-        continue;
+        let jobs;
+        try {
+          jobs = await this.queue.claim({ workerId: this.workerId, limit: this.concurrency - active.size, leaseMs: this.leaseMs, projectBurst: this.projectBurst });
+          failures = 0;
+        } catch (error) {
+          failures += 1;
+          this.counters.errors += 1;
+          this._reportError(error);
+          await this._wait(this._jitteredDelay(Math.min(60_000, this.errorBackoffMs * (2 ** Math.min(failures - 1, 6)))));
+          continue;
+        }
+        if (!jobs.length) {
+          const delay = this._jitteredDelay(idlePollMs);
+          if (typeof this.queue.waitForWork === 'function') {
+            let wakeStopWait;
+            const stopWait = new Promise((resolve) => {
+              wakeStopWait = () => resolve();
+              this._idleWaiters.add(wakeStopWait);
+            });
+            await Promise.race([this.queue.waitForWork({ timeoutMs: delay }), stopWait]).catch(() => {});
+            this._idleWaiters.delete(wakeStopWait);
+          } else {
+            await this._wait(delay);
+          }
+          idlePollMs = Math.min(this.maxPollMs, idlePollMs * 2);
+          continue;
+        }
+        this.counters.claimed += jobs.length;
+        idlePollMs = this.pollMs;
+        for (const job of jobs) {
+          const task = this._runJob(job).finally(() => { active.delete(task); slotAvailable?.(); });
+          active.add(task);
+        }
+        // A partial claim may leave spare slots; poll/notifications still admit
+        // newly queued work while existing handlers run.
       }
-      this.counters.claimed += jobs.length;
-      idlePollMs = this.pollMs;
-      await Promise.all(jobs.map((job) => this._runJob(job)));
+    } finally {
+      await Promise.all(active);
     }
   }
 

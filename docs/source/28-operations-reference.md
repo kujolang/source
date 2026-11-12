@@ -90,6 +90,18 @@ its lease to expire so another worker can recover the job. Handlers also have a
 with `--worker-handler-timeout-ms`. The jitter range is configurable with
 `--worker-jitter-ratio` (default `0.2`, capped at `1`).
 
+Worker capacity refills as individual jobs finish; a slow peer does not hold
+finished slots idle. Claims remain serialized, request only free slots, and retain
+the queue's per-project burst policy. Shutdown stops new claim cycles and drains
+already claimed work, including claims that were in flight when stop began.
+
+Library numeric settings must be finite numbers or nonempty numeric strings.
+Malformed/nonfinite values throw before execution; finite values retain existing
+integer truncation and bounds. For direct `SourceWorker` callers, zero handler
+timeout disables that timeout, zero shutdown timeout waits for an unlimited drain,
+and zero retry delay/jitter remain supported. CLI numeric fallback behavior is
+unchanged. `stop({ timeoutMs })` also rejects malformed/nonfinite values.
+
 Workers register handlers by job kind and can run as separate processes:
 
 ```js
