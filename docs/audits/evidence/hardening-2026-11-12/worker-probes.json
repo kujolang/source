@@ -1,0 +1,14 @@
+{
+  "waveBarrier": {
+    "activeJobs": 1,
+    "configuredConcurrency": 2,
+    "queuedJobs": 1,
+    "fastJobCompleted": true,
+    "waitingJobStarted": false
+  },
+  "invalidConfiguration": {
+    "concurrencyIsNaN": true,
+    "handlerTimeoutIsNaN": true,
+    "handlerTimeoutEnabled": false
+  }
+}

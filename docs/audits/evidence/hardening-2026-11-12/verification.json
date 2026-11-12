@@ -1,0 +1,80 @@
+{
+  "tests.log": {
+    "sha256": "9be635e2761cb2306454dc2a75216b4e48900b2f3d7dd2819ba378f4f41a1af8",
+    "bytes": 51612,
+    "summary": [
+      "\u2139 tests 408",
+      "\u2139 suites 0",
+      "\u2139 pass 371",
+      "\u2139 fail 0",
+      "\u2139 cancelled 0",
+      "\u2139 skipped 37",
+      "\u2139 todo 0",
+      "\u2139 duration_ms 283285.374645"
+    ]
+  },
+  "lint.log": {
+    "sha256": "17b2f476c50108c7cb8c1ed150973a2e53f04395ead1de8f97cdaa04ec4a8149",
+    "bytes": 234,
+    "summary": [
+      "lint: syntax checked 127 JavaScript files"
+    ]
+  },
+  "worker-tests.log": {
+    "sha256": "3a3603685627910203684d59484dfc5abfa81850f87f94f57a5c694a0415d9a2",
+    "bytes": 1231,
+    "summary": [
+      "\u2139 tests 6",
+      "\u2139 suites 0",
+      "\u2139 pass 6",
+      "\u2139 fail 0",
+      "\u2139 cancelled 0",
+      "\u2139 skipped 0",
+      "\u2139 todo 0",
+      "\u2139 duration_ms 253.835341"
+    ]
+  },
+  "live-integration.log": {
+    "sha256": "275f40b309319d3bf36f9919b435286802f73c3eb98e7377f70d68ec8dbb3e4d",
+    "bytes": 931,
+    "summary": [
+      "\u2139 tests 8",
+      "\u2139 suites 0",
+      "\u2139 pass 6",
+      "\u2139 fail 0",
+      "\u2139 cancelled 0",
+      "\u2139 skipped 2",
+      "\u2139 todo 0",
+      "\u2139 duration_ms 92514.104486"
+    ]
+  },
+  "live-fencing.log": {
+    "sha256": "7e91fa45368955b24fce6034df8db7a4d25c2cc053a38e6cb4334e67a29fd631",
+    "bytes": 77605,
+    "summary": [
+      "\u2139 tests 19",
+      "\u2139 suites 0",
+      "\u2139 pass 19",
+      "\u2139 fail 0",
+      "\u2139 cancelled 0",
+      "\u2139 skipped 0",
+      "\u2139 todo 0",
+      "\u2139 duration_ms 132193.043721"
+    ]
+  },
+  "root-dependencies.json": {
+    "sha256": "31f942a0f758d5c0ab827e4a85b3dfe4bc4c47bb76153a8a461c25826ec2ba56",
+    "bytes": 360,
+    "summary": []
+  },
+  "worker-dependencies.json": {
+    "sha256": "2ba174dba3d8660de1a3e9a147662992d51b4bc841e9925a8bae9db587d58f6e",
+    "bytes": 361,
+    "summary": []
+  },
+  "docker.log": {
+    "sha256": "0fd1076b663ea8b41e332c31e3bf5ceaa7968f1d9c48bd14e31b86a2ab42761b",
+    "bytes": 2218,
+    "summary": []
+  }
+}
