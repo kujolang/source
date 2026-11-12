@@ -39,3 +39,15 @@ that the peer remains ready.
 The live gate is intentionally not silently replaced by a local mock: external
 database, shared Git storage, failover, and deployment load remain deployment
 evidence rather than repository-only claims.
+
+## Required live integration regressions
+
+`SOURCE_TEST_DATABASE_URL=... npm run test:integration` runs the bounded submission
+recovery, verification queue/dispatch, integration benchmark and workflow comparison
+suites sequentially against a disposable PostgreSQL database. CI runs this command
+in its PostgreSQL job. Missing DSN, nonzero child exit, failures, cancellations or
+any skipped tests fail the gate. The reviewed inventory floor is 25 executed tests;
+update it in `scripts/run-live-integration.js` only with a reviewed suite change.
+Adding tests needs no floor change to pass, but update the floor to protect the new
+inventory. OCI/browser suites need their own image/environment and are deliberately
+outside this database-only gate; a green result is not container execution proof.
