@@ -7,7 +7,9 @@
 import { test, after } from 'node:test';
 import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import fsp from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Source } from '../src/source.js';
@@ -155,6 +157,43 @@ test('JSON store async contract avoids synchronous file I/O and serializes count
 });
 
 // --- interface contract ----------------------------------------------------
+
+test('JSON store publishes artifact bytes only after the complete write', async (t) => {
+  const store = new Store(tmp());
+  t.after(() => rmSync(store.root, { recursive: true, force: true }));
+  const bytes = Buffer.from('complete artifact');
+  const hash = createHash('sha256').update(bytes).digest('hex');
+  const partial = Promise.withResolvers();
+  const resume = Promise.withResolvers();
+  const write = fsp.writeFile;
+  t.mock.method(fsp, 'writeFile', async (file, data, options) => {
+    await write(file, data.subarray(0, 1), options);
+    partial.resolve();
+    await resume.promise;
+    await fsp.appendFile(file, data.subarray(1));
+  });
+  const publication = store.putArtifactAsync(bytes);
+  try {
+    await partial.promise;
+    assert.equal(await store.getArtifactAsync(hash), null);
+    assert.equal(store.getArtifact(hash), null);
+  } finally {
+    resume.resolve();
+  }
+  assert.equal((await publication).hash, hash);
+  assert.deepEqual(await store.getArtifactAsync(hash), bytes);
+});
+
+test('failed JSON publications remove staging files and allow subsequent writes', async (t) => {
+  const store = new Store(tmp());
+  t.after(() => rmSync(store.root, { recursive: true, force: true }));
+  mkdirSync(path.join(store.root, 'blocked.json'));
+  assert.throws(() => store.writeJson('blocked.json', { value: 1 }));
+  await assert.rejects(store.writeJsonAsync('blocked.json', { value: 1 }));
+  assert.deepEqual(readdirSync(store.root), ['blocked.json']);
+  await store.writeJsonAsync('working.json', { value: 2 });
+  assert.deepEqual(await store.readJsonAsync('working.json'), { value: 2 });
+});
 
 test('SqliteStore listJson returns direct children only', () => {
   const store = new SqliteStore(tmp());

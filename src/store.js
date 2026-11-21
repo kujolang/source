@@ -13,7 +13,29 @@
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+
+function writeAtomicSync(file, data) {
+  const temporary = `${file}.tmp-${randomUUID()}`;
+  try {
+    fs.writeFileSync(temporary, data, { flag: 'wx' });
+    fs.renameSync(temporary, file);
+  } catch (error) {
+    if (error.code !== 'EEXIST') fs.rmSync(temporary, { force: true });
+    throw error;
+  }
+}
+
+async function writeAtomic(file, data) {
+  const temporary = `${file}.tmp-${randomUUID()}`;
+  try {
+    await fsp.writeFile(temporary, data, { flag: 'wx' });
+    await fsp.rename(temporary, file);
+  } catch (error) {
+    if (error.code !== 'EEXIST') await fsp.rm(temporary, { force: true });
+    throw error;
+  }
+}
 
 export class Store {
   constructor(root) {
@@ -43,9 +65,7 @@ export class Store {
   writeJson(relPath, obj) {
     const p = this._p(relPath);
     this._ensureDir(path.dirname(p));
-    const tmp = `${p}.tmp-${process.pid}-${Date.now()}`;
-    fs.writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n', 'utf8');
-    fs.renameSync(tmp, p);
+    writeAtomicSync(p, JSON.stringify(obj, null, 2) + '\n');
   }
 
   // Async methods keep the compatibility backend usable by the async API
@@ -65,9 +85,7 @@ export class Store {
     return this._enqueueAsyncWrite(async () => {
       const p = this._p(relPath);
       await fsp.mkdir(path.dirname(p), { recursive: true });
-      const tmp = `${p}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      await fsp.writeFile(tmp, JSON.stringify(obj, null, 2) + '\n', 'utf8');
-      await fsp.rename(tmp, p);
+      await writeAtomic(p, JSON.stringify(obj, null, 2) + '\n');
     });
   }
 
@@ -127,9 +145,7 @@ export class Store {
       meta[key] = value;
       const p = this._p('meta.json');
       await fsp.mkdir(path.dirname(p), { recursive: true });
-      const tmp = `${p}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      await fsp.writeFile(tmp, JSON.stringify(meta, null, 2) + '\n', 'utf8');
-      await fsp.rename(tmp, p);
+      await writeAtomic(p, JSON.stringify(meta, null, 2) + '\n');
     });
   }
 
@@ -141,9 +157,7 @@ export class Store {
       meta[key] = next;
       const p = this._p('meta.json');
       await fsp.mkdir(path.dirname(p), { recursive: true });
-      const tmp = `${p}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      await fsp.writeFile(tmp, JSON.stringify(meta, null, 2) + '\n', 'utf8');
-      await fsp.rename(tmp, p);
+      await writeAtomic(p, JSON.stringify(meta, null, 2) + '\n');
       return `${prefix}${next}`;
     });
   }
@@ -154,7 +168,7 @@ export class Store {
     const rel = path.join('artifacts', hash.slice(0, 2), hash);
     const p = this._p(rel);
     this._ensureDir(path.dirname(p));
-    if (!fs.existsSync(p)) fs.writeFileSync(p, bytes);
+    if (!fs.existsSync(p)) writeAtomicSync(p, bytes);
     return { hash, rel };
   }
 
@@ -166,13 +180,14 @@ export class Store {
       await fsp.mkdir(path.dirname(p), { recursive: true });
       try { await fsp.access(p); } catch (e) {
         if (e.code !== 'ENOENT') throw e;
-        await fsp.writeFile(p, bytes);
+        await writeAtomic(p, bytes);
       }
     });
     return { hash, rel };
   }
 
   getArtifact(hash) {
+    if (typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash)) return null;
     const rel = path.join('artifacts', hash.slice(0, 2), hash);
     try {
       return fs.readFileSync(this._p(rel));
@@ -183,6 +198,7 @@ export class Store {
   }
 
   async getArtifactAsync(hash) {
+    if (typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash)) return null;
     const rel = path.join('artifacts', hash.slice(0, 2), hash);
     try {
       return await fsp.readFile(this._p(rel));
