@@ -144,7 +144,7 @@ test('malformed Host returns 400 without terminating the serving process', async
   assert.equal(result.status, 0, result.stderr);
 });
 
-test('queued client disconnect releases its late admission grant', { timeout: 5000 }, async (t) => {
+test('queued client disconnect immediately frees its queue position', { timeout: 5000 }, async (t) => {
   const { createConnection } = await import('node:net');
   const { once } = await import('node:events');
   let unblock;
@@ -163,13 +163,15 @@ test('queued client disconnect releases its late admission grant', { timeout: 50
   let queued;
   const queueEntry = new Promise((resolve) => { queued = resolve; });
   const acquire = server.requestSlots.acquire.bind(server.requestSlots);
-  server.requestSlots.acquire = () => { const value = acquire(); queued(); return value; };
+  server.requestSlots.acquire = (options) => { const value = acquire(options); queued(); return value; };
   const socket = createConnection({ host: '127.0.0.1', port });
   await once(socket, 'connect');
   socket.write('GET /healthz HTTP/1.1\r\nHost: localhost\r\n\r\n');
   await queueEntry;
   socket.destroy();
   await disconnected;
+  assert.equal(server.requestSlots.waiters.length, 0);
+  assert.equal(server.requestSlots.active, 1);
   unblock();
   await (await first).text();
   await new Promise(setImmediate);

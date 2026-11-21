@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
+import http from 'node:http';
+import { once } from 'node:events';
 import { freshSource } from './helpers.js';
 import { startServer } from '../src/api.js';
 
@@ -45,6 +47,57 @@ test('artifact downloads have bounded admission and advertise their size', async
     assert.equal(firstResponse.headers.get('content-length'), '16');
     assert.equal(await firstResponse.text(), 'bounded-artifact');
   }, { artifactConcurrency: 1, artifactQueue: 0 });
+});
+
+test('admission remains occupied while a disconnected handler finishes', { timeout: 5000 }, async (t) => {
+  const entered = Promise.withResolvers();
+  const unblock = Promise.withResolvers();
+  const src = {
+    store: {},
+    async checkHealthAsync() { entered.resolve(); await unblock.promise; },
+    async getInstanceAsync() { return { id: 'instance' }; },
+  };
+  const server = await startServer(src, { port: 0, requestConcurrency: 1, requestQueue: 0 });
+  t.after(() => { unblock.resolve(); server.closeAllConnections(); server.close(); });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const first = http.get(`${base}/readyz`);
+  first.on('error', () => {});
+  const [req, res] = await once(server, 'request');
+  assert.equal(req.url, '/readyz');
+  await entered.promise;
+  const disconnected = once(res, 'close');
+  first.destroy();
+  await disconnected;
+  assert.equal(server.requestSlots.active, 1);
+  const rejected = await fetch(`${base}/healthz`);
+  assert.equal(rejected.status, 503);
+  await rejected.text();
+  unblock.resolve();
+  await new Promise(setImmediate);
+  assert.equal(server.requestSlots.active, 0);
+});
+
+test('artifact admission lasts until the response drains or disconnects', { timeout: 5000 }, async (t) => {
+  const { src, org, project, agent } = freshSource();
+  const capability = src.capabilities.issue({
+    principalId: agent.id,
+    scope: { org: org.id, project: project.id },
+    allowed: ['read_context'],
+  });
+  src.getEvidenceAsync = async () => ({ artifactRef: { hash: 'artifact-1' } });
+  src.getArtifactAsync = async () => Buffer.alloc(16 * 1024 * 1024);
+  const server = await startServer(src, { port: 0, artifactConcurrency: 1, artifactQueue: 0 });
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  const base = `http://127.0.0.1:${server.address().port}/api/v1/orgs/${org.id}/projects/${project.id}/evidence`;
+  const headers = auth(capability.credential);
+  const first = http.get(`${base}/E1/artifact`, { headers });
+  const [res] = await once(first, 'response');
+  t.after(() => res.destroy());
+  assert.equal(res.statusCode, 200);
+  const rejected = await fetch(`${base}/E2/artifact`, { headers });
+  assert.equal(rejected.status, 503);
+  await rejected.text();
+  res.destroy();
 });
 
 function auth(credential) {

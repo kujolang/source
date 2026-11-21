@@ -10,23 +10,40 @@ export class Semaphore {
     this.rejected = 0;
   }
 
-  acquire() {
+  acquire({ signal } = {}) {
+    if (signal?.aborted) return Promise.resolve(null);
     if (this.active < this.capacity) {
       this.active += 1;
-      return Promise.resolve(this._release);
+      return Promise.resolve(this._permit());
     }
     if (this.waiters.length >= this.queueLimit) {
       this.rejected += 1;
       return Promise.resolve(null);
     }
-    return new Promise((resolve) => this.waiters.push(resolve));
+    return new Promise((resolve) => {
+      const grant = () => {
+        signal?.removeEventListener('abort', cancel);
+        resolve(this._permit());
+      };
+      const cancel = () => {
+        this.waiters.splice(this.waiters.indexOf(grant), 1);
+        resolve(null);
+      };
+      this.waiters.push(grant);
+      signal?.addEventListener('abort', cancel, { once: true });
+    });
   }
 
-  _release = () => {
-    const next = this.waiters.shift();
-    if (next) next(this._release);
-    else this.active -= 1;
-  };
+  _permit() {
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const next = this.waiters.shift();
+      if (next) next();
+      else this.active -= 1;
+    };
+  }
 }
 
 // Per-key admission prevents one tenant from monopolizing a shared global
@@ -41,7 +58,8 @@ export class KeyedSemaphore {
     this.rejected = 0;
   }
 
-  async acquire(key) {
+  async acquire(key, { signal } = {}) {
+    if (signal?.aborted) return null;
     const normalized = String(key).slice(0, 256);
     let bucket = this.buckets.get(normalized);
     if (!bucket) {
@@ -52,18 +70,15 @@ export class KeyedSemaphore {
       bucket = new Semaphore({ capacity: this.capacity, queue: this.queue });
       this.buckets.set(normalized, bucket);
     }
-    const release = await bucket.acquire();
+    const release = await bucket.acquire({ signal });
     if (!release) {
-      if (bucket.active === 0 && bucket.waiters.length === 0) this.buckets.delete(normalized);
-      this.rejected += 1;
+      if (bucket.active === 0 && this.buckets.get(normalized) === bucket) this.buckets.delete(normalized);
+      if (!signal?.aborted) this.rejected += 1;
       return null;
     }
-    let released = false;
     return () => {
-      if (released) return;
-      released = true;
       release();
-      if (bucket.active === 0 && bucket.waiters.length === 0) this.buckets.delete(normalized);
+      if (bucket.active === 0 && this.buckets.get(normalized) === bucket) this.buckets.delete(normalized);
     };
   }
 }

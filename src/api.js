@@ -26,6 +26,7 @@ import path from 'node:path';
 import https from 'node:https';
 import { gunzip } from 'node:zlib';
 import { promisify } from 'node:util';
+import { finished } from 'node:stream/promises';
 import { readFileSync } from 'node:fs';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { Source } from './source.js';
@@ -509,7 +510,13 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
     state.requestsTotal += 1;
     state.activeRequests += 1;
     let accounted = false;
+    let handlerDone = false;
     let releaseRequest = null;
+    const disconnect = new AbortController();
+    const { signal } = disconnect;
+    const releaseIfDone = () => {
+      if (accounted && handlerDone) releaseRequest?.();
+    };
     const accountResponse = (aborted) => {
       if (accounted) return;
       accounted = true;
@@ -520,25 +527,22 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
         const status = String(res.statusCode || 200);
         state.statuses.set(status, (state.statuses.get(status) || 0) + 1);
       }
-      if (releaseRequest) {
-        releaseRequest();
-        releaseRequest = null;
-      }
+      releaseIfDone();
     };
     res.once('finish', () => accountResponse(false));
-    res.once('close', () => { if (!res.writableFinished) accountResponse(true); });
-    releaseRequest = await requestSlots.acquire();
-    if (!releaseRequest) {
-      res.setHeader('Retry-After', '1');
-      return json(res, 503, { error: 'request capacity exhausted', retryable: true });
-    }
-    if (accounted || req.aborted || res.destroyed) {
-      releaseRequest();
-      releaseRequest = null;
-      return res.destroy();
-    }
+    res.once('close', () => {
+      if (res.writableFinished) return;
+      disconnect.abort();
+      accountResponse(true);
+    });
 
     try {
+      releaseRequest = await requestSlots.acquire({ signal });
+      if (signal.aborted || req.aborted || res.destroyed) return res.destroy();
+      if (!releaseRequest) {
+        res.setHeader('Retry-After', '1');
+        return json(res, 503, { error: 'request capacity exhausted', retryable: true });
+      }
       const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
       const pathname = url.pathname;
       const fields = url.searchParams.get('fields') || undefined;
@@ -1011,11 +1015,13 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
         }
 
         if (req.aborted || res.destroyed) return;
-        const tenantRelease = await gitTenantSlots.acquire(`${orgId}:${projectId}`);
+        const tenantRelease = await gitTenantSlots.acquire(`${orgId}:${projectId}`, { signal });
+        if (!tenantRelease && signal.aborted) return;
         if (!tenantRelease) return gitAuthError(res, 503, 'Git tenant service busy; retry later');
-        const release = await gitSlots.acquire();
+        const release = await gitSlots.acquire({ signal });
         if (!release) {
           tenantRelease();
+          if (signal.aborted) return;
           return gitAuthError(res, 503, 'Git service busy; retry later');
         }
         let body = null;
@@ -1024,11 +1030,6 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           // A close can occur while awaiting tenant/global admission, before
           // abort listeners exist. Never start Git for that disconnected client.
           if (req.aborted || res.destroyed) return;
-          const abortController = new AbortController();
-          req.once('aborted', () => abortController.abort());
-          res.once('close', () => {
-            if (!res.writableFinished) abortController.abort();
-          });
           let input = null;
           let contentLength = null;
           if (req.method === 'POST') {
@@ -1036,7 +1037,8 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
             if (contentEncoding !== 'identity') {
               // Git compresses larger negotiation requests. Bound both wire and
               // decoded bytes before handing the request to the Git subprocess.
-              releaseChunked = await chunkedGitSlots.acquire();
+              releaseChunked = await chunkedGitSlots.acquire({ signal });
+              if (signal.aborted) return;
               if (!releaseChunked) return gitAuthError(res, 503, 'buffered Git uploads busy; retry later');
               const limit = Math.min(maxGitBodyBytes, maxChunkedGitBodyBytes);
               try {
@@ -1051,13 +1053,14 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
               input = req;
               contentLength = length;
             } else {
-              releaseChunked = await chunkedGitSlots.acquire();
+              releaseChunked = await chunkedGitSlots.acquire({ signal });
+              if (signal.aborted) return;
               if (!releaseChunked) return gitAuthError(res, 503, 'chunked Git uploads busy; retry later');
               body = await readRawBody(req, Math.min(maxGitBodyBytes, maxChunkedGitBodyBytes));
             }
           }
 
-          if (abortController.signal.aborted || req.aborted || res.destroyed) return;
+          if (signal.aborted || req.aborted || res.destroyed) return;
           let streamed = false;
           const result = await gitHttpBackend({
           projectRoot: src.reposRoot(orgId, projectId),
@@ -1071,7 +1074,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           input,
           contentLength,
           maxInputBytes: maxGitBodyBytes,
-          abortSignal: abortController.signal,
+          abortSignal: signal,
           timeoutMs: gitTimeoutMs,
           remoteUser: auth.remoteUser,
           remoteAddr: req.socket.remoteAddress || '',
@@ -1165,7 +1168,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           const authorization = await authorizeRequestAsync(src.capabilities, req, action, { org: orgId, project: projectId });
           if (!authorization.ok) return json(res, authorization.status, { error: authorization.error });
           const scope = { orgId, projectId, repoId: brokerRoute[1], candidateId: brokerRoute[2], principalId: authorization.cap.principalId };
-          const release = await gitSlots.acquire();
+          const release = await gitSlots.acquire({ signal });
           if (!release) return json(res, 503, { error: 'Git service busy; retry later' });
           try {
             if (operation === 'dispatch') return json(res, 200, await src.verification.dispatch(scope));
@@ -1196,7 +1199,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           }
           if (req.method === 'POST' && !integrationRoute[2]) {
             const body = await readBody(req, maxJsonBodyBytes);
-            const release = await gitSlots.acquire();
+            const release = await gitSlots.acquire({ signal });
             if (!release) return json(res, 503, { error: 'Git service busy; retry later' });
             try { return json(res, 201, await src.planIntegrationAsync({ orgId, projectId, repoId, changeIds: body.changeIds })); }
             finally { release(); }
@@ -1419,7 +1422,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
             if (!auth.ok) return json(res, auth.status, { error: auth.error });
             submitPrincipalId = auth.cap.principalId;
           }
-          const release = await gitSlots.acquire();
+          const release = await gitSlots.acquire({ signal });
           if (!release) {
             req.resume();
             return json(res, 503, { error: 'Git service busy; retry later' });
@@ -1533,7 +1536,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           if (crest === '/scan' && req.method === 'GET') {
             const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
-            const release = await gitSlots.acquire();
+            const release = await gitSlots.acquire({ signal });
             if (!release) return json(res, 503, { error: 'Git service busy; retry later' });
             try {
               const findings = await src.scanChangeSecretsAsync({ orgId, projectId, changeId });
@@ -1576,20 +1579,25 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           if (erest === '/artifact' && req.method === 'GET') {
             const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId });
             if (g) return json(res, g.status, g.body);
-            const releaseArtifact = await artifactSlots.acquire();
+            const releaseArtifact = await artifactSlots.acquire({ signal });
+            if (signal.aborted && !releaseArtifact) return;
             if (!releaseArtifact) {
               res.setHeader('Retry-After', '1');
               return json(res, 503, { error: 'artifact service busy; retry later', retryable: true });
             }
             try {
+              if (signal.aborted) return;
               const e = await src.getEvidenceAsync(orgId, projectId, evidenceId);
               if (!e || !e.artifactRef) return json(res, 404, { error: 'not found' });
               const bytes = typeof src.getArtifactAsync === 'function'
                 ? await src.getArtifactAsync(e.artifactRef.hash)
                 : src.getArtifact(e.artifactRef.hash);
+              if (signal.aborted) return;
               if (!bytes) return json(res, 404, { error: 'artifact not found' });
               res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': bytes.length });
-              return res.end(bytes);
+              res.end(bytes);
+              await finished(res, { cleanup: true });
+              return;
             } finally {
               releaseArtifact();
             }
@@ -1599,6 +1607,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
 
       return json(res, 404, { error: 'not found' });
     } catch (e) {
+      if (res.destroyed) return;
       if (res.headersSent) {
         if (!res.writableEnded) res.destroy(e);
         return;
@@ -1622,6 +1631,9 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
         return json(res, 503, { error: 'storage temporarily unavailable', retryable: true });
       }
       return json(res, 400, { error: e.message });
+    } finally {
+      handlerDone = true;
+      releaseIfDone();
     }
   };
 
