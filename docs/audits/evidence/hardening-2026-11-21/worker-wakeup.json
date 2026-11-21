@@ -1,0 +1,42 @@
+{
+  "baselineRevision": "7fb0ac7c047a1be9e174aa69e468a41ff45ff3fe",
+  "currentRevision": "8c96b0f5770560ae46de46d9a5677da09bc76aa1",
+  "node": "v26.12.1",
+  "platform": "darwin",
+  "arch": "x64",
+  "pollMs": 250,
+  "workload": "warm idle worker, one committed job, elapsed from enqueue start to handler entry",
+  "warmupsPerRevision": 1,
+  "sampleOrder": "alternating baseline-first and current-first",
+  "equivalentJobs": true,
+  "results": {
+    "baseline": {
+      "samplesMs": [
+        261.5175310000013,
+        256.4277010000005,
+        277.94978400000036,
+        257.6518939999987,
+        261.2529599999998,
+        258.37423800000033,
+        446.5609289999993
+      ],
+      "medianMs": 261.2529599999998,
+      "minMs": 256.4277010000005,
+      "maxMs": 446.5609289999993
+    },
+    "current": {
+      "samplesMs": [
+        30.157498999999007,
+        32.10749399999986,
+        16.648909999999887,
+        12.989550000000236,
+        30.831357000000935,
+        9.260145000000193,
+        29.468050000001313
+      ],
+      "medianMs": 29.468050000001313,
+      "minMs": 9.260145000000193,
+      "maxMs": 32.10749399999986
+    }
+  }
+}
