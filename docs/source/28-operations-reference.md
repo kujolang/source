@@ -83,7 +83,9 @@ retried with bounded attempts. This is the worker-plane seam
 for batch workflows that should not run inside request handlers.
 Workers back off and report transient queue/database failures instead of
 terminating, while leases allow abandoned jobs to be recovered by another
-worker. Idle polls and outage backoff include bounded jitter, preventing a
+worker. PostgreSQL notifications wake idle workers on committed enqueues. Polling
+remains active if the notification connection is unavailable, and idle waits
+are cancelled during shutdown. Idle polls and outage backoff include bounded jitter, preventing a
 large worker fleet from synchronizing claim storms. Shutdown drains for 30 seconds by default; a hung handler then leaves
 its lease to expire so another worker can recover the job. Handlers also have a
 15-minute execution timeout by default and receive an `AbortSignal`; tune it

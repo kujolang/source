@@ -123,6 +123,7 @@ class PostgresStore {
     this._jobWakeupChannel = `source_jobs_${createHash('sha256').update(String(schema)).digest('hex').slice(0, 24)}`;
     this._jobListenerClient = null;
     this._jobListenerPromise = null;
+    this._closing = false;
     this._jobWaiters = new Set();
 
     // Schema creation is intentionally serialized across serving nodes. The
@@ -270,16 +271,27 @@ class PostgresStore {
   }
 
   async _ensureJobListenerAsync() {
+    if (this._closing) return false;
     if (this._jobListenerClient) return true;
     if (this._jobListenerPromise) return this._jobListenerPromise;
     this._jobListenerPromise = (async () => {
-      const listenerOptions = { connectionString: this.dsn, ...this.connectionOptions };
-      delete listenerOptions.env;
-      delete listenerOptions.noPassword;
-      delete listenerOptions.maxConnections;
-      delete listenerOptions.fallbackConcurrency;
-      delete listenerOptions.fallbackTimeoutMs;
+      const listenerOptions = {
+        connectionString: this.dsn,
+        ...this.connectionOptions,
+        connectionTimeoutMillis: this.connectionOptions.connectionTimeoutMillis || 10_000,
+        query_timeout: this.connectionOptions.query_timeout || 30_000,
+      };
       const client = new pg.Client(listenerOptions);
+      let connected = true;
+      const reset = () => {
+        connected = false;
+        if (this._jobListenerClient !== client) return;
+        this._jobListenerClient = null;
+        for (const waiter of this._jobWaiters) waiter(false);
+        void client.end().catch(() => {});
+      };
+      client.on('error', reset);
+      client.on('end', reset);
       try {
         await client.connect();
         await client.query(`LISTEN ${escapeSqlIdent(this._jobWakeupChannel)}`);
@@ -287,42 +299,43 @@ class PostgresStore {
         await client.end().catch(() => {});
         throw error;
       }
-      const reset = () => {
-        if (this._jobListenerClient !== client) return;
-        this._jobListenerClient = null;
-        for (const waiter of this._jobWaiters) waiter(false);
-        this._jobWaiters.clear();
-      };
+      if (this._closing || !connected) {
+        await client.end().catch(() => {});
+        return false;
+      }
       client.on('notification', () => {
         for (const waiter of this._jobWaiters) waiter(true);
-        this._jobWaiters.clear();
       });
-      client.on('error', reset);
       this._jobListenerClient = client;
       return true;
     })().finally(() => { this._jobListenerPromise = null; });
     return this._jobListenerPromise;
   }
 
-  async waitForWorkAsync({ timeoutMs = 10_000 } = {}) {
+  async waitForWorkAsync({ timeoutMs = 10_000, signal } = {}) {
+    if (this._closing || signal?.aborted) return false;
     const timeout = Math.min(300_000, Math.max(1, Math.trunc(timeoutMs)));
     try {
-      await this._ensureJobListenerAsync();
+      if (!(await this._ensureJobListenerAsync())) return false;
     } catch {
       return false;
     }
+    if (this._closing || signal?.aborted || !this._jobListenerClient) return false;
     return new Promise((resolve) => {
+      const cancel = () => finish(false);
       let settled = false;
       const finish = (woken) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        signal?.removeEventListener('abort', cancel);
         this._jobWaiters.delete(finish);
         resolve(woken);
       };
       const timer = setTimeout(() => finish(false), timeout);
       timer.unref?.();
       this._jobWaiters.add(finish);
+      signal?.addEventListener('abort', cancel, { once: true });
     });
   }
 
@@ -1733,14 +1746,12 @@ class PostgresStore {
   }
 
   async closeAsync() {
+    this._closing = true;
     for (const waiter of this._jobWaiters) waiter(false);
-    this._jobWaiters.clear();
-    if (this._jobListenerClient) {
-      const client = this._jobListenerClient;
-      this._jobListenerClient = null;
-      await client.query('UNLISTEN *').catch(() => {});
-      await client.end().catch(() => {});
-    }
+    await this._jobListenerPromise?.catch(() => {});
+    const client = this._jobListenerClient;
+    this._jobListenerClient = null;
+    if (client) await client.end().catch(() => {});
     await this.pool.end();
   }
 

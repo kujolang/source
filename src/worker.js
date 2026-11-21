@@ -12,10 +12,9 @@ export class SourceWorker {
     this.handlers = handlers;
     this.workerId = workerId;
     this.concurrency = Math.min(1000, Math.max(1, Math.trunc(concurrency)));
-    this.leaseMs = Math.max(1, Math.trunc(leaseMs));
-    this.pollMs = Math.max(1, Math.trunc(pollMs));
-    const safeMaxPollMs = Number.isFinite(Number(maxPollMs)) ? Number(maxPollMs) : 10_000;
-    this.maxPollMs = Math.max(this.pollMs, Math.min(300_000, Math.trunc(safeMaxPollMs)));
+    this.leaseMs = Math.min(86_400_000, Math.max(1, Math.trunc(leaseMs)));
+    this.pollMs = Math.min(300_000, Math.max(1, Math.trunc(pollMs)));
+    this.maxPollMs = Math.max(this.pollMs, Math.min(300_000, Math.trunc(maxPollMs)));
     this.retryDelayMs = Math.max(0, Math.trunc(retryDelayMs));
     this.maxAttempts = Math.max(1, Math.trunc(maxAttempts));
     this.projectBurst = Math.min(1_000, Math.max(1, Math.trunc(projectBurst)));
@@ -99,17 +98,7 @@ export class SourceWorker {
         }
         if (!jobs.length) {
           const delay = this._jitteredDelay(idlePollMs);
-          if (typeof this.queue.waitForWork === 'function') {
-            let wakeStopWait;
-            const stopWait = new Promise((resolve) => {
-              wakeStopWait = () => resolve();
-              this._idleWaiters.add(wakeStopWait);
-            });
-            await Promise.race([this.queue.waitForWork({ timeoutMs: delay }), stopWait]).catch(() => {});
-            this._idleWaiters.delete(wakeStopWait);
-          } else {
-            await this._wait(delay);
-          }
+          await this._waitForWork(delay);
           idlePollMs = Math.min(this.maxPollMs, idlePollMs * 2);
           continue;
         }
@@ -127,6 +116,31 @@ export class SourceWorker {
     }
   }
 
+  _waitForWork(ms) {
+    if (typeof this.queue.waitForWork !== 'function') return this._wait(ms);
+    if (this.stopping) return Promise.resolve();
+    return new Promise((resolve) => {
+      const controller = new AbortController();
+      const finish = () => {
+        clearTimeout(timer);
+        this._idleWaiters.delete(finish);
+        controller.abort();
+        resolve();
+      };
+      const timer = setTimeout(finish, ms);
+      this._idleWaiters.add(finish);
+      Promise.resolve().then(() => {
+        if (controller.signal.aborted) return false;
+        return this.queue.waitForWork({ timeoutMs: ms, signal: controller.signal });
+      }).then((woken) => {
+        // An unavailable listener must leave the polling delay in effect.
+        if (woken !== false && !controller.signal.aborted) finish();
+      }, (error) => {
+        if (!controller.signal.aborted) this._reportError(error);
+      });
+    });
+  }
+
   _wait(ms) {
     if (this.stopping) return Promise.resolve();
     return new Promise((resolve) => {
@@ -141,7 +155,7 @@ export class SourceWorker {
   }
 
   async _runJob(job) {
-    const handler = this.handlers[job.kind];
+    const handler = Object.hasOwn(this.handlers, job.kind) ? this.handlers[job.kind] : undefined;
     let heartbeat;
     let timeout;
     let leaseDeadline;

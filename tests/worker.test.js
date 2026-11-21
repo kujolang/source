@@ -214,16 +214,61 @@ test('worker uses queue wakeups when available and retains polling fallback sema
   assert.deepEqual(waits, [10, 10]);
 });
 
+test('unavailable queue notifications retain the polling delay', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const waited = Promise.withResolvers();
+  let claims = 0;
+  const worker = new SourceWorker({
+    queue: {
+      async claim() { claims++; return []; },
+      async waitForWork() { waited.resolve(); return false; },
+    },
+    workerId: 'listener-outage', pollMs: 100, jitterRatio: 0,
+  });
+  worker.start();
+  try {
+    await waited.promise;
+    await new Promise(setImmediate);
+    t.mock.timers.tick(99);
+    await new Promise(setImmediate);
+    assert.equal(claims, 1);
+    t.mock.timers.tick(1);
+    await new Promise(setImmediate);
+    assert.equal(claims, 2);
+  } finally {
+    await worker.stop({ timeoutMs: 0 });
+  }
+});
+
+test('inherited object methods are not job handlers', async () => {
+  const failure = Promise.withResolvers();
+  const worker = new SourceWorker({
+    queue: {
+      async fail(job) { failure.resolve(job); },
+      async complete() { assert.fail('unexpected completion'); },
+    },
+    workerId: 'no-inherited-handlers',
+  });
+  await worker._runJob({ id: 'J1', kind: 'toString' });
+  assert.match((await failure.promise).error, /no handler registered/);
+});
+
 test('worker shutdown interrupts an outstanding queue wakeup wait', async () => {
   let waiting;
   const queue = {
     async claim() { return []; },
-    async waitForWork() { await new Promise((resolve) => { waiting = resolve; }); },
+    async waitForWork({ signal }) {
+      await new Promise((resolve) => {
+        waiting = signal;
+        signal.addEventListener('abort', resolve, { once: true });
+      });
+    },
   };
   const worker = new SourceWorker({ queue, workerId: 'wakeup-stop-test', pollMs: 10_000, handlers: {} });
   worker.start();
-  await waitFor(() => typeof waiting === 'function');
+  await waitFor(() => waiting !== undefined);
   assert.equal(await worker.stop({ timeoutMs: 100 }), true);
+  assert.equal(waiting.aborted, true);
 });
 
 test('shutdown cancels idle polling and outage backoff timers', async () => {

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PostgresStore } from '../src/postgres-store.js';
+import { JobQueue } from '../src/job-queue.js';
 
 const dsn = process.env.SOURCE_TEST_DATABASE_URL;
 
@@ -103,4 +104,22 @@ test('Postgres listing applies literal scope, unique children and cursor before 
     assert.deepEqual(await list('org_a/items', { cursor: 'z', limit: 2 }), []);
     assert.deepEqual(await list('org_🦊/items'), ['A']);
   }
+});
+
+test('durable job queue wakes on committed enqueue and cancels idle notification waits', { skip: !dsn, timeout: 15_000 }, async (t) => {
+  const schema = `source_wakeup_${process.pid}_${Date.now()}`;
+  const store = new PostgresStore({ dsn, schema });
+  t.after(async () => { await store.pool.query(`DROP SCHEMA "${schema}" CASCADE`); await store.closeAsync(); });
+  const queue = new JobQueue(store);
+  await store._ensureJobListenerAsync();
+  const wakeup = queue.waitForWork({ timeoutMs: 2_000 });
+  await queue.enqueue({ kind: 'notification-test' });
+  assert.equal(await wakeup, true);
+  const controller = new AbortController();
+  const cancelled = queue.waitForWork({ timeoutMs: 60_000, signal: controller.signal });
+  await new Promise(setImmediate);
+  assert.equal(store._jobWaiters.size, 1);
+  controller.abort();
+  assert.equal(await cancelled, false);
+  assert.equal(store._jobWaiters.size, 0);
 });

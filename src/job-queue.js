@@ -25,6 +25,12 @@ export class JobQueue {
     return this.store.claimJobsAsync({ workerId, limit, leaseMs, maxAttempts, projectBurst });
   }
 
+  async waitForWork(options) {
+    return typeof this.store.waitForWorkAsync === 'function'
+      ? this.store.waitForWorkAsync(options)
+      : false;
+  }
+
   async cancel({ id, orgId, projectId, reason }) {
     if (typeof this.store.cancelJobAsync !== 'function') throw new Error('durable job queue requires a Postgres-backed store');
     return this.store.cancelJobAsync({ id, orgId, projectId, reason });
