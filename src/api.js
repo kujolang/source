@@ -246,56 +246,17 @@ function jobDedupeKey(key, orgId, projectId, workId) {
   return `client:${createHash('sha256').update(JSON.stringify([orgId, projectId, workId || null, String(key)])).digest('hex')}`;
 }
 
-function readText(req, maxBytes = 1_000_000) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    let size = 0;
-    let settled = false;
-    req.on('data', (c) => {
-      if (settled) return;
-      size += c.length;
-      if (size > maxBytes) {
-        settled = true;
-        chunks.length = 0;
-        req.resume();
-        reject(new Error('body too large'));
-        return;
-      }
-      chunks.push(c);
-    });
-    req.on('end', () => {
-      if (!settled) {
-        settled = true;
-        resolve(Buffer.concat(chunks).toString('utf8'));
-      }
-    });
-    req.on('error', (error) => {
-      if (!settled) {
-        settled = true;
-        reject(error);
-      }
-    });
-    req.on('aborted', () => {
-      if (!settled) {
-        settled = true;
-        reject(new Error('request body aborted'));
-      }
-    });
-  });
+async function readText(req, maxBytes) {
+  return (await readRawBody(req, maxBytes)).toString('utf8');
 }
 
-function readBody(req, maxBytes = 1_000_000) {
-  return new Promise((resolve, reject) => {
-    readText(req, maxBytes)
-      .then((data) => {
-        try {
-          resolve(data ? JSON.parse(data) : {});
-        } catch (e) {
-          reject(new Error('invalid JSON body'));
-        }
-      })
-      .catch(reject);
-  });
+async function readBody(req, maxBytes = 1_000_000) {
+  const data = await readText(req, maxBytes);
+  try {
+    return data ? JSON.parse(data) : {};
+  } catch {
+    throw new Error('invalid JSON body');
+  }
 }
 
 function validWebhookSignature(raw, header, secret) {
@@ -322,6 +283,7 @@ async function readLoginBody(req) {
 
 // Read a raw (possibly binary) request body, e.g. a Git packfile upload.
 function readRawBody(req, maxBytes = 100_000_000) {
+  if (req.aborted) return Promise.reject(new Error('request body aborted'));
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
@@ -1169,6 +1131,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           if (!authorization.ok) return json(res, authorization.status, { error: authorization.error });
           const scope = { orgId, projectId, repoId: brokerRoute[1], candidateId: brokerRoute[2], principalId: authorization.cap.principalId };
           const release = await gitSlots.acquire({ signal });
+          if (signal.aborted) { release?.(); return; }
           if (!release) return json(res, 503, { error: 'Git service busy; retry later' });
           try {
             if (operation === 'dispatch') return json(res, 200, await src.verification.dispatch(scope));
@@ -1200,6 +1163,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           if (req.method === 'POST' && !integrationRoute[2]) {
             const body = await readBody(req, maxJsonBodyBytes);
             const release = await gitSlots.acquire({ signal });
+            if (signal.aborted) { release?.(); return; }
             if (!release) return json(res, 503, { error: 'Git service busy; retry later' });
             try { return json(res, 201, await src.planIntegrationAsync({ orgId, projectId, repoId, changeIds: body.changeIds })); }
             finally { release(); }
@@ -1244,10 +1208,10 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
           if (!webhookSecret) return json(res, 503, { error: 'webhook ingress is not configured' });
           const ip = clientAddress(req, trustProxy);
           if (!(await limiter.allowAsync(`webhook:${ip}:${orgId}:${projectId}`, limits.workflowDispatch))) return json(res, 429, { error: 'rate limit exceeded' });
-          const raw = await readText(req, maxJsonBodyBytes);
+          const raw = await readRawBody(req, maxJsonBodyBytes);
           if (!validWebhookSignature(raw, req.headers['x-hub-signature-256'] || req.headers['x-source-signature-256'], webhookSecret)) return json(res, 401, { error: 'invalid webhook signature' });
           let body;
-          try { body = raw ? JSON.parse(raw) : {}; } catch { return json(res, 400, { error: 'invalid JSON body' }); }
+          try { body = raw.length ? JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(raw)) : {}; } catch { return json(res, 400, { error: 'invalid JSON body' }); }
           const workflow = await src.getWorkflowAsync(orgId, projectId, webhookMatch[1]);
           if (!workflow) return json(res, 404, { error: 'workflow not found' });
           const eventId = body.eventId || req.headers['x-github-delivery'] || req.headers['x-source-delivery'];
@@ -1423,6 +1387,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
             submitPrincipalId = auth.cap.principalId;
           }
           const release = await gitSlots.acquire({ signal });
+          if (signal.aborted) { release?.(); return; }
           if (!release) {
             req.resume();
             return json(res, 503, { error: 'Git service busy; retry later' });
@@ -1537,6 +1502,7 @@ export function createServer(src, { port = 8787, tls, host, trustProxy = false, 
             const g = await guard(src, req, ACTIONS.read_context, { org: orgId, project: projectId, work: workId });
             if (g) return json(res, g.status, g.body);
             const release = await gitSlots.acquire({ signal });
+            if (signal.aborted) { release?.(); return; }
             if (!release) return json(res, 503, { error: 'Git service busy; retry later' });
             try {
               const findings = await src.scanChangeSecretsAsync({ orgId, projectId, changeId });

@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import http from 'node:http';
 import { once } from 'node:events';
+import { createHmac } from 'node:crypto';
 import { freshSource } from './helpers.js';
 import { startServer } from '../src/api.js';
 
@@ -103,6 +104,30 @@ test('artifact admission lasts until the response drains or disconnects', { time
 function auth(credential) {
   return { Authorization: `Bearer ${credential}` };
 }
+
+test('webhook signatures cover wire bytes and authenticated JSON must be valid UTF-8', async () => {
+  const { src, org, project } = freshSource();
+  const webhookSecret = 'local-webhook-test';
+  src.getWorkflowAsync = async () => ({ id: 'workflow' });
+  src.dispatchWorkflowAsync = async ({ payload }) => ({ payload });
+  await withServer(src, async (base) => {
+    const url = `${base}/api/v1/orgs/${org.id}/projects/${project.id}/workflows/workflow/webhook`;
+    const send = (body) => fetch(url, {
+      method: 'POST',
+      headers: {
+        'x-github-delivery': 'delivery-1',
+        'x-hub-signature-256': 'sha256=' + createHmac('sha256', webhookSecret).update(body).digest('hex'),
+      },
+      body,
+    });
+    const valid = await send(Buffer.from('{"message":"café"}'));
+    assert.equal(valid.status, 202);
+    assert.deepEqual(await valid.json(), { payload: { message: 'café' } });
+    const invalid = await send(Buffer.concat([Buffer.from('{"message":"'), Buffer.from([0xff]), Buffer.from('"}')]));
+    assert.equal(invalid.status, 400);
+    assert.deepEqual(await invalid.json(), { error: 'invalid JSON body' });
+  }, { webhookSecret });
+});
 
 test('discovery endpoint returns a compact machine manifest', async () => {
   const { src } = freshSource();
