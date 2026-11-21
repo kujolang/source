@@ -284,7 +284,9 @@ recovery exceeds that SLO, making the drill suitable for a release gate.
 For deployments with more than one application node, use the Postgres writer
 lease primitive to prevent an expired or partitioned node from continuing to
 mutate the control plane. `PostgresStore.acquireWriterLeaseAsync()` creates or
-renews a named lease and returns a monotonically increasing fencing token.
+reacquires a named lease and returns a monotonically increasing fencing token.
+Release expires the lease and retains its token so a later acquisition keeps
+the sequence across graceful restarts.
 The active node must renew it, and wire a guard around the token into the API:
 
 ```js

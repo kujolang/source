@@ -123,3 +123,18 @@ test('durable job queue wakes on committed enqueue and cancels idle notification
   assert.equal(await cancelled, false);
   assert.equal(store._jobWaiters.size, 0);
 });
+
+test('released writer leases preserve monotonically increasing fencing tokens', { skip: !dsn }, async (t) => {
+  const schema = `source_fencing_${process.pid}_${Date.now()}`;
+  const store = new PostgresStore({ dsn, schema });
+  t.after(async () => { await store.pool.query(`DROP SCHEMA "${schema}" CASCADE`); await store.closeAsync(); });
+  const owner = 'restarted-writer';
+  const first = await store.acquireWriterLeaseAsync({ owner });
+  assert.equal(await store.releaseWriterLeaseAsync({ owner, fencingToken: first.fencingToken }), true);
+  assert.equal(await store.releaseWriterLeaseAsync({ owner, fencingToken: first.fencingToken }), false);
+  const next = await store.acquireWriterLeaseAsync({ owner });
+  assert.ok(next.fencingToken > first.fencingToken);
+  assert.equal(await store.releaseWriterLeaseAsync({ owner, fencingToken: first.fencingToken }), false);
+  assert.equal(await store.renewWriterLeaseAsync({ owner, fencingToken: first.fencingToken }), null);
+  assert.equal((await store.assertWriterLeaseAsync({ owner, fencingToken: next.fencingToken })).fencingToken, next.fencingToken);
+});

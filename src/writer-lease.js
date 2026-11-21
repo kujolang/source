@@ -3,6 +3,7 @@
 export class WriterLeaseController {
   constructor(store, { name = 'primary', owner, leaseMs = 30_000, onLost = null } = {}) {
     if (!store || typeof store.acquireWriterLeaseAsync !== 'function') throw new Error('writer lease requires a Postgres store');
+    if ((typeof leaseMs !== 'number' && typeof leaseMs !== 'string') || (typeof leaseMs === 'string' && !leaseMs.trim()) || !Number.isFinite(Number(leaseMs))) throw new TypeError('leaseMs must be a finite number');
     this.store = store;
     this.name = name;
     this.owner = owner;
@@ -95,21 +96,26 @@ export class WriterLeaseController {
   }
 
   async assertAsync() {
-    if (this.stopped || this.lost || !this.lease) {
-      const error = new Error('writer lease is not valid');
-      error.code = 'WRITER_LEASE_LOST';
-      throw error;
-    }
+    const generation = this.generation;
+    const token = this.lease?.fencingToken;
+    const stillHeld = () => !this.stopped && !this.lost && Boolean(this.lease) &&
+      this.generation === generation && this.lease.fencingToken === token;
+    const lost = () => Object.assign(new Error('writer lease is not valid'), { code: 'WRITER_LEASE_LOST' });
+    if (!stillHeld()) throw lost();
+
+    let asserted;
     try {
-      return await this.store.assertWriterLeaseAsync({
+      asserted = await this.store.assertWriterLeaseAsync({
         name: this.name,
         owner: this.owner,
-        fencingToken: this.lease.fencingToken,
+        fencingToken: token,
       });
     } catch (error) {
-      await this._markLost();
+      if (stillHeld()) await this._markLost();
       throw error;
     }
+    if (!stillHeld()) throw lost();
+    return asserted;
   }
 
   async stop() {

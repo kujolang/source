@@ -717,3 +717,29 @@ test('minimum-duration writer lease renews before expiry and repeated start is i
     assert.equal(renewals, 1);
   } finally { await controller.stop(); }
 });
+
+test('writer assertion cannot authorize writes after stop or invalidate a replacement lease', async () => {
+  for (const failed of [false, true]) {
+    const assertion = Promise.withResolvers();
+    let token = 0;
+    const controller = new WriterLeaseController({
+      async acquireWriterLeaseAsync() { return { fencingToken: String(++token) }; },
+      assertWriterLeaseAsync({ fencingToken }) { return fencingToken === '1' ? assertion.promise : Promise.resolve(true); },
+      async releaseWriterLeaseAsync() {},
+    }, { owner: 'restarted' });
+    await controller.start();
+    try {
+      const old = controller.assertAsync();
+      const rejection = assert.rejects(old, failed ? /database unavailable/ : { code: 'WRITER_LEASE_LOST' });
+      await controller.stop();
+      await controller.start();
+      if (failed) assertion.reject(new Error('database unavailable'));
+      else assertion.resolve(true);
+      await rejection;
+      assert.equal(await controller.assertAsync(), true);
+      assert.equal(controller.metrics().active, 1);
+    } finally {
+      await controller.stop();
+    }
+  }
+});

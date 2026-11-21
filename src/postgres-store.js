@@ -1823,12 +1823,13 @@ class PostgresStore {
   async releaseWriterLeaseAsync({ name = 'primary', owner, fencingToken } = {}) {
     if (!owner || !Number.isSafeInteger(Number(fencingToken))) throw new Error('writer lease release identity is invalid');
     const rows = await this._runJsonCommandAsync(`
-      WITH removed AS (
-        DELETE FROM ${this._qualified('writer_leases')}
-        WHERE name = ${escapeSqlLiteral(name)} AND owner = ${escapeSqlLiteral(owner)} AND fencing_token = ${Number(fencingToken)}
+      WITH released AS (
+        UPDATE ${this._qualified('writer_leases')}
+        SET lease_until = '-infinity', updated_at = NOW()
+        WHERE name = ${escapeSqlLiteral(name)} AND owner = ${escapeSqlLiteral(owner)} AND fencing_token = ${Number(fencingToken)} AND lease_until <> '-infinity'
         RETURNING name
       )
-      SELECT COALESCE(json_agg(row_to_json(removed)), '[]'::json)::text AS rows FROM removed
+      SELECT COALESCE(json_agg(row_to_json(released)), '[]'::json)::text AS rows FROM released
     `);
     return Boolean(rows[0]);
   }
