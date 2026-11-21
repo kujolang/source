@@ -2,9 +2,9 @@
 import { execFile } from 'node:child_process';
 import { ClientRetry } from './client-retry.js';
 
-export function git(args, cwd, { timeoutMs = 120000 } = {}) {
+export function git(args, cwd, { timeoutMs = 120000, env = {} } = {}) {
   return new Promise((resolve, reject) => {
-    execFile('git', ['--no-replace-objects', ...args], { cwd, encoding: 'utf8', timeout: timeoutMs, env: { ...process.env, LC_ALL: 'C' } }, (err, stdout, stderr) => {
+    execFile('git', ['--no-replace-objects', ...args], { cwd, encoding: 'utf8', timeout: timeoutMs, env: { ...process.env, ...env, LC_ALL: 'C' } }, (err, stdout, stderr) => {
       if (err) {
         err.httpStatus = Number(stderr.match(/The requested URL returned error: (\d{3})/i)?.[1]) || null;
         err.curlCode = Number(stderr.match(/\bcurl ([0-9]{1,3})\b/i)?.[1]) || null;
@@ -51,10 +51,15 @@ export async function resolveRemote(cwd, remote, url = null) {
 export function authenticatedGit(credential, url, cwd, { retry = new ClientRetry(), runGit = git } = {}) {
   const cred = credential || process.env.SOURCE_CREDENTIAL;
   const flags = ['-c', 'http.followRedirects=false'];
-  if (cred) flags.push('-c', `http.${url}.extraHeader=Authorization: Basic ${Buffer.from(`source:${cred}`).toString('base64')}`);
+  const env = {};
+  if (cred) {
+    // Keep the credential out of process arguments and Git's command errors.
+    flags.push(`--config-env=http.${url}.extraHeader=SOURCE_GIT_AUTHORIZATION`);
+    env.SOURCE_GIT_AUTHORIZATION = `Authorization: Basic ${Buffer.from(`source:${cred}`).toString('base64')}`;
+  }
   return async (args) => {
     while (true) {
-      try { return await runGit([...flags, ...args], cwd, { timeoutMs: retry.timeoutMs() }); }
+      try { return await runGit([...flags, ...args], cwd, { timeoutMs: retry.timeoutMs(), env }); }
       catch (error) {
         if (error.httpStatus === 429 && ['ls-remote', 'fetch', 'push'].includes(args[0])) {
           await retry.wait(`Git ${args[0]}`);

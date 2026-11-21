@@ -139,3 +139,23 @@ test('submit preserves safe nested transport codes but never retries an uncertai
     assert.equal(calls, 1);
   }
 });
+
+test('authenticated Git supplies its URL-scoped header without putting it in arguments', async () => {
+  const url = 'https://source.invalid/git/O/P/R.git';
+  const credential = 'isolated-credential-fixture';
+  const encoded = Buffer.from(`source:${credential}`).toString('base64');
+  let invoked = false;
+  const run = authenticatedGit(credential, url, '.', {
+    async runGit(args, cwd, { env }) {
+      invoked = true;
+      assert.equal(cwd, '.');
+      assert.ok(args.includes(`--config-env=http.${url}.extraHeader=SOURCE_GIT_AUTHORIZATION`));
+      assert.ok(args.includes('http.followRedirects=false'));
+      assert.ok(!args.join(' ').includes(encoded));
+      assert.equal(env.SOURCE_GIT_AUTHORIZATION, `Authorization: Basic ${encoded}`);
+      return 'done';
+    },
+  });
+  assert.equal(await run(['ls-remote', url]), 'done');
+  assert.equal(invoked, true);
+});
