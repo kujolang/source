@@ -126,3 +126,38 @@ test('replacement refs cannot hide committed credentials from contribution evide
   assert.ok(git.diff(base, original).includes('credential.txt'));
   assert.ok((await git.changedFilesAsync(base, original)).some((name) => name.includes('credential.txt')));
 });
+
+test('bare-repository diffs support an empty base and fail explicitly for missing revisions', async (t) => {
+  const { src, dir, org, project } = freshSource();
+  const { repo, head, work } = seedRepo(src, org.id, project.id);
+  t.after(() => {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(work, { recursive: true, force: true });
+  });
+  const git = src.gitRepo(org.id, project.id, repo.id);
+  const expected = git.changedFiles('', head);
+  assert.ok(expected.length > 0);
+  assert.deepEqual(await git.changedFilesAsync('', head), expected);
+  assert.deepEqual(await git.changedFilesAsync(head, head), []);
+  const missing = 'f'.repeat(head.length);
+  assert.throws(() => git.diff(missing, head), /Git diff failed/);
+  await assert.rejects(git.diffAsync(missing, head), /Git diff failed/);
+});
+
+test('contributions with an unreadable diff leave no work behind', async (t) => {
+  const { src, dir, org, project } = freshSource();
+  const { repo, base, head, work } = seedRepo(src, org.id, project.id);
+  t.after(() => {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(work, { recursive: true, force: true });
+  });
+  const git = src.gitRepo(org.id, project.id, repo.id);
+  src._gitRepoFor = () => git;
+  git.diff = () => { throw new Error('Git diff failed'); };
+  git.diffAsync = async () => { throw new Error('Git diff failed'); };
+  const args = { orgId: org.id, projectId: project.id, repoRef: repo.id, baseCommit: base, headCommit: head };
+  const before = src.listWork(org.id, project.id);
+  assert.throws(() => src.submitContribution(args), /Git diff failed/);
+  await assert.rejects(src.submitContributionAsync(args), /Git diff failed/);
+  assert.deepEqual(src.listWork(org.id, project.id), before);
+});

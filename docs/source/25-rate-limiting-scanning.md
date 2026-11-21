@@ -46,7 +46,9 @@ Integration points:
 - `Source.scanChangeSecrets({ orgId, projectId, changeId })` scans the diff of
   every repository in a Change and returns findings.
 - `submitContribution` runs the scan automatically and, when findings exist,
-  attaches a `security` Evidence (validity `invalid`) to the Change.
+  attaches a `security` Evidence (validity `invalid`) to the Change. Git reads
+  finish before submission creates lifecycle records. Diff failures return an
+  error. An omitted base compares the head against an empty tree.
 - `GET /api/v1/orgs/{org}/projects/{project}/changes/{changeId}/scan` exposes
   the scan over the machine interface.
 - `source change scan-secrets --change <id>` exposes it over the CLI.

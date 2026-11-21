@@ -48,8 +48,12 @@ are preserved.
 
 Each repository is still guarded by the TOCTOU fast-forward check: the base
 commit must be an ancestor of the current tip, and the head must descend from
-it. A multi-repo update is atomic in intent — all repositories are updated in
-one call, and the Work is closed only if every repository fast-forwards.
+it. The asynchronous path validates every target's
+repository policy and binding before moving refs. Git updates are applied
+per repository. An operational failure can leave earlier refs advanced. Source
+drains writes already in flight before releasing the project lock, and a retry
+can reconcile refs that already point at the accepted head. Work closes when
+all target updates succeed.
 
 ## Decision source state
 

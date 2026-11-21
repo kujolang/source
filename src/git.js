@@ -6,6 +6,7 @@
 
 import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -36,6 +37,25 @@ async function runAsync(args, opts = {}) {
     ...execOptions,
   });
   return trim ? String(stdout || '').trim() : String(stdout || '');
+}
+
+const diffLimits = { maxBuffer: 32 * 1024 * 1024, timeout: 120_000 };
+
+function validateDiffRevisions(base, head) {
+  if (base) validateRevision(base);
+  validateRevision(head);
+}
+
+function diffArgs(base, head, mode) {
+  return ['diff', ...mode, '--no-renames', '--no-ext-diff', '--no-textconv', base, head, '--'];
+}
+
+function emptyTree(format) {
+  return createHash(format).update('tree 0\0').digest('hex');
+}
+
+function diffError(cause) {
+  return new Error('Git diff failed; check the repository, revisions and diff size', { cause });
 }
 
 export class GitRepo {
@@ -139,33 +159,26 @@ export class GitRepo {
     }
   }
 
-  // Full diff (patch) between two commits (or empty tree).
+  // Full diff between two commits or against the empty tree.
   diff(base, head) {
-    if (base) validateRevision(base);
-    validateRevision(head);
-    const args = ['diff', '--no-renames'];
-    if (base) args.push(base, head);
-    else args.push(head);
+    return this._diff(base, head, []);
+  }
+
+  _diff(base, head, mode) {
+    validateDiffRevisions(base, head);
+    const options = { ...diffLimits, cwd: this.barePath };
     try {
-      return run(args, { cwd: this.barePath });
-    } catch {
-      return '';
+      const from = base || emptyTree(run(['rev-parse', '--show-object-format'], options));
+      return run(diffArgs(from, head, mode), options);
+    } catch (error) {
+      throw diffError(error);
     }
   }
 
   // List changed files between base and head.
   changedFiles(base, head) {
-    if (base) validateRevision(base);
-    validateRevision(head);
-    const args = ['diff', '--name-status', '--no-renames'];
-    if (base) args.push(base, head);
-    else args.push(head);
-    try {
-      const out = run(args, { cwd: this.barePath });
-      return out ? out.split('\n') : [];
-    } catch {
-      return [];
-    }
+    const out = this._diff(base, head, ['--name-status']);
+    return out ? out.split('\n') : [];
   }
 
   // Async counterparts are used by HTTP-facing service paths so Git work does
@@ -264,22 +277,23 @@ export class GitRepo {
   }
 
   async diffAsync(base, head) {
-    if (base) validateRevision(base);
-    validateRevision(head);
-    const args = ['diff', '--no-renames'];
-    if (base) args.push(base, head); else args.push(head);
-    try { return await runAsync(args, { cwd: this.barePath }); } catch { return ''; }
+    return this._diffAsync(base, head, []);
+  }
+
+  async _diffAsync(base, head, mode) {
+    validateDiffRevisions(base, head);
+    const options = { ...diffLimits, cwd: this.barePath };
+    try {
+      const from = base || emptyTree(await runAsync(['rev-parse', '--show-object-format'], options));
+      return await runAsync(diffArgs(from, head, mode), options);
+    } catch (error) {
+      throw diffError(error);
+    }
   }
 
   async changedFilesAsync(base, head) {
-    if (base) validateRevision(base);
-    validateRevision(head);
-    const args = ['diff', '--name-status', '--no-renames'];
-    if (base) args.push(base, head); else args.push(head);
-    try {
-      const out = await runAsync(args, { cwd: this.barePath });
-      return out ? out.split('\n') : [];
-    } catch { return []; }
+    const out = await this._diffAsync(base, head, ['--name-status']);
+    return out ? out.split('\n') : [];
   }
 }
 

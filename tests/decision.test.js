@@ -100,7 +100,8 @@ test('concurrent canonical updates are serialized per project', async () => {
   src.store.writeJson(`${src._projectRel(org.id, project.id)}/changes/${c.id}.json`, acceptedChange);
   let active = 0;
   let maximum = 0;
-  src.gitRepo = () => ({
+  src.getRepositoryAsync = async (_orgId, _projectId, id) => ({ id });
+  src._gitRepoFor = () => ({
     async hasCommitAsync() { return true; },
     async defaultBranchAsync() { return 'main'; },
     async fastForwardAsync() {
@@ -128,7 +129,7 @@ test('async secret scans bound multi-repository Git work', async () => {
   src.store.writeJson(`${src._projectRel(org.id, project.id)}/changes/${c.id}.json`, change);
   let active = 0;
   let maximum = 0;
-  src.gitRepo = () => ({
+  src.gitRepoAsync = async () => ({
     async diffAsync() {
       active += 1;
       maximum = Math.max(maximum, active);
@@ -140,4 +141,68 @@ test('async secret scans bound multi-repository Git work', async () => {
   assert.deepEqual(await src.scanChangeSecretsAsync({ orgId: org.id, projectId: project.id, changeId: c.id }), []);
   assert.ok(maximum > 1);
   assert.ok(maximum <= src.canonicalRepoConcurrency);
+});
+
+test('canonical promotion preflights every repository before moving any ref', async () => {
+  const { src, org, project, agent, service, human } = freshSource();
+  const { c } = fullChange(src, org, project, agent, service);
+  const scope = { orgId: org.id, projectId: project.id, changeId: c.id };
+  src.makeDecision({ ...scope, decision: 'accepted', decider: human.id });
+  const change = src.getChange(org.id, project.id, c.id);
+  change.repositoryChanges = ['R1', 'R2'].map(repoId => ({ repoId, baseCommit: 'base', headCommit: 'head' }));
+  src.store.writeJson(`${src._projectRel(org.id, project.id)}/changes/${c.id}.json`, change);
+  const policy = Promise.withResolvers();
+  src.getRepositoryAsync = async (_orgId, _projectId, id) => id === 'R1' ? { id } : policy.promise;
+  src._gitRepoFor = () => ({
+    async hasCommitAsync() { return true; },
+    async defaultBranchAsync() { return 'main'; },
+    async fastForwardAsync() { assert.fail('no ref may move before policy checks complete'); },
+  });
+  const pending = src.updateCanonicalStateAsync(scope);
+  await new Promise(setImmediate);
+  policy.resolve({ id: 'R2', integrationPolicy: {} });
+  await assert.rejects(pending, /integration broker/);
+});
+
+test('canonical promotion retains admission until already started Git writes settle', async () => {
+  const { src, org, project, agent, service, human } = freshSource();
+  const { c } = fullChange(src, org, project, agent, service);
+  const scope = { orgId: org.id, projectId: project.id, changeId: c.id };
+  src.makeDecision({ ...scope, decision: 'accepted', decider: human.id });
+  const change = src.getChange(org.id, project.id, c.id);
+  change.repositoryChanges = ['R1', 'R2', 'R3'].map(repoId => ({ repoId, baseCommit: 'base', headCommit: 'head' }));
+  src.store.writeJson(`${src._projectRel(org.id, project.id)}/changes/${c.id}.json`, change);
+  src.canonicalRepoConcurrency = 2;
+  src.getRepositoryAsync = async (_orgId, _projectId, id) => ({ id });
+  const started = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  const failed = Promise.withResolvers();
+  const calls = [];
+  src._gitRepoFor = ({ id }) => ({
+    async hasCommitAsync() { return true; },
+    async defaultBranchAsync() { return 'main'; },
+    async fastForwardAsync() {
+      calls.push(id);
+      if (id === 'R1') {
+        started.resolve();
+        await release.promise;
+        return { ok: true };
+      }
+      await started.promise;
+      failed.resolve();
+      throw new Error('Git unavailable');
+    },
+  });
+  const pending = src.updateCanonicalStateAsync(scope);
+  const rejection = assert.rejects(pending, /Git unavailable/);
+  try {
+    await failed.promise;
+    await new Promise(setImmediate);
+    assert.equal(src.canonicalGlobalSlots.active, 1);
+  } finally {
+    release.resolve();
+  }
+  await rejection;
+  assert.deepEqual(calls, ['R1', 'R2']);
+  assert.equal(src.canonicalGlobalSlots.active, 0);
 });

@@ -36,7 +36,7 @@ import { IntegrationBroker } from './integration-broker.js';
 import { VerificationDispatcher } from './verification-dispatcher.js';
 import { JobQueue } from './job-queue.js';
 import { translateGitHubActions } from './integrations/github-actions.js';
-import { KeyedSemaphore, Semaphore } from './concurrency.js';
+import { KeyedSemaphore, Semaphore, mapConcurrent } from './concurrency.js';
 
 const DEFAULT_HUMAN_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_HUMAN_SESSION_ACTIONS = ['read_source', 'read_context', 'accept_change'];
@@ -425,7 +425,14 @@ export class Source {
   }
 
   gitRepo(orgId, projectId, repoId) {
-    const repo = this.getRepository(orgId, projectId, repoId);
+    return this._gitRepoFor(this.getRepository(orgId, projectId, repoId), repoId);
+  }
+
+  async gitRepoAsync(orgId, projectId, repoId) {
+    return this._gitRepoFor(await this.getRepositoryAsync(orgId, projectId, repoId), repoId);
+  }
+
+  _gitRepoFor(repo, repoId) {
     if (!repo) throw new Error(`repository not found: ${repoId}`);
     const git = new GitRepo(repo.barePath);
     git.artifacts = checkArtifactsProtection(git, repo.artifacts);
@@ -1402,10 +1409,14 @@ export class Source {
   submitContribution({ orgId, projectId, repoRef, baseCommit, headCommit, intent = '', contributorName = 'contributor', principalId = null }) {
     const repo = this.resolveRepository(orgId, projectId, repoRef);
     if (!repo) throw new Error(`repository not found: ${repoRef}`);
-    const git = this.gitRepo(orgId, projectId, repo.id);
+    const git = this._gitRepoFor(repo, repo.id);
     if (!git.hasCommit(headCommit)) throw new Error('head commit not present in repository');
     if (baseCommit && !git.hasCommit(baseCommit)) throw new Error('base commit not present in repository');
     if (baseCommit === headCommit) throw new Error('no changes to submit (base == head)');
+    const changed = git.changedFiles(baseCommit, headCommit);
+    const findings = scanSecrets(git.diff(baseCommit, headCommit));
+    const nonEmpty = changed.length > 0;
+    const footprintArtifact = this._artifactBytes(JSON.stringify({ changedFiles: changed, nonEmpty }));
 
     // Contributor identity: a human principal (no auth in the MVP).
     const principal = principalId ? this.getPrincipal(principalId) : this.createPrincipal({ type: 'human', name: contributorName });
@@ -1423,9 +1434,7 @@ export class Source {
     const session = this.startSession({ orgId, projectId, workId: work.id, principalId: principal.id, baseCommit });
     const change = this.submitChange({ orgId, projectId, workId: work.id, sessionId: session.id, baseCommit, headCommit, repositories: [repo.id] });
 
-    // Deterministic footprint evidence (always available, no LLM, no test suite).
-    const changed = git.changedFiles(baseCommit, headCommit);
-    const nonEmpty = changed.length > 0;
+    // Deterministic footprint evidence from the preflight Git reads.
     const footprint = this.addEvidence({
       orgId,
       projectId,
@@ -1434,7 +1443,7 @@ export class Source {
       claim: 'change is non-empty',
       type: 'test',
       producer: principal.id,
-      artifact: JSON.stringify({ changedFiles: changed, nonEmpty }),
+      artifact: footprintArtifact,
       result: { status: nonEmpty ? 'pass' : 'fail' },
       validity: nonEmpty ? 'valid' : 'invalid',
     });
@@ -1443,7 +1452,6 @@ export class Source {
     // `security` evidence with validity 'invalid' so the finding is visible in
     // the Change's evidence chain (detective control; the maintainer's Decision
     // remains the gate).
-    const findings = this.scanChangeSecrets({ orgId, projectId, changeId: change.id });
     let securityEvidence = null;
     if (findings.length > 0) {
       securityEvidence = this.addEvidence({
@@ -1504,30 +1512,24 @@ export class Source {
       const apply = async () => {
         const current = await this.getChangeAsync(orgId, projectId, changeId);
         if (!current || current.decisionState !== 'accepted') throw new Error('change is no longer accepted');
-        const results = new Array(targets.length);
-        let nextTarget = 0;
-        const applyTarget = async () => {
-          while (true) {
-            const index = nextTarget++;
-            if (index >= targets.length) return;
-            const target = targets[index];
-            if ((await this.getRepositoryAsync(orgId, projectId, target.repoId))?.integrationPolicy) throw new Error('protected repository requires integration broker promotion');
-            const git = this.gitRepo(orgId, projectId, target.repoId);
-            if (!(await git.hasCommitAsync(target.headCommit))) {
-              results[index] = { repoId: target.repoId, ok: false, reason: 'head commit not present in repository' };
-              continue;
-            }
-            const branch = await git.defaultBranchAsync();
-            const binding = git.artifacts;
-            const result = binding
-              ? (this.artifacts ? await this.artifacts.promote(git, binding, target.baseCommit, target.headCommit)
-                : { ok: false, reason: 'Artifacts Worker configuration required; local fallback refused' })
-              : await git.fastForwardAsync(target.baseCommit, target.headCommit, branch);
-            await this._asyncAudit({ event: 'canonical.update', orgId, projectId, changeId, repoId: target.repoId, branch, ...result });
-            results[index] = { repoId: target.repoId, ...result };
+        const prepared = await mapConcurrent(targets, this.canonicalRepoConcurrency, async (target) => {
+          const repository = await this.getRepositoryAsync(orgId, projectId, target.repoId);
+          if (repository?.integrationPolicy) throw new Error('protected repository requires integration broker promotion');
+          return { target, git: this._gitRepoFor(repository, target.repoId) };
+        });
+        const results = await mapConcurrent(prepared, this.canonicalRepoConcurrency, async ({ target, git }) => {
+          if (!(await git.hasCommitAsync(target.headCommit))) {
+            return { repoId: target.repoId, ok: false, reason: 'head commit not present in repository' };
           }
-        };
-        await Promise.all(Array.from({ length: Math.min(this.canonicalRepoConcurrency, targets.length) }, () => applyTarget()));
+          const branch = await git.defaultBranchAsync();
+          const binding = git.artifacts;
+          const result = binding
+            ? (this.artifacts ? await this.artifacts.promote(git, binding, target.baseCommit, target.headCommit)
+              : { ok: false, reason: 'Artifacts Worker configuration required; local fallback refused' })
+            : await git.fastForwardAsync(target.baseCommit, target.headCommit, branch);
+          await this._asyncAudit({ event: 'canonical.update', orgId, projectId, changeId, repoId: target.repoId, branch, ...result });
+          return { repoId: target.repoId, ...result };
+        });
         const ok = results.every((result) => result.ok);
         if (ok) {
           const work = await this.getWorkAsync(orgId, projectId, change.workId);
@@ -1554,18 +1556,10 @@ export class Source {
   async scanChangeSecretsAsync({ orgId, projectId, changeId }) {
     const change = await this.getChangeAsync(orgId, projectId, changeId);
     if (!change) throw new Error(`change not found: ${changeId}`);
-    const findingsByTarget = new Array(change.repositoryChanges.length);
-    let nextTarget = 0;
-    const scanTarget = async () => {
-      while (true) {
-        const index = nextTarget++;
-        if (index >= change.repositoryChanges.length) return;
-        const repositoryChange = change.repositoryChanges[index];
-        const git = this.gitRepo(orgId, projectId, repositoryChange.repoId);
-        findingsByTarget[index] = scanSecrets(await git.diffAsync(repositoryChange.baseCommit, repositoryChange.headCommit));
-      }
-    };
-    await Promise.all(Array.from({ length: Math.min(this.canonicalRepoConcurrency, change.repositoryChanges.length) }, () => scanTarget()));
+    const findingsByTarget = await mapConcurrent(change.repositoryChanges, this.canonicalRepoConcurrency, async (target) => {
+      const git = await this.gitRepoAsync(orgId, projectId, target.repoId);
+      return scanSecrets(await git.diffAsync(target.baseCommit, target.headCommit));
+    });
     return findingsByTarget.flat();
   }
 
@@ -1605,10 +1599,14 @@ export class Source {
     }
     const repo = await this.resolveRepositoryAsync(orgId, projectId, repoRef);
     if (!repo) throw new Error(`repository not found: ${repoRef}`);
-    const git = this.gitRepo(orgId, projectId, repo.id);
+    const git = this._gitRepoFor(repo, repo.id);
     if (!(await git.hasCommitAsync(headCommit))) throw new Error('head commit not present in repository');
     if (baseCommit && !(await git.hasCommitAsync(baseCommit))) throw new Error('base commit not present in repository');
     if (baseCommit === headCommit) throw new Error('no changes to submit (base == head)');
+    const changed = await git.changedFilesAsync(baseCommit, headCommit);
+    const findings = scanSecrets(await git.diffAsync(baseCommit, headCommit));
+    const nonEmpty = changed.length > 0;
+    const footprintArtifact = this._artifactBytes(JSON.stringify({ changedFiles: changed, nonEmpty }));
 
     const principal = principalId
       ? await this.getPrincipalAsync(principalId)
@@ -1618,13 +1616,10 @@ export class Source {
     await this.claimWorkAsync({ orgId, projectId, workId: work.id, principalId: principal.id });
     const session = await this.startSessionAsync({ orgId, projectId, workId: work.id, principalId: principal.id, baseCommit });
     const change = await this.submitChangeAsync({ orgId, projectId, workId: work.id, sessionId: session.id, baseCommit, headCommit, repositories: [repo.id] });
-    const changed = await git.changedFilesAsync(baseCommit, headCommit);
-    const nonEmpty = changed.length > 0;
     const footprint = await this.addEvidenceAsync({
       orgId, projectId, changeId: change.id, subject: 'change footprint', claim: 'change is non-empty', type: 'test', producer: principal.id,
-      artifact: JSON.stringify({ changedFiles: changed, nonEmpty }), result: { status: nonEmpty ? 'pass' : 'fail' }, validity: nonEmpty ? 'valid' : 'invalid',
+      artifact: footprintArtifact, result: { status: nonEmpty ? 'pass' : 'fail' }, validity: nonEmpty ? 'valid' : 'invalid',
     });
-    const findings = await this.scanChangeSecretsAsync({ orgId, projectId, changeId: change.id });
     let securityEvidence = null;
     if (findings.length > 0) {
       securityEvidence = await this.addEvidenceAsync({

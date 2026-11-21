@@ -82,3 +82,24 @@ export class KeyedSemaphore {
     };
   }
 }
+
+// Stop taking new items on failure, and finish admitted work before returning
+// so callers can safely release admission slots and transaction locks.
+export async function mapConcurrent(items, concurrency, transform) {
+  const results = new Array(items.length);
+  let next = 0;
+  let failure;
+  const run = async () => {
+    while (!failure && next < items.length) {
+      const index = next++;
+      try {
+        results[index] = await transform(items[index]);
+      } catch (error) {
+        failure ??= { error };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, run));
+  if (failure) throw failure.error;
+  return results;
+}
