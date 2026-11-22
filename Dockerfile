@@ -35,6 +35,6 @@ USER node
 ENV NODE_ENV=production \
     SOURCE_DATA=/var/lib/source/data \
     SOURCE_GIT_ROOT=/var/lib/source/git
-EXPOSE 8787
-HEALTHCHECK --interval=10s --timeout=3s --retries=6 CMD node -e "fetch('http://127.0.0.1:8787/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-CMD ["node", "bin/source.js", "--store", "postgres", "serve", "--host", "0.0.0.0", "--port", "8787", "--writer-lease"]
+EXPOSE 8790
+HEALTHCHECK --interval=10s --timeout=3s --retries=6 CMD node -e "fetch('http://127.0.0.1:8790/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "bin/source.js", "--store", "postgres", "serve", "--host", "0.0.0.0", "--port", "8790", "--writer-lease"]

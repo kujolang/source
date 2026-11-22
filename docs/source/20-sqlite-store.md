@@ -114,7 +114,7 @@ Select it with:
 
 ```bash
 SOURCE_DATABASE_URL='postgres://source:password@db/source' \
-  node bin/source.js --store postgres serve --host 0.0.0.0 --port 8787
+  node bin/source.js --store postgres serve --host 0.0.0.0 --port 8790
 ```
 
 The JSON and SQLite backends remain useful for local development and
