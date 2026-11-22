@@ -43,14 +43,14 @@ is the recommended production shape because the proxy handles certificate
 renewal, HTTP/2, and connection limits without Source reimplementing them.
 
 ```text
-client ──TLS──► reverse proxy ──HTTP──► source serve --host 127.0.0.1 --port 8787
+client ──TLS──► reverse proxy ──HTTP──► source serve --host 127.0.0.1 --port 8790
 ```
 
 Example (Caddy, automatic Let's Encrypt):
 
 ```text
 source.example.com {
-    reverse_proxy 127.0.0.1:8787
+    reverse_proxy 127.0.0.1:8790
 }
 ```
 
@@ -68,7 +68,7 @@ server {
     ssl_certificate     /etc/letsencrypt/live/source.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/source.example.com/privkey.pem;
     location / {
-        proxy_pass http://127.0.0.1:8787;
+        proxy_pass http://127.0.0.1:8790;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto https;
     }
@@ -91,7 +91,7 @@ docker volume create source-git
 docker run --rm --user root -v source-git:/var/lib/source/git \
   source:local chown 1000:1000 /var/lib/source/git
 docker run --read-only --tmpfs /tmp --cap-drop=ALL \
-  -p 8787:8787 \
+  -p 8790:8790 \
   -e SOURCE_DATABASE_URL='postgresql://source:password@db/source' \
   -v source-data:/var/lib/source/data \
   -v source-git:/var/lib/source/git:rw \

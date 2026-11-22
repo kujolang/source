@@ -111,7 +111,7 @@ see a Change id and a clear statement of what is still required.
 ## Secondary remotes and imports
 
 GitHub may remain `origin`. Add Source with `source sync --url
-http://127.0.0.1:8787/git/O1/P1/R1.git` from an existing clone, then use `source
+http://127.0.0.1:8790/git/O1/P1/R1.git` from an existing clone, then use `source
 submit`. Select another remote with `--remote backup` or `git config source.remote
 backup`. Explicit selection takes precedence over config, followed by a remote
 named `source`, then `origin`. Invalid selections fail rather than silently

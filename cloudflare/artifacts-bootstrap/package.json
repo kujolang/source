@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test worker.test.js",
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --port 8797",
     "deploy": "wrangler deploy",
     "smoke": "node smoke.js"
   },

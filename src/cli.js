@@ -143,7 +143,7 @@ export async function run(argv) {
           repository,
           principal,
           membership,
-          login: { principalId: principal.id, orgId: org.id, projectId: project.id, management: true, url: 'http://localhost:8787/login' },
+          login: { principalId: principal.id, orgId: org.id, projectId: project.id, management: true, url: 'http://localhost:8790/login' },
           message: 'Use the password supplied to this command. Source does not ship with a default password.',
         });
         return;
@@ -439,7 +439,7 @@ export async function run(argv) {
         };
         import('./api.js')
           .then(({ startServer }) => startServer(src, {
-            port: Number(flag('--port') || 8787),
+            port: Number(flag('--port') || 8790),
             tls,
             host,
             trustProxy: hasFlag('--trust-proxy'),

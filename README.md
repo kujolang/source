@@ -73,7 +73,7 @@ path. To inspect that run in the browser, use the directory printed by the demo:
 npm run demo:serve -- .contest-demo/run-XXXXXX
 ```
 
-Open `http://127.0.0.1:8787`. Read the login IDs and password from that run's local
+Open `http://127.0.0.1:8790`. Read the login IDs and password from that run's local
 `operator.json`. Run directories and credentials are ignored by Git. Stop the
 server with Ctrl-C. See the [runbook](docs/contest/RUNBOOK.md) for repeatable checks
 and the reviewed implementation commit.
@@ -82,7 +82,7 @@ and the reviewed implementation commit.
 
 ```bash
 node bin/source.js demo --password '<your own password, at least 12 characters>'
-node bin/source.js serve --host 127.0.0.1 --port 8787
+node bin/source.js serve --host 127.0.0.1 --port 8790
 ```
 
 The bootstrap command prints the login IDs. Sign in with the password you supplied
@@ -122,7 +122,7 @@ From your existing working repository, invoke the Source CLI by its absolute pat
 
 ```bash
 # Replace the path and IDs with your checkout and Source repository.
-node /path/to/source/bin/source.js sync --url http://127.0.0.1:8787/git/O1/P1/R1.git
+node /path/to/source/bin/source.js sync --url http://127.0.0.1:8790/git/O1/P1/R1.git
 
 # Repeat synchronization later; preview with --dry-run.
 node /path/to/source/bin/source.js sync --dry-run

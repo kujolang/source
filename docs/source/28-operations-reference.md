@@ -137,7 +137,7 @@ For production multi-process deployments, select the pooled Postgres backend:
 
 ```bash
 SOURCE_DATABASE_URL='postgres://source:password@db/source' \
-  node bin/source.js --store postgres serve --host 0.0.0.0 --port 8787 \
+  node bin/source.js --store postgres serve --host 0.0.0.0 --port 8790 \
   --writer-lease --writer-owner "$SOURCE_INSTANCE_ID"
 ```
 

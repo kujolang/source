@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { isArtifactsToken } from '../../src/integrations/artifacts.js';
 
-const url = new URL(process.env.SOURCE_BOOTSTRAP_URL || 'http://localhost:8787');
+const url = new URL(process.env.SOURCE_BOOTSTRAP_URL || 'http://localhost:8797');
 if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))) throw new Error('Use HTTPS or loopback HTTP');
 const secret = process.env.SOURCE_BOOTSTRAP_SECRET;
 if (!secret || secret.length < 32) throw new Error('SOURCE_BOOTSTRAP_SECRET must contain at least 32 characters');

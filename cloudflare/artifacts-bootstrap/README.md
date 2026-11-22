@@ -49,7 +49,7 @@ credential responses `Cache-Control: no-store`. Upstream errors are redacted and
 creation is not automatically retried because its outcome may be uncertain.
 `GET /healthz` is process liveness only; it does not prove Artifacts access.
 
-For local development, put the secret in ignored `.dev.vars` and run `npm run dev`.
+For local development, put the secret in ignored `.dev.vars` and run `npm run dev` on port 8797.
 A live proof must use the deployed service or an explicitly configured remote
 Artifacts binding; a local emulator does not prove account access.
 

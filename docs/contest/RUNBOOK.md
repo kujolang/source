@@ -41,7 +41,7 @@ The command prints the new run directory and report path. For example:
 npm run demo:serve -- .contest-demo/run-XXXXXX
 ```
 
-Use the exact directory printed by your run. Open http://127.0.0.1:8787 and read
+Use the exact directory printed by your run. Open http://127.0.0.1:8790 and read
 login IDs/password locally from that run's `operator.json`. The server binds only
 to loopback. Stop it with Ctrl-C. Inspect the UI's original and revised Changes,
 evidence, decisions and repository tree alongside `report.json`.

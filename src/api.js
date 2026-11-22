@@ -481,7 +481,7 @@ async function changeWork(src, orgId, projectId, changeId) {
   return c ? c.workId : undefined;
 }
 
-export function createServer(src, { port = 8787, tls, host, trustProxy = false, webhookSecret = process.env.SOURCE_WEBHOOK_SECRET || null, secretBroker = null, writerLease = null, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxJobPayloadBytes = 64 * 1024, maxJobQueueDepth = 100_000, maxWorkflowJobs = 1_000, maxGitBodyBytes = 100_000_000, maxChunkedGitBodyBytes = 16 * 1024 * 1024, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTenantConcurrency = 8, gitTenantQueue = 256, gitTimeoutMs = 120_000, artifactConcurrency = 8, artifactQueue = 64, requestConcurrency = 2_048, requestQueue = 4_096, maxConnections = 10_000, requireReplication = false, replicationRole = 'primary', replicationMinStandbys = 1, replicationMaxLagBytes = 64 * 1024 * 1024, readOnly = false } = {}) {
+export function createServer(src, { port = 8790, tls, host, trustProxy = false, webhookSecret = process.env.SOURCE_WEBHOOK_SECRET || null, secretBroker = null, writerLease = null, rateLimit = {}, maxJsonBodyBytes = 1_000_000, maxJobPayloadBytes = 64 * 1024, maxJobQueueDepth = 100_000, maxWorkflowJobs = 1_000, maxGitBodyBytes = 100_000_000, maxChunkedGitBodyBytes = 16 * 1024 * 1024, maxGitResponseBytes = 512 * 1024 * 1024, gitConcurrency = 32, gitQueue = 256, gitTenantConcurrency = 8, gitTenantQueue = 256, gitTimeoutMs = 120_000, artifactConcurrency = 8, artifactQueue = 64, requestConcurrency = 2_048, requestQueue = 4_096, maxConnections = 10_000, requireReplication = false, replicationRole = 'primary', replicationMinStandbys = 1, replicationMaxLagBytes = 64 * 1024 * 1024, readOnly = false } = {}) {
   const limiter = new RateLimiter({ maxKeys: rateLimit.maxKeys || 100_000, store: rateLimit.store || src.store });
   const gitSlots = new Semaphore({ capacity: gitConcurrency, queue: gitQueue });
   const gitTenantSlots = new KeyedSemaphore({ capacity: gitTenantConcurrency, queue: gitTenantQueue, maxKeys: rateLimit.maxKeys || 100_000 });
@@ -1658,7 +1658,7 @@ export function startServer(src, opts = {}) {
   return new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen({
-      port: opts.port ?? 8787,
+      port: opts.port ?? 8790,
       host: opts.host || '127.0.0.1',
       backlog: opts.backlog ?? Math.max(511, opts.maxConnections ?? 10_000),
     }, () => resolve(server));

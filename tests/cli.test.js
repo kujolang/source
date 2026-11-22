@@ -41,7 +41,7 @@ test('demo command bootstraps a login-ready local tenant', () => {
     orgId: 'O1',
     projectId: 'P1',
     management: true,
-    url: 'http://localhost:8787/login',
+    url: 'http://localhost:8790/login',
   });
   assert.equal(output.repository.id, 'R1');
   assert.match(output.message, /does not ship with a default password/);

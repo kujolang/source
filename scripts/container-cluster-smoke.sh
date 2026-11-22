@@ -51,8 +51,8 @@ start_node() {
   -e SOURCE_DATABASE_URL="$SOURCE_CONTAINER_DATABASE_URL" \
   -v "$volume":/var/lib/source/git \
   --tmpfs /var/lib/source/data:uid=1000,gid=1000 \
-  -p "$port":8787 "$image" \
-    node bin/source.js --store postgres --schema "$schema" serve --host 0.0.0.0 --port 8787 \
+  -p "$port":8790 "$image" \
+    node bin/source.js --store postgres --schema "$schema" serve --host 0.0.0.0 --port 8790 \
       --writer-lease --writer-owner "$name" --writer-lease-ms 5000 >/dev/null
 }
 
