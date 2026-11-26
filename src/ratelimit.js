@@ -10,6 +10,7 @@ export class RateLimiter {
   constructor({ maxKeys = 100_000, store = null } = {}) {
     this.buckets = new Map(); // key -> { count, resetAt }
     this.maxKeys = maxKeys;
+    this.nextExpiry = Infinity;
     this.store = store;
   }
 
@@ -35,18 +36,23 @@ export class RateLimiter {
   }
 
   _allowInMemory(key, limit, windowMs, now, cost = 1) {
-    const safeCost = Math.min(1000, Math.max(1, Math.trunc(cost)));
-    if (this.buckets.size >= this.maxKeys && !this.buckets.has(key)) {
+    const amount = Math.trunc(cost);
+    if (!Number.isFinite(amount)) return false;
+    const safeCost = Math.min(1000, Math.max(1, amount));
+    let b = this.buckets.get(key);
+    if (!b && this.buckets.size >= this.maxKeys) {
+      if (now < this.nextExpiry) return false;
+      this.nextExpiry = Infinity;
       for (const [candidate, bucket] of this.buckets) {
         if (now >= bucket.resetAt) this.buckets.delete(candidate);
-        if (this.buckets.size < this.maxKeys) break;
+        else this.nextExpiry = Math.min(this.nextExpiry, bucket.resetAt);
       }
       if (this.buckets.size >= this.maxKeys) return false;
     }
-    let b = this.buckets.get(key);
     if (!b || now >= b.resetAt) {
       b = { count: 0, resetAt: now + windowMs };
       this.buckets.set(key, b);
+      this.nextExpiry = Math.min(this.nextExpiry, b.resetAt);
     }
     if (b.count + safeCost > limit) return false;
     b.count += safeCost;
@@ -56,5 +62,6 @@ export class RateLimiter {
   // Clear all state (used by tests).
   reset() {
     this.buckets.clear();
+    this.nextExpiry = Infinity;
   }
 }

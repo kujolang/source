@@ -36,6 +36,20 @@ test('RateLimiter resets after the window elapses', async () => {
   assert.equal(rl.allow('k', opts), true);
 });
 
+test('a full limiter admits new keys only when the next bucket expires', (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1000 });
+  const rl = new RateLimiter({ maxKeys: 2 });
+  assert.equal(rl.allow('short', { limit: 1, windowMs: 500 }), true);
+  assert.equal(rl.allow('long', { limit: 1, windowMs: 2000 }), true);
+  assert.equal(rl.allow('next', { limit: 1, windowMs: 300 }), false);
+  t.mock.timers.setTime(1500);
+  assert.equal(rl.allow('next', { limit: 1, windowMs: 300 }), true);
+  assert.equal(rl.allow('long', { limit: 1, windowMs: 2000 }), false);
+  t.mock.timers.setTime(1800);
+  assert.equal(rl.allow('after-next', { limit: 1, windowMs: 300 }), true);
+  assert.equal(rl.buckets.size, 2);
+});
+
 test('the submit endpoint is rate-limited by client address', async () => {
   const { src, org } = freshSource();
   const project = src.createProject({ orgId: org.id, slug: 'public', name: 'Public', visibility: 'public' });
