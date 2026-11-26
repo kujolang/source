@@ -4,6 +4,10 @@ All notable changes to Source are recorded here.
 
 ## [Unreleased]
 
+- Bound standalone Git response headers separately from packfile data. Isolate server-side Git configuration and stop its process group on abort.
+- Keep Artifacts credentials on their configured Worker origin and verify ordinary binding and guard files with bounded reads.
+- Avoid rescanning active in-memory rate-limit buckets when the earliest expiry is still in the future.
+
 ## [0.2.0] — 2026-11-10
 
 Experimental agent-native integration and recovery release. Source remains a
