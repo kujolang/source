@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 import { startServer } from '../src/api.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, unlinkSync } from 'node:fs';
+import { readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { hybridFixture, runGit } from '../scripts/contest/lib/hybrid-fixture.js';
 import { artifactsBinding, ArtifactsBridge } from '../src/integrations/artifacts.js';
@@ -70,6 +70,28 @@ test('credential remote substitution and insecure Worker URLs are rejected', asy
   await assert.rejects(bridge.credentials('source-hybrid-test'), /invalid Artifacts remote/);
 });
 
+
+test('Artifacts accepts its configured Worker origin and bounds local binding metadata', async (t) => {
+  let calls = 0;
+  const bridge = new ArtifactsBridge({
+    url: 'https://worker.example', secret: 'x'.repeat(32),
+    fetchImpl: async (url) => {
+      calls += 1;
+      assert.equal(url.origin, 'https://worker.example');
+      return Response.json({ ok: true });
+    },
+  });
+  assert.deepEqual(await bridge.request('/repos', {}), { ok: true });
+  await assert.rejects(bridge.request('https://other.example/repos', {}), /Worker request failed/);
+  assert.equal(calls, 1);
+
+  const fixture = await hybridFixture();
+  t.after(fixture.cleanup);
+  const marker = path.join(fixture.repo.barePath, 'source-artifacts.json');
+  assert.equal(artifactsBinding(fixture.repo).provider, 'cloudflare-artifacts');
+  writeFileSync(marker, ' '.repeat(16_385));
+  assert.throws(() => artifactsBinding(fixture.repo), /binding unreadable/);
+});
 
 test('HTTP staging accepts proposals, rejects direct canonical pushes and reports failed promotion', async (t) => {
   const f = await hybridFixture(); t.after(f.cleanup);

@@ -1,8 +1,9 @@
 // Operator-side Artifacts transport. Credentials never enter Source records.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readFileSync, writeFileSync, existsSync, chmodSync, statSync } from 'node:fs';
+import { closeSync, constants, fchmodSync, fstatSync, openSync, readSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { sourceGitEnvironment } from '../git.js';
 const exec = promisify(execFile);
 const marker = 'source-artifacts.json';
 const namePattern = /^source-(?:smoke|hybrid)-[a-z0-9-]{1,48}$/;
@@ -30,12 +31,42 @@ function remoteUrl(value, name) {
   return url.href;
 }
 
+function readBindingFile(file, byteLimit, use = (value) => value) {
+  let fd;
+  try {
+    fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  }
+  try {
+    const before = fstatSync(fd, { bigint: true });
+    if (!before.isFile() || before.nlink !== 1n || before.size > BigInt(byteLimit))
+      throw new Error('expected a bounded regular binding file');
+    const bytes = Buffer.alloc(Number(before.size) + 1);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const count = readSync(fd, bytes, offset, bytes.length - offset, null);
+      if (count === 0) break;
+      offset += count;
+    }
+    const after = fstatSync(fd, { bigint: true });
+    if (BigInt(offset) !== before.size || before.size !== after.size || before.nlink !== after.nlink ||
+        before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs)
+      throw new Error('binding file changed while reading');
+    return use({ text: bytes.subarray(0, offset).toString('utf8'), mode: Number(after.mode) }, fd);
+  } finally {
+    closeSync(fd);
+  }
+}
+
 export function artifactsBinding(git) {
   let raw;
-  try { raw = readFileSync(path.join(git.barePath, marker), 'utf8'); }
-  catch (error) { if (error.code === 'ENOENT') return null; throw new Error('Artifacts binding unreadable'); }
+  try { raw = readBindingFile(path.join(git.barePath, marker), 16_384); }
+  catch { throw new Error('Artifacts binding unreadable'); }
+  if (raw === null) return null;
   try {
-    const value = JSON.parse(raw);
+    const value = JSON.parse(raw.text);
     if (value.provider !== 'cloudflare-artifacts' || !namePattern.test(value.name) || value.branch !== 'main') throw new Error();
     return { provider: value.provider, name: value.name, remote: remoteUrl(value.remote, value.name), branch: value.branch };
   } catch { throw new Error('Artifacts binding invalid; refusing local fallback'); }
@@ -46,7 +77,9 @@ export function checkArtifactsProtection(git, expected) {
   if (expected && (!binding || ['name', 'remote', 'branch', 'provider'].some((key) => binding[key] !== expected[key]))) throw new Error('Artifacts binding missing or inconsistent; operator recovery required');
   if (binding) {
     const hookPath = path.join(git.barePath, 'hooks', 'pre-receive');
-    if (!existsSync(hookPath) || readFileSync(hookPath, 'utf8') !== hook || !(statSync(hookPath).mode & 0o111)) throw new Error('Artifacts canonical guard missing; repeat operator binding');
+    let guard;
+    try { guard = readBindingFile(hookPath, Buffer.byteLength(hook)); } catch { /* reject unsafe guards below */ }
+    if (!guard || guard.text !== hook || !(guard.mode & 0o111)) throw new Error('Artifacts canonical guard missing; repeat operator binding');
   }
   return binding;
 }
@@ -55,15 +88,11 @@ export function checkArtifactsProtection(git, expected) {
 // logging or redirecting credentials. Git sees the header in its environment,
 // never argv or persisted config. Host operators remain trusted.
 export async function artifactsGit(args, { cwd, token } = {}) {
-  const env = {};
-  for (const key of ['PATH', 'HOME', 'TMPDIR', 'SYSTEMROOT', 'SSL_CERT_FILE', 'SSL_CERT_DIR']) {
-    if (process.env[key]) env[key] = process.env[key];
-  }
-  Object.assign(env, {
-    GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null',
+  const env = {
+    ...sourceGitEnvironment(),
     GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'http.extraHeader',
     GIT_CONFIG_VALUE_0: token ? `Authorization: Bearer ${token}` : '',
-  });
+  };
   try {
     const { stdout } = await exec('git', ['--no-replace-objects', '-c', 'core.hooksPath=/dev/null', '-c', 'credential.helper=',
       '-c', 'http.followRedirects=false', ...args], { cwd, env, encoding: 'utf8', timeout: 60000, maxBuffer: 8 * 1024 * 1024 });
@@ -82,7 +111,10 @@ export class ArtifactsBridge {
 
   async request(route, body) {
     try {
-      const response = await this.fetch(new URL(route, this.url), {
+      const destination = new URL(route, this.url);
+      if (destination.origin !== this.url.origin || destination.username || destination.password || destination.hash)
+        throw new Error();
+      const response = await this.fetch(destination, {
         method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30000),
         headers: { Authorization: `Bearer ${this.secret}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -131,7 +163,11 @@ export class ArtifactsBridge {
     const hooksPath = await this.runGit(['config', '--local', '--get', 'core.hooksPath'], { cwd: git.barePath }).catch(() => '');
     if (hooksPath) throw new Error('custom hooksPath is not supported for hybrid binding');
     const hookPath = path.join(git.barePath, 'hooks', 'pre-receive');
-    if (existsSync(hookPath) && readFileSync(hookPath, 'utf8') !== hook) throw new Error('existing pre-receive hook requires manual integration');
+    let existingGuard;
+    try { existingGuard = readBindingFile(hookPath, Buffer.byteLength(hook)); }
+    catch { throw new Error('existing pre-receive hook requires manual integration'); }
+    if (existingGuard && existingGuard.text !== hook)
+      throw new Error('existing pre-receive hook requires manual integration');
     const local = await git.revParseAsync('refs/heads/main');
     if (createRemote) {
       if (local) throw new Error('create-remote binding requires an empty local canonical branch');
@@ -143,8 +179,15 @@ export class ArtifactsBridge {
     // Fail closed on interruption: the marker prevents local-only promotion.
     const binding = { provider: 'cloudflare-artifacts', name, remote: credentials.remote, branch: 'main' };
     if (!existing) writeFileSync(path.join(git.barePath, marker), JSON.stringify(binding) + '\n', { flag: 'wx', mode: 0o600 });
-    writeFileSync(hookPath, hook, { mode: 0o755 });
-    chmodSync(hookPath, 0o755);
+    if (!existingGuard) writeFileSync(hookPath, hook, { flag: 'wx', mode: 0o755 });
+    else if (!(existingGuard.mode & 0o111)) {
+      const repaired = readBindingFile(hookPath, Buffer.byteLength(hook), (guard, fd) => {
+        if (guard.text !== hook) throw new Error('existing pre-receive hook requires manual integration');
+        fchmodSync(fd, 0o755);
+        return true;
+      });
+      if (!repaired) throw new Error('existing pre-receive hook requires manual integration');
+    }
     if (tip && !local) {
       await this.runGit(['fetch', '--no-tags', credentials.remote, 'refs/heads/main'], { cwd: git.barePath, token: credentials.token });
       const result = await git.fastForwardAsync('', tip, 'main');
