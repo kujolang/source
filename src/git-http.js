@@ -11,42 +11,36 @@
 //   Source — URL → repository mapping, tenant isolation, (future) authN/authZ.
 
 import { spawn } from 'node:child_process';
+import { validateHeaderName, validateHeaderValue } from 'node:http';
+import { sourceGitEnvironment } from './git.js';
 
-// Parse a CGI response (headers, blank line, body) into {status, headers, body}.
-// `git http-backend` writes a `Status:` header plus normal headers, then a blank
-// line, then the (possibly binary) body.
-function parseCgiResponse(raw) {
+const maxHeaderBytes = 32 * 1024;
+function headerBoundary(raw) {
   const crlf = raw.indexOf('\r\n\r\n');
   const lf = raw.indexOf('\n\n');
-  let headerEnd;
-  let bodyStart;
-  if (crlf >= 0 && (lf < 0 || crlf <= lf)) {
-    headerEnd = crlf;
-    bodyStart = crlf + 4;
-  } else if (lf >= 0) {
-    headerEnd = lf;
-    bodyStart = lf + 2;
-  } else {
-    headerEnd = raw.length;
-    bodyStart = raw.length;
-  }
-  const headerText = raw.slice(0, headerEnd).toString('utf8');
-  const body = raw.slice(bodyStart);
-  const headers = {};
+  if (crlf >= 0 && (lf < 0 || crlf <= lf)) return { end: crlf, body: crlf + 4 };
+  if (lf >= 0) return { end: lf, body: lf + 2 };
+  return null;
+}
+
+function parseCgiHeaders(raw) {
+  const headers = new Map();
   let status = 200;
-  for (const line of headerText.split(/\r?\n/)) {
-    const i = line.indexOf(':');
-    if (i < 0) continue;
-    const k = line.slice(0, i).trim().toLowerCase();
-    const v = line.slice(i + 1).trim();
-    if (k === 'status') {
-      const m = v.match(/^(\d+)/);
-      if (m) status = parseInt(m[1], 10);
+  for (const line of raw.toString('latin1').split(/\r?\n/)) {
+    const separator = line.indexOf(':');
+    if (separator < 1) throw new Error('Invalid Git CGI header');
+    const name = line.slice(0, separator).toLowerCase();
+    const value = line.slice(separator + 1).trim();
+    if (name === 'status') {
+      if (!/^[2-5][0-9]{2}(?: [^\r\n\0]*)?$/.test(value)) throw new Error('Invalid Git CGI status');
+      status = Number(value.slice(0, 3));
     } else {
-      headers[k] = v;
+      validateHeaderName(name);
+      validateHeaderValue(name, value);
+      headers.set(name, value);
     }
   }
-  return { status, headers, body };
+  return { status, headers: Object.fromEntries(headers) };
 }
 
 // Serve a single Git smart-HTTP request via `git http-backend`.
@@ -89,8 +83,12 @@ export function gitHttpBackend({
   spawnProcess = spawn,
 }) {
   return new Promise((resolve, reject) => {
+    if (abortSignal?.aborted) {
+      reject(new Error('Git request was aborted'));
+      return;
+    }
     const env = {
-      ...process.env,
+      ...sourceGitEnvironment(),
       GIT_PROJECT_ROOT: projectRoot,
       GIT_HTTP_EXPORT_ALL: '1',
       PATH_INFO: pathInfo,
@@ -100,37 +98,52 @@ export function gitHttpBackend({
       CONTENT_LENGTH: String(contentLength ?? (body ? body.length : 0)),
       REMOTE_ADDR: remoteAddr,
     };
-    delete env.SOURCE_BOOTSTRAP_SECRET;
     if (remoteUser) env.REMOTE_USER = remoteUser;
     // Protocol v2 negotiation: the client sends `Git-Protocol: version=2`.
     // `git http-backend` copies HTTP_GIT_PROTOCOL into GIT_PROTOCOL.
     if (headers['git-protocol']) env.HTTP_GIT_PROTOCOL = headers['git-protocol'];
 
-    const child = spawnProcess('git', ['--no-replace-objects', ...(hooksPath ? ['-c', `core.hooksPath=${hooksPath}`] : []), '-c', 'receive.hideRefs=refs/source/', '-c', 'receive.hideRefs=refs/replace/', ...(protectedRef ? ['-c', `receive.hideRefs=${protectedRef}`] : []), 'http-backend'], { env, stdio: ['pipe', 'pipe', 'pipe'] });
+    const ownsProcessGroup = spawnProcess === spawn && process.platform !== 'win32';
+    const child = spawnProcess('git', ['--no-replace-objects', ...(hooksPath ? ['-c', `core.hooksPath=${hooksPath}`] : []), '-c', 'receive.hideRefs=refs/source/', '-c', 'receive.hideRefs=refs/replace/', ...(protectedRef ? ['-c', `receive.hideRefs=${protectedRef}`] : []), 'http-backend'], {
+      env, detached: ownsProcessGroup, stdio: ['pipe', 'pipe', 'pipe'],
+    });
     const stdout = [];
     const stderr = [];
     let outputBytes = 0;
     let stderrBytes = 0;
     let onInputData;
     let headerBuffer = Buffer.alloc(0);
-    let streamed = false;
+    let response = null;
     let settled = false;
     let inputBytes = 0;
     let timeout;
 
     const emitBody = (chunk) => {
-      if (!chunk.length || stream.onBody?.(chunk) !== false) return;
+      if (!chunk.length) return;
+      if (!stream) {
+        stdout.push(chunk);
+        return;
+      }
+      if (stream.onBody?.(chunk) !== false) return;
       child.stdout.pause();
-      stream.onDrain?.(() => child.stdout.resume());
+      stream.onDrain?.(() => { if (!settled) child.stdout.resume(); });
     };
 
-    const fail = (error) => {
+    const fail = (error, terminate = true) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
       cleanup();
-      stream?.onError?.(error);
-      child.kill('SIGTERM');
+      if (terminate) {
+        try {
+          if (ownsProcessGroup && child.pid) process.kill(-child.pid, 'SIGKILL');
+          else child.kill('SIGTERM');
+        } catch {
+          child.kill('SIGTERM');
+        }
+      }
+      try { stream?.onError?.(error); }
+      catch (callbackError) { error = new AggregateError([error, callbackError], error.message); }
       reject(error);
     };
 
@@ -143,47 +156,39 @@ export function gitHttpBackend({
         input.removeListener('error', fail);
       }
     };
+    child.on('error', fail);
     child.stdin.on('error', fail);
-    if (abortSignal?.aborted) {
-      fail(new Error('Git request was aborted'));
-      return;
-    }
     abortSignal?.addEventListener('abort', onAbort, { once: true });
     timeout = setTimeout(() => fail(new Error('Git request timed out')), Math.max(1, timeoutMs));
     timeout.unref?.();
 
-    const emitHeadersAndBody = (chunk) => {
-      const crlf = chunk.indexOf('\r\n\r\n');
-      const lf = chunk.indexOf('\n\n');
-      let bodyStart;
-      if (crlf >= 0 && (lf < 0 || crlf <= lf)) bodyStart = crlf + 4;
-      else if (lf >= 0) bodyStart = lf + 2;
-      else return false;
-      const parsed = parseCgiResponse(chunk);
-      stream.onHeaders?.(parsed);
-      streamed = true;
-      if (chunk.length > bodyStart) emitBody(chunk.subarray(bodyStart));
-      return true;
-    };
-
-    child.stdout.on('data', (c) => {
+    child.stdout.on('data', (chunk) => {
       if (settled) return;
-      outputBytes += c.length;
+      outputBytes += chunk.length;
       if (outputBytes > maxOutputBytes) {
         fail(new Error('Git response exceeded configured output limit'));
         return;
       }
-      if (!stream) {
-        stdout.push(c);
-        return;
-      }
-      if (!streamed) {
-        headerBuffer = Buffer.concat([headerBuffer, c]);
-        if (!emitHeadersAndBody(headerBuffer)) return;
+      try {
+        if (response) {
+          emitBody(chunk);
+          return;
+        }
+        const combined = headerBuffer.length ? Buffer.concat([headerBuffer, chunk]) : chunk;
+        const boundary = headerBoundary(combined.subarray(0, maxHeaderBytes + 4));
+        if (!boundary) {
+          if (combined.length >= maxHeaderBytes + 4) throw new Error('Git CGI headers exceeded configured output limit');
+          headerBuffer = combined;
+          return;
+        }
+        if (boundary.end > maxHeaderBytes) throw new Error('Git CGI headers exceeded configured output limit');
+        response = parseCgiHeaders(combined.subarray(0, boundary.end));
+        stream?.onHeaders?.(response);
         headerBuffer = Buffer.alloc(0);
-        return;
+        emitBody(combined.subarray(boundary.body));
+      } catch (error) {
+        fail(error);
       }
-      emitBody(c);
     });
     child.stderr.on('data', (c) => {
       if (settled) return;
@@ -191,28 +196,29 @@ export function gitHttpBackend({
       if (stderrBytes > maxStderrBytes) return fail(new Error('Git stderr exceeded configured output limit'));
       stderr.push(c);
     });
-    child.on('error', fail);
     child.on('close', (code) => {
       if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      cleanup();
-      const errorText = Buffer.concat(stderr).toString('utf8');
-      if (stream) {
-        if (!streamed && headerBuffer.length) {
-          const parsed = parseCgiResponse(headerBuffer);
-          stream.onHeaders?.(parsed);
-          if (parsed.body.length) emitBody(parsed.body);
-        }
-        stream.onEnd?.({ exitCode: code, outputBytes, stderr: errorText });
-        resolve({ status: streamed ? 200 : 502, headers: {}, body: null, streamed: true, stderr: errorText, exitCode: code, outputBytes });
+      if (!response) {
+        fail(new Error('Git CGI closed without complete response headers'), false);
         return;
       }
-      const parsed = parseCgiResponse(Buffer.concat(stdout));
-      parsed.stderr = errorText;
-      parsed.exitCode = code;
-      parsed.outputBytes = outputBytes;
-      resolve(parsed);
+      try {
+        const errorText = Buffer.concat(stderr).toString('utf8');
+        stream?.onEnd?.({ exitCode: code, outputBytes, stderr: errorText });
+        settled = true;
+        clearTimeout(timeout);
+        cleanup();
+        resolve({
+          ...response,
+          body: stream ? null : Buffer.concat(stdout),
+          ...(stream ? { streamed: true } : {}),
+          stderr: errorText,
+          exitCode: code,
+          outputBytes,
+        });
+      } catch (error) {
+        fail(error, false);
+      }
     });
     if (input) {
       onInputData = (chunk) => {

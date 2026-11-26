@@ -17,6 +17,11 @@ binding.
 
 ## Two deployment modes
 
+Source sends Git smart-HTTP requests through a server-owned Git environment.
+Git's response header block is limited to 32 KiB independently of the configured
+packfile response budget. On Unix, a disconnected client or a backend timeout
+terminates the isolated Git process group.
+
 ### 1. In-process TLS (simple self-host)
 
 `source serve` terminates TLS itself. Suitable for a single-node self-host

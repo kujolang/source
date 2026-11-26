@@ -251,6 +251,52 @@ test('Git pipe errors and stderr overflow reject without retaining abort listene
   }
 });
 
+test('Git CGI bounds split response headers independently of binary pack data', async () => {
+  const { EventEmitter } = await import('node:events');
+  const { PassThrough } = await import('node:stream');
+  const fakeChild = () => {
+    const child = new EventEmitter();
+    child.stdin = new PassThrough();
+    child.stdout = new PassThrough();
+    child.stderr = new PassThrough();
+    child.kill = () => {};
+    return child;
+  };
+  const payload = Buffer.alloc(48 * 1024, 0x82);
+  const child = fakeChild();
+  let settings;
+  const pending = gitHttpBackend({
+    projectRoot: '/fixture', pathInfo: '/repo.git/git-upload-pack',
+    headers: {'git-protocol': 'version=2'},
+    spawnProcess: (_program, _args, options) => { settings = options; return child; },
+  });
+  child.stdout.write(Buffer.from('Content-Type: application/x-git-upload-pack-result\r\n\r'));
+  child.stdout.write(Buffer.concat([Buffer.from('\n'), payload]));
+  child.emit('close', 0);
+  const response = await pending;
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body, payload);
+  assert.equal(settings.env.HTTP_GIT_PROTOCOL, 'version=2');
+  assert.equal(settings.env.GIT_CONFIG_NOSYSTEM, '1');
+
+  const incomplete = fakeChild();
+  const rejected = assert.rejects(gitHttpBackend({
+    projectRoot: '/fixture', pathInfo: '/repo.git/git-upload-pack',
+    spawnProcess: () => incomplete,
+  }), /without complete response headers/);
+  incomplete.stdout.write(Buffer.from('Content-Type: text/plain\r\n'));
+  incomplete.emit('close', 0);
+  await rejected;
+
+  const oversized = fakeChild();
+  const tooLarge = assert.rejects(gitHttpBackend({
+    projectRoot: '/fixture', pathInfo: '/repo.git/git-upload-pack',
+    spawnProcess: () => oversized,
+  }), /headers exceeded/);
+  oversized.stdout.write(Buffer.alloc(33 * 1024, 0x61));
+  await tooLarge;
+});
+
 test('internal candidate refs cannot be modified by a Git push capability', async () => {
   const { src, org, project, human } = freshSource();
   const { repo, head } = seedRepo(src, org.id, project.id);

@@ -9,6 +9,22 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 
+// Server operations use repository-local Git state and explicit TLS trust
+// inputs without inheriting mutable Git selectors, hooks or credentials.
+export function sourceGitEnvironment() {
+  const env = {};
+  for (const key of ['PATH', 'HOME', 'TMPDIR', 'TMP', 'TEMP', 'SYSTEMROOT', 'SSL_CERT_FILE', 'SSL_CERT_DIR']) {
+    if (process.env[key]) env[key] = process.env[key];
+  }
+  return {
+    ...env,
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_ATTR_NOSYSTEM: '1',
+    GIT_TERMINAL_PROMPT: '0',
+  };
+}
+
 // execFile prevents shell expansion; revision validation also prevents Git
 // from interpreting caller-controlled revisions as options (for example --output).
 function validateRevision(value) {
@@ -21,6 +37,9 @@ function validateRevision(value) {
 function run(args, opts = {}) {
   return execFileSync('git', ['--no-replace-objects', ...args], {
     encoding: 'utf8',
+    env: sourceGitEnvironment(),
+    timeout: 60_000,
+    maxBuffer: 32 * 1024 * 1024,
     stdio: ['ignore', 'pipe', 'pipe'],
     ...opts,
   }).trim();
@@ -32,6 +51,8 @@ async function runAsync(args, opts = {}) {
   const { trim = true, ...execOptions } = opts;
   const { stdout } = await execFileAsync('git', ['--no-replace-objects', ...args], {
     encoding: 'utf8',
+    env: sourceGitEnvironment(),
+    timeout: 60_000,
     maxBuffer: 32 * 1024 * 1024,
     ...execOptions,
   });
@@ -129,7 +150,7 @@ export class GitRepo {
   diffStat(base, head) {
     if (base) validateRevision(base);
     validateRevision(head);
-    const args = ['diff', '--stat', '--no-renames'];
+    const args = ['diff', '--stat', '--no-renames', '--no-ext-diff', '--no-textconv'];
     if (base) args.push(base, head);
     else args.push(head);
     try {
@@ -143,7 +164,7 @@ export class GitRepo {
   diff(base, head) {
     if (base) validateRevision(base);
     validateRevision(head);
-    const args = ['diff', '--no-renames'];
+    const args = ['diff', '--no-renames', '--no-ext-diff', '--no-textconv'];
     if (base) args.push(base, head);
     else args.push(head);
     try {
@@ -157,7 +178,7 @@ export class GitRepo {
   changedFiles(base, head) {
     if (base) validateRevision(base);
     validateRevision(head);
-    const args = ['diff', '--name-status', '--no-renames'];
+    const args = ['diff', '--name-status', '--no-renames', '--no-ext-diff', '--no-textconv'];
     if (base) args.push(base, head);
     else args.push(head);
     try {
@@ -210,11 +231,19 @@ export class GitRepo {
     if (typeof ref !== 'string' || !/^[A-Za-z0-9._/@-]{1,200}$/.test(ref)) throw new Error('invalid Git ref');
     const safeLimit = Math.min(100, Math.max(1, Math.trunc(Number(limit) || 50)));
     try {
-      const out = await runAsync(['log', `-${safeLimit}`, '--date=iso-strict', '--format=%H%x09%an%x09%ad%x09%s', ref], { cwd: this.barePath });
-      return out ? out.split('\n').map((line) => {
-        const [hash, author, date, ...subject] = line.split('\t');
-        return { hash, author, date, subject: subject.join('\t') };
-      }) : [];
+      const out = await runAsync(
+        ['log', '-z', `-${safeLimit}`, '--date=iso-strict', '--format=%H%x00%an%x00%ad%x00%s', ref, '--'],
+        { cwd: this.barePath, trim: false },
+      );
+      if (!out) return [];
+      const fields = out.split('\0');
+      if (fields.pop() !== '' || fields.length % 4 !== 0) return [];
+      const commits = [];
+      for (let i = 0; i < fields.length; i += 4) {
+        const [hash, author, date, subject] = fields.slice(i, i + 4);
+        commits.push({ hash, author, date, subject });
+      }
+      return commits;
     } catch {
       return [];
     }
@@ -239,7 +268,7 @@ export class GitRepo {
 
   async commitDiffAsync(hash) {
     if (typeof hash !== 'string' || !/^[0-9a-f]{7,64}$/i.test(hash)) throw new Error('invalid commit');
-    try { return await runAsync(['show', '--format=fuller', '--stat', '--patch', hash], { cwd: this.barePath }); } catch { return ''; }
+    try { return await runAsync(['show', '--format=fuller', '--stat', '--patch', '--no-ext-diff', '--no-textconv', hash], { cwd: this.barePath }); } catch { return ''; }
   }
 
   async isAncestorAsync(ancestor, descendant) {
@@ -266,7 +295,7 @@ export class GitRepo {
   async diffAsync(base, head) {
     if (base) validateRevision(base);
     validateRevision(head);
-    const args = ['diff', '--no-renames'];
+    const args = ['diff', '--no-renames', '--no-ext-diff', '--no-textconv'];
     if (base) args.push(base, head); else args.push(head);
     try { return await runAsync(args, { cwd: this.barePath }); } catch { return ''; }
   }
@@ -274,7 +303,7 @@ export class GitRepo {
   async changedFilesAsync(base, head) {
     if (base) validateRevision(base);
     validateRevision(head);
-    const args = ['diff', '--name-status', '--no-renames'];
+    const args = ['diff', '--name-status', '--no-renames', '--no-ext-diff', '--no-textconv'];
     if (base) args.push(base, head); else args.push(head);
     try {
       const out = await runAsync(args, { cwd: this.barePath });
